@@ -1,10 +1,39 @@
 /* ================================================================
-   Fichas Técnicas — single-page app (vanilla JS)
-   Author: generated for consultoria
+   Fichas Técnicas — single-page app (Firebase + vanilla JS)
    ================================================================ */
 
-const STORAGE_KEY = 'fichas-tecnicas-v1';
-let DATA = null;
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs, writeBatch
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+// ---------- Firebase config (safe to be public — security comes from rules) ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyDF3jKFty1lQrib9lwsRoRxBFTsO-2boMY",
+  authDomain: "fichastecnicas-c3829.firebaseapp.com",
+  projectId: "fichastecnicas-c3829",
+  storageBucket: "fichastecnicas-c3829.firebasestorage.app",
+  messagingSenderId: "461159721803",
+  appId: "1:461159721803:web:922a9a8a39f4c5ec2416ce"
+};
+const ADMIN_EMAIL = "gustavo@quibebe.com.br";
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+
+// ---------- State ----------
+const DATA = {
+  dishes: [],
+  insumos: [],
+  equipamentos_disponiveis: [],
+  loaded: { dishes: false, insumos: false, config: false }
+};
+let currentUser = null;
+let isAdmin = false;
 
 // ---------- Utilities ----------
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -24,7 +53,6 @@ const el = (tag, attrs = {}, ...children) => {
   }
   return node;
 };
-const escapeHtml = s => (s == null ? '' : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 const fmtBRL = v => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
 const fmtNum = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
 const slugify = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'item';
@@ -38,30 +66,108 @@ function toast(msg) {
   t._to = setTimeout(() => { t.hidden = true; }, 2400);
 }
 
-// ---------- Data layer ----------
-async function loadData() {
-  const local = localStorage.getItem(STORAGE_KEY);
-  if (local) {
-    try { DATA = JSON.parse(local); return; } catch (e) { console.warn('bad local, reloading'); }
+// ---------- Debouncing for Firestore writes ----------
+const pendingWrites = new Map();
+function scheduleSave(key, saveFn, delay = 800) {
+  const existing = pendingWrites.get(key);
+  if (existing) clearTimeout(existing);
+  pendingWrites.set(key, setTimeout(async () => {
+    pendingWrites.delete(key);
+    try { await saveFn(); } catch (e) { console.error(e); toast('Erro ao salvar: ' + e.message); }
+  }, delay));
+}
+
+// ---------- Firestore I/O ----------
+async function saveDishToFirestore(dish) {
+  if (!isAdmin) { toast('Faça login como admin para editar'); return; }
+  const clean = { ...dish };
+  delete clean.id; // id goes in doc path
+  await setDoc(doc(db, 'dishes', dish.id), clean);
+}
+async function deleteDishFromFirestore(dishId) {
+  if (!isAdmin) return;
+  await deleteDoc(doc(db, 'dishes', dishId));
+}
+async function saveInsumoToFirestore(insumo) {
+  if (!isAdmin) return;
+  const clean = { ...insumo };
+  delete clean.id;
+  await setDoc(doc(db, 'insumos', insumo.id), clean);
+}
+
+// ---------- Real-time listeners ----------
+function setupListeners() {
+  onSnapshot(collection(db, 'dishes'), (snap) => {
+    DATA.dishes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort by name
+    DATA.dishes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    DATA.loaded.dishes = true;
+    maybeRender();
+  });
+  onSnapshot(collection(db, 'insumos'), (snap) => {
+    DATA.insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    DATA.insumos.sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()));
+    DATA.loaded.insumos = true;
+    maybeRender();
+  });
+  onSnapshot(doc(db, 'config', 'equipamentos'), (snap) => {
+    DATA.equipamentos_disponiveis = snap.exists() ? (snap.data().list || []) : [];
+    DATA.loaded.config = true;
+    maybeRender();
+  });
+}
+
+let hasRenderedOnce = false;
+function maybeRender() {
+  if (DATA.loaded.dishes && DATA.loaded.insumos) {
+    if (!hasRenderedOnce) hasRenderedOnce = true;
+    route();
   }
-  const resp = await fetch('data/data.json');
-  DATA = await resp.json();
-  persist();
 }
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+
+// ---------- Seed initial data from data.json ----------
+async function seedFromJson() {
+  if (!isAdmin) { toast('Faça login como admin'); return; }
+  if (!confirm('Importar dados iniciais do arquivo data.json? Isso sobrescreve o que estiver no banco.')) return;
+  try {
+    toast('Importando...');
+    const resp = await fetch('data/data.json');
+    const seed = await resp.json();
+    // Batch in chunks of 400 (firestore limit 500)
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const dish of seed.dishes) {
+      const clean = { ...dish };
+      delete clean.id;
+      batch.set(doc(db, 'dishes', dish.id), clean);
+      count++;
+      if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+    }
+    for (const ins of seed.insumos) {
+      const clean = { ...ins };
+      delete clean.id;
+      batch.set(doc(db, 'insumos', ins.id), clean);
+      count++;
+      if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+    }
+    batch.set(doc(db, 'config', 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
+    count++;
+    if (count > 0) await batch.commit();
+    toast('Dados importados com sucesso!');
+  } catch (err) {
+    console.error(err);
+    toast('Erro ao importar: ' + err.message);
+  }
 }
-async function resetData() {
-  if (!confirm('Restaurar do arquivo original? Todas as edições locais serão perdidas.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  const resp = await fetch('data/data.json');
-  DATA = await resp.json();
-  persist();
-  route();
-  toast('Dados restaurados do original');
-}
+
+// ---------- Backup / Restore ----------
 function downloadBackup() {
-  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({
+    version: 1,
+    dishes: DATA.dishes,
+    insumos: DATA.insumos,
+    equipamentos_disponiveis: DATA.equipamentos_disponiveis
+  }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -70,19 +176,83 @@ function downloadBackup() {
   URL.revokeObjectURL(url);
   toast('Backup baixado');
 }
+
 function restoreBackup(file) {
+  if (!isAdmin) { toast('Apenas admin pode restaurar'); return; }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async (e) => {
     try {
       const d = JSON.parse(e.target.result);
       if (!d.dishes || !d.insumos) throw new Error('formato inválido');
-      DATA = d;
-      persist();
-      route();
+      if (!confirm('Restaurar backup? Sobrescreve tudo no banco.')) return;
+      toast('Restaurando...');
+      let batch = writeBatch(db);
+      let count = 0;
+      for (const dish of d.dishes) {
+        const clean = { ...dish };
+        delete clean.id;
+        batch.set(doc(db, 'dishes', dish.id), clean);
+        count++;
+        if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+      }
+      for (const ins of d.insumos) {
+        const clean = { ...ins };
+        delete clean.id;
+        batch.set(doc(db, 'insumos', ins.id), clean);
+        count++;
+        if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+      }
+      if (d.equipamentos_disponiveis) {
+        batch.set(doc(db, 'config', 'equipamentos'), { list: d.equipamentos_disponiveis });
+      }
+      if (count > 0) await batch.commit();
       toast('Backup restaurado');
-    } catch (err) { alert('Arquivo inválido: ' + err.message); }
+    } catch (err) { alert('Erro: ' + err.message); }
   };
   reader.readAsText(file);
+}
+
+// ---------- Auth ----------
+function openLoginModal() {
+  $('#login-modal').hidden = false;
+  $('#login-email').focus();
+}
+function closeLoginModal() {
+  $('#login-modal').hidden = true;
+  $('#login-error').hidden = true;
+  $('#login-form').reset();
+}
+async function doLogin(email, password) {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    closeLoginModal();
+    toast('Bem-vindo!');
+  } catch (err) {
+    const errEl = $('#login-error');
+    errEl.textContent = err.code === 'auth/invalid-credential' ? 'Email ou senha incorretos' : ('Erro: ' + err.message);
+    errEl.hidden = false;
+  }
+}
+async function doLogout() {
+  await signOut(auth);
+  toast('Saiu');
+  if (location.hash.startsWith('#/admin')) location.hash = '#/';
+}
+
+function updateAuthUI() {
+  const authBtn = $('#btn-auth');
+  const navAdmin = $('#nav-admin');
+  if (isAdmin) {
+    authBtn.textContent = 'Sair';
+    authBtn.classList.add('logged-in');
+    navAdmin.style.display = '';
+    $$('.admin-only').forEach(el => el.style.display = '');
+  } else {
+    authBtn.textContent = 'Entrar';
+    authBtn.classList.remove('logged-in');
+    navAdmin.style.display = 'none';
+    $$('.admin-only').forEach(el => el.style.display = 'none');
+  }
 }
 
 // ---------- Cost calculations ----------
@@ -91,9 +261,6 @@ function subfichaCost(sf) {
   let total = 0;
   const rows = sf.ingredientes.map(ing => {
     const insumo = findInsumo(ing.insumo_id);
-    const price = insumo ? (insumo.price || 0) : 0;
-    // Assumption: price is per "unit" of insumo (e.g. per kg or per unit). Quantity in recipe uses same unit.
-    // To handle "g" recipe ingredient while insumo price is per "kg", we normalize:
     const [qNorm, priceNorm] = normalizeQtyPrice(ing, insumo);
     const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm : 0;
     total += cost;
@@ -102,30 +269,25 @@ function subfichaCost(sf) {
   return { rows, total };
 }
 function normalizeQtyPrice(ing, insumo) {
-  // Given ingredient quantity + unit vs insumo price unit, normalize so multiplication is correct.
-  // Supported conversions: g <-> kg, ml <-> l. Otherwise assume same unit.
   if (!insumo || ing.qty == null) return [null, null];
   const iu = (ing.unit || '').toLowerCase().trim();
   const pu = (insumo.unit || '').toLowerCase().trim();
   const q = ing.qty;
   const p = insumo.price || 0;
   if (iu === pu || !iu || !pu) return [q, p];
-  // conversions
   if (iu === 'g' && pu === 'kg') return [q / 1000, p];
   if (iu === 'kg' && pu === 'g') return [q * 1000, p];
   if (iu === 'ml' && (pu === 'l' || pu === 'lt' || pu === 'litro')) return [q / 1000, p];
   if (iu === 'l' && pu === 'ml') return [q * 1000, p];
-  // fallback: trust units are equivalent
   return [q, p];
 }
 function dishCost(dish) {
-  const sfCosts = dish.sub_fichas.map(sf => ({ ...subfichaCost(sf), sf }));
+  const sfCosts = (dish.sub_fichas || []).map(sf => ({ ...subfichaCost(sf), sf }));
   const total = sfCosts.reduce((s, x) => s + x.total, 0);
-  // Final sub-ficha often represents per-portion, use its yield to estimate portion count
-  const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+  const finalSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
   const portions = parsePortions(finalSf ? finalSf.rendimento : '');
   const costPerPortion = portions > 0 ? total / portions : 0;
-  const markup = dish.markup || 300; // percentage
+  const markup = dish.markup || 300;
   const suggestedPrice = costPerPortion * (1 + markup / 100);
   const cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
   return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv };
@@ -133,7 +295,6 @@ function dishCost(dish) {
 function parsePortions(rendStr) {
   if (!rendStr) return 1;
   const s = String(rendStr).toLowerCase();
-  // Try to find "X unidades", "X porções", "X porção"
   const m = s.match(/(\d+(?:[.,]\d+)?)\s*(?:und|unidades?|por[cç][oõ]es?|por[cç][aã]o)/);
   if (m) return parseFloat(m[1].replace(',', '.'));
   const m2 = s.match(/^(\d+(?:[.,]\d+)?)/);
@@ -145,8 +306,14 @@ function parsePortions(rendStr) {
 function route() {
   const hash = location.hash.slice(1) || '/';
   const parts = hash.split('/').filter(Boolean);
-  // Highlight nav
   $$('.site-nav a').forEach(a => a.classList.remove('active'));
+  // If not loaded yet, keep loading state
+  if (!DATA.loaded.dishes || !DATA.loaded.insumos) return;
+  // Empty database state
+  if (DATA.dishes.length === 0 && DATA.insumos.length === 0) {
+    renderEmptyState();
+    return;
+  }
   if (parts.length === 0) {
     $('[data-nav="home"]').classList.add('active');
     renderHome();
@@ -156,6 +323,7 @@ function route() {
     $('[data-nav="insumos"]').classList.add('active');
     renderInsumos();
   } else if (parts[0] === 'admin') {
+    if (!isAdmin) { openLoginModal(); renderHome(); return; }
     $('[data-nav="admin"]').classList.add('active');
     if (parts[1] === 'edit' && parts[2]) renderAdminEdit(parts[2]);
     else if (parts[1] === 'new') renderAdminEdit(null);
@@ -167,11 +335,29 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
+// ---------- Empty state ----------
+function renderEmptyState() {
+  const app = $('#app');
+  app.innerHTML = '';
+  const box = el('div', { style: 'max-width:600px;margin:4rem auto;text-align:center;' },
+    el('h1', {}, 'Banco de dados vazio'),
+    el('p', { style: 'color:#888;font-style:italic;font-family:"Cormorant Garamond",serif;font-size:1.2rem;margin-bottom:2rem;' },
+      'As fichas ainda não foram importadas para o banco.'),
+    isAdmin
+      ? el('button', { class: 'btn btn-primary', onclick: seedFromJson }, 'Importar dados iniciais agora')
+      : el('div', {},
+          el('p', {}, 'Entre como administrador para importar os dados iniciais.'),
+          el('button', { class: 'btn btn-primary', onclick: openLoginModal }, 'Entrar como admin')
+        )
+  );
+  app.appendChild(box);
+}
+
 // ---------- Views ----------
 function renderHome() {
   const app = $('#app');
   app.innerHTML = '';
-  const totalSubfichas = DATA.dishes.reduce((s, d) => s + d.sub_fichas.length, 0);
+  const totalSubfichas = DATA.dishes.reduce((s, d) => s + (d.sub_fichas || []).length, 0);
   const hero = el('section', { class: 'home-hero' },
     el('h1', {}, 'Cardápio'),
     el('p', { class: 'subtitle' }, 'Fichas técnicas operacionais e custeio por rendimento'),
@@ -185,8 +371,9 @@ function renderHome() {
 
   const grid = el('div', { class: 'grid-dishes' });
   DATA.dishes.forEach(dish => {
-    const { costPerPortion, portions } = dishCost(dish);
+    const { costPerPortion } = dishCost(dish);
     const photo = dish.photos && dish.photos[0];
+    const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
     const card = el('a', { class: 'card-dish', href: `#/ficha/${dish.id}` },
       el('div', { class: 'card-photo' },
         photo ? el('img', { src: photo, alt: dish.name }) : el('span', { class: 'placeholder' }, 'sem foto')
@@ -194,7 +381,7 @@ function renderHome() {
       el('div', { class: 'card-body' },
         el('h3', {}, dish.name),
         el('div', { class: 'card-meta' },
-          el('span', {}, 'Rendimento', el('br'), el('strong', {}, dish.sub_fichas[dish.sub_fichas.length-1]?.rendimento || '—')),
+          el('span', {}, 'Rendimento', el('br'), el('strong', {}, lastSf?.rendimento || '—')),
           el('span', {}, 'Custo/porção', el('br'), el('strong', {}, fmtBRL(costPerPortion)))
         )
       )
@@ -213,10 +400,9 @@ function renderFicha(dishId) {
     return;
   }
 
-  // State for this view
   const state = {
-    view: 'trabalho', // 'trabalho' | 'custo'
-    activeSf: dish.sub_fichas[dish.sub_fichas.length - 1]?.id || dish.sub_fichas[0]?.id,
+    view: 'trabalho',
+    activeSf: (dish.sub_fichas || [])[dish.sub_fichas.length - 1]?.id || (dish.sub_fichas || [])[0]?.id,
   };
 
   const header = el('div', { class: 'ficha-header' },
@@ -225,32 +411,27 @@ function renderFicha(dishId) {
   );
   app.appendChild(header);
 
-  // Gallery
   if (dish.photos && dish.photos.length) {
     const gallery = el('div', { class: 'gallery' });
     dish.photos.forEach(p => gallery.appendChild(el('div', { class: 'photo' }, el('img', { src: p }))));
     app.appendChild(gallery);
   }
 
-  // View toggle
   const toggle = el('div', { class: 'view-toggle' },
     el('button', { 'data-view': 'trabalho' }, 'Ficha de trabalho'),
     el('button', { 'data-view': 'custo' }, 'Ficha de custo')
   );
   app.appendChild(toggle);
 
-  // Tabs
   const tabs = el('div', { class: 'subficha-tabs' });
-  dish.sub_fichas.forEach(sf => {
+  (dish.sub_fichas || []).forEach(sf => {
     tabs.appendChild(el('button', { 'data-sf': sf.id }, sf.name));
   });
   app.appendChild(tabs);
 
-  // Body container
   const body = el('div', {});
   app.appendChild(body);
 
-  // Actions (exports)
   const actions = el('div', { class: 'ficha-actions' },
     el('button', { class: 'btn', onclick: () => exportFichaPDF(dish, state) }, 'Exportar PDF'),
     el('button', { class: 'btn', onclick: () => exportFichaXLSX(dish) }, 'Exportar Excel')
@@ -258,16 +439,12 @@ function renderFicha(dishId) {
   app.appendChild(actions);
 
   function updateUI() {
-    // Toggle states
     $$('.view-toggle button', toggle).forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
     $$('.subficha-tabs button', tabs).forEach(b => b.classList.toggle('active', b.dataset.sf === state.activeSf));
-    const sf = dish.sub_fichas.find(s => s.id === state.activeSf) || dish.sub_fichas[0];
+    const sf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
     body.innerHTML = '';
-    if (state.view === 'trabalho') {
-      body.appendChild(renderFichaTrabalho(dish, sf));
-    } else {
-      body.appendChild(renderFichaCusto(dish, sf));
-    }
+    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf));
+    else body.appendChild(renderFichaCusto(dish, sf));
   }
   toggle.addEventListener('click', e => {
     if (e.target.dataset.view) { state.view = e.target.dataset.view; updateUI(); }
@@ -284,7 +461,6 @@ function renderFichaTrabalho(dish, sf) {
   wrap.appendChild(el('h2', {}, sf.name));
   if (sf.rendimento) wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Rendimento: ', el('strong', {}, sf.rendimento)));
 
-  // Ingredients table
   const tbl = el('table', { class: 'ficha-table' },
     el('thead', {}, el('tr', {},
       el('th', {}, 'Insumo'),
@@ -292,7 +468,7 @@ function renderFichaTrabalho(dish, sf) {
       el('th', {}, 'Unidade'),
       el('th', {}, 'Observação / Processamento')
     )),
-    el('tbody', {}, ...sf.ingredientes.map(ing => el('tr', {},
+    el('tbody', {}, ...(sf.ingredientes || []).map(ing => el('tr', {},
       el('td', { 'data-label': 'Insumo' }, ing.insumo_name),
       el('td', { class: 'num', 'data-label': 'Quantidade' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
       el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
@@ -301,7 +477,6 @@ function renderFichaTrabalho(dish, sf) {
   );
   wrap.appendChild(tbl);
 
-  // Modo de preparo
   if (sf.modo_preparo) {
     const sec = el('div', { class: 'ficha-section' },
       el('h3', {}, 'Modo de Preparo'),
@@ -310,14 +485,12 @@ function renderFichaTrabalho(dish, sf) {
     wrap.appendChild(sec);
   }
 
-  // Apresentação (louça)
   if (dish.louca) {
     wrap.appendChild(el('div', { class: 'info-box' },
       el('strong', {}, 'Apresentação / Louça'),
       dish.louca
     ));
   }
-  // Equipamentos
   if (dish.equipamentos && dish.equipamentos.length) {
     const box = el('div', { class: 'info-box' }, el('strong', {}, 'Equipamentos necessários'));
     const list = el('div', { class: 'equipamentos-list' });
@@ -334,7 +507,6 @@ function renderFichaCusto(dish, currentSf) {
   wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha de Custo por Rendimento'));
   wrap.appendChild(el('h2', {}, dish.name));
 
-  // Per-subficha tables
   const all = dishCost(dish);
   all.sfCosts.forEach(({ sf, rows, total }) => {
     const section = el('div', { class: 'ficha-section' },
@@ -368,7 +540,6 @@ function renderFichaCusto(dish, currentSf) {
     wrap.appendChild(section);
   });
 
-  // Dish totals
   const total = el('div', { class: 'total-dish-cost' },
     el('div', {},
       el('span', { class: 'stat-label' }, 'Custo total do prato'),
@@ -387,20 +558,11 @@ function renderFichaCusto(dish, currentSf) {
 
   // Markup + CMV editor
   const cost = el('div', { class: 'cost-summary' });
+  const markupInput = el('input', { type: 'number', min: '0', step: '5', value: String(dish.markup || 300) });
+  if (!isAdmin) markupInput.disabled = true;
   cost.appendChild(el('div', { class: 'stat' },
     el('span', { class: 'stat-label' }, 'Markup (%)'),
-    (() => {
-      const input = el('input', { type: 'number', min: '0', step: '5', value: String(dish.markup || 300) });
-      input.addEventListener('input', () => {
-        dish.markup = parseFloat(input.value) || 0;
-        persist();
-        // Update the numbers in-place
-        priceSpan.textContent = fmtBRL(parseFloat(input.value) >= 0 ? (all.costPerPortion * (1 + (parseFloat(input.value) || 0) / 100)) : 0);
-        const newPrice = all.costPerPortion * (1 + (parseFloat(input.value) || 0) / 100);
-        cmvSpan.textContent = newPrice > 0 ? fmtNum(all.costPerPortion / newPrice * 100, 1) + '%' : '—';
-      });
-      return input;
-    })()
+    markupInput
   ));
   const priceSpan = el('span', { class: 'stat-value accent' }, fmtBRL(all.suggestedPrice));
   cost.appendChild(el('div', { class: 'stat' },
@@ -412,6 +574,14 @@ function renderFichaCusto(dish, currentSf) {
     el('span', { class: 'stat-label' }, 'CMV (food cost)'),
     cmvSpan
   ));
+  markupInput.addEventListener('input', () => {
+    const newMarkup = parseFloat(markupInput.value) || 0;
+    dish.markup = newMarkup;
+    const newPrice = all.costPerPortion * (1 + newMarkup / 100);
+    priceSpan.textContent = fmtBRL(newPrice);
+    cmvSpan.textContent = newPrice > 0 ? fmtNum(all.costPerPortion / newPrice * 100, 1) + '%' : '—';
+    scheduleSave('dish-' + dish.id, () => saveDishToFirestore(dish));
+  });
   wrap.appendChild(cost);
 
   return wrap;
@@ -424,7 +594,9 @@ function renderInsumos() {
   const header = el('div', { class: 'insumos-header' },
     el('div', {},
       el('h1', {}, 'Insumos'),
-      el('p', {}, 'Atualize os preços — os custos das fichas recalculam automaticamente.')
+      el('p', {}, isAdmin
+        ? 'Atualize os preços — salva automaticamente e todas as fichas recalculam.'
+        : 'Preços dos insumos. Faça login para editar.')
     ),
     el('input', { type: 'search', class: 'insumos-search', placeholder: 'Buscar insumo…' })
   );
@@ -433,18 +605,17 @@ function renderInsumos() {
   const table = el('table', { class: 'insumos-table' },
     el('thead', {}, el('tr', {},
       el('th', {}, 'Insumo'),
-      el('th', {}, 'Unidade de referência'),
+      el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
       el('th', {}, 'Usado em')
     ))
   );
   const tbody = el('tbody', {});
 
-  // Count usage
   const usageMap = {};
   DATA.dishes.forEach(d => {
-    d.sub_fichas.forEach(sf => {
-      sf.ingredientes.forEach(i => {
+    (d.sub_fichas || []).forEach(sf => {
+      (sf.ingredientes || []).forEach(i => {
         usageMap[i.insumo_id] = (usageMap[i.insumo_id] || 0) + 1;
       });
     });
@@ -456,18 +627,21 @@ function renderInsumos() {
     DATA.insumos
       .filter(i => !f || i.name.toLowerCase().includes(f))
       .forEach(insumo => {
+        const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
+        const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
+        if (!isAdmin) { unitInput.disabled = true; priceInput.disabled = true; }
+        unitInput.addEventListener('change', () => {
+          insumo.unit = unitInput.value.trim();
+          scheduleSave('insumo-' + insumo.id, () => saveInsumoToFirestore(insumo));
+        });
+        priceInput.addEventListener('input', () => {
+          insumo.price = parseFloat(priceInput.value) || 0;
+          scheduleSave('insumo-' + insumo.id, () => saveInsumoToFirestore(insumo));
+        });
         const tr = el('tr', {},
           el('td', { 'data-label': 'Insumo' }, insumo.name),
-          el('td', { 'data-label': 'Unidade' }, (() => {
-            const i = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
-            i.addEventListener('change', () => { insumo.unit = i.value.trim(); persist(); });
-            return i;
-          })()),
-          el('td', { 'data-label': 'Preço (R$)' }, (() => {
-            const i = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
-            i.addEventListener('input', () => { insumo.price = parseFloat(i.value) || 0; persist(); });
-            return i;
-          })()),
+          el('td', { 'data-label': 'Unidade' }, unitInput),
+          el('td', { 'data-label': 'Preço (R$)' }, priceInput),
           el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas')
         );
         tbody.appendChild(tr);
@@ -487,7 +661,7 @@ function renderAdminList() {
   const header = el('div', { class: 'insumos-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar fichas'),
-      el('p', {}, 'Adicione, edite ou exclua pratos. Faça upload de até 3 fotos por prato.')
+      el('p', {}, 'Adicione, edite ou exclua pratos. Até 3 fotos por prato. Salva automaticamente no banco.')
     ),
     el('a', { class: 'btn btn-primary', href: '#/admin/new' }, '+ Nova ficha')
   );
@@ -499,12 +673,12 @@ function renderAdminList() {
     const item = el('div', { class: 'dish-admin-item' },
       el('div', { class: 'info' },
         el('h4', {}, dish.name),
-        el('p', {}, `${dish.sub_fichas.length} sub-fichas · ${dish.photos?.length || 0} fotos`)
+        el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
       el('div', { class: 'dish-admin-actions' },
         el('a', { class: 'btn btn-small', href: `#/ficha/${dish.id}` }, 'Ver'),
         el('a', { class: 'btn btn-small btn-primary', href: `#/admin/edit/${dish.id}` }, 'Editar'),
-        el('button', { class: 'btn btn-small btn-danger', onclick: () => deleteDish(dish.id) }, 'Excluir')
+        el('button', { class: 'btn btn-small btn-danger', onclick: () => deleteDishAction(dish.id) }, 'Excluir')
       )
     );
     list.appendChild(item);
@@ -512,14 +686,15 @@ function renderAdminList() {
   panel.appendChild(list);
   app.appendChild(panel);
 }
-function deleteDish(id) {
+
+async function deleteDishAction(id) {
   const d = DATA.dishes.find(x => x.id === id);
   if (!d) return;
-  if (!confirm(`Excluir "${d.name}"? Essa ação pode ser revertida restaurando um backup.`)) return;
-  DATA.dishes = DATA.dishes.filter(x => x.id !== id);
-  persist();
-  renderAdminList();
-  toast('Ficha excluída');
+  if (!confirm(`Excluir "${d.name}" do banco? Essa ação não pode ser desfeita (mas você tem backup baixável).`)) return;
+  try {
+    await deleteDishFromFirestore(id);
+    toast('Ficha excluída');
+  } catch (err) { toast('Erro: ' + err.message); }
 }
 
 // ---------- Admin: edit/new ----------
@@ -528,10 +703,9 @@ function renderAdminEdit(dishId) {
   app.innerHTML = '';
   let dish;
   if (dishId) {
-    dish = DATA.dishes.find(d => d.id === dishId);
-    if (!dish) { app.appendChild(el('p', {}, 'Prato não encontrado')); return; }
-    // work on copy until save
-    dish = JSON.parse(JSON.stringify(dish));
+    const existing = DATA.dishes.find(d => d.id === dishId);
+    if (!existing) { app.appendChild(el('p', {}, 'Prato não encontrado')); return; }
+    dish = JSON.parse(JSON.stringify(existing));
   } else {
     dish = {
       id: 'new-' + uid(),
@@ -550,7 +724,6 @@ function renderAdminEdit(dishId) {
 
   const panel = el('div', { class: 'admin-panel' });
 
-  // Basic info
   panel.appendChild(el('h2', {}, 'Informações gerais'));
   const basic = el('div', { class: 'form-grid' },
     fieldInput('Nome do prato', 'text', dish.name, v => dish.name = v),
@@ -559,7 +732,6 @@ function renderAdminEdit(dishId) {
   );
   panel.appendChild(basic);
 
-  // Photos
   panel.appendChild(el('h3', {}, 'Fotos (até 3)'));
   const photoWrap = el('div', { class: 'photo-upload' });
   function renderPhotos() {
@@ -578,16 +750,15 @@ function renderAdminEdit(dishId) {
           if (!file) return;
           const reader = new FileReader();
           reader.onload = () => {
-            // Compress: draw to canvas at max 1200px wide
             const img = new Image();
             img.onload = () => {
-              const maxW = 1200;
+              const maxW = 1000;
               const scale = Math.min(1, maxW / img.width);
               const canvas = document.createElement('canvas');
               canvas.width = img.width * scale;
               canvas.height = img.height * scale;
               canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-              dish.photos[i] = canvas.toDataURL('image/jpeg', 0.8);
+              dish.photos[i] = canvas.toDataURL('image/jpeg', 0.78);
               renderPhotos();
             };
             img.src = reader.result;
@@ -602,15 +773,13 @@ function renderAdminEdit(dishId) {
   renderPhotos();
   panel.appendChild(photoWrap);
 
-  // Equipamentos multi-select
   panel.appendChild(el('h3', {}, 'Equipamentos necessários'));
   const eqBox = el('div', { class: 'equipamentos-select' });
   (DATA.equipamentos_disponiveis || []).forEach(eq => {
-    const checked = dish.equipamentos.includes(eq);
     const lbl = el('label', {},
       (() => {
         const i = el('input', { type: 'checkbox' });
-        if (checked) i.setAttribute('checked', '');
+        if (dish.equipamentos.includes(eq)) i.setAttribute('checked', '');
         i.addEventListener('change', () => {
           if (i.checked) { if (!dish.equipamentos.includes(eq)) dish.equipamentos.push(eq); }
           else dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
@@ -623,7 +792,6 @@ function renderAdminEdit(dishId) {
   });
   panel.appendChild(eqBox);
 
-  // Sub-fichas editor
   panel.appendChild(el('h2', {}, 'Sub-fichas (preparações)'));
   const sfWrap = el('div', {});
   function renderSubfichas() {
@@ -645,7 +813,6 @@ function renderAdminEdit(dishId) {
           fieldInput('Rendimento', 'text', sf.rendimento, v => sf.rendimento = v)
         )
       );
-      // Ingredients
       const ingHeader = el('h4', {}, 'Insumos');
       box.appendChild(ingHeader);
       const ingList = el('div', {});
@@ -653,11 +820,9 @@ function renderAdminEdit(dishId) {
         ingList.innerHTML = '';
         sf.ingredientes.forEach((ing, ingIdx) => {
           const row = el('div', { class: 'ingredient-row' });
-          // insumo select with datalist-like behavior
           const nameInput = el('input', { type: 'text', value: ing.insumo_name, placeholder: 'Insumo', list: 'all-insumos' });
           nameInput.addEventListener('input', () => {
             ing.insumo_name = nameInput.value;
-            // if matches existing insumo normalize id
             const match = DATA.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
             ing.insumo_id = match ? match.id : slugify(nameInput.value);
           });
@@ -687,7 +852,6 @@ function renderAdminEdit(dishId) {
       }
       renderIngs();
       box.appendChild(ingList);
-      // Modo de preparo
       box.appendChild(el('label', { class: 'field' },
         el('span', { class: 'label-text' }, 'Modo de Preparo'),
         (() => {
@@ -707,12 +871,10 @@ function renderAdminEdit(dishId) {
   renderSubfichas();
   panel.appendChild(sfWrap);
 
-  // Datalist for ingredient autocomplete
   const dl = el('datalist', { id: 'all-insumos' });
   DATA.insumos.forEach(i => dl.appendChild(el('option', { value: i.name })));
   panel.appendChild(dl);
 
-  // Save / cancel
   const saveBar = el('div', { class: 'ficha-actions' },
     el('button', { class: 'btn btn-primary', onclick: () => saveDish(dish, dishId) }, 'Salvar'),
     el('a', { class: 'btn', href: '#/admin' }, 'Cancelar')
@@ -722,41 +884,47 @@ function renderAdminEdit(dishId) {
   app.appendChild(panel);
 }
 
-function saveDish(dish, originalId) {
+async function saveDish(dish, originalId) {
+  if (!isAdmin) { toast('Faça login como admin'); return; }
   if (!dish.name.trim()) { alert('Nome do prato é obrigatório'); return; }
-  dish.id = slugify(dish.name);
-  // Register any new insumos
-  dish.sub_fichas.forEach(sf => {
-    sf.ingredientes.forEach(ing => {
-      if (!ing.insumo_name.trim()) return;
-      const existing = DATA.insumos.find(i => i.name.toLowerCase() === ing.insumo_name.toLowerCase());
-      if (!existing) {
-        const newIns = { id: slugify(ing.insumo_name), name: ing.insumo_name.trim(), unit: ing.unit || 'g', price: 0 };
-        DATA.insumos.push(newIns);
-        ing.insumo_id = newIns.id;
-      } else {
-        ing.insumo_id = existing.id;
+  const newId = slugify(dish.name);
+  dish.id = newId;
+  try {
+    // Register new insumos first
+    const batch = writeBatch(db);
+    let batchCount = 0;
+    for (const sf of dish.sub_fichas) {
+      for (const ing of sf.ingredientes) {
+        if (!ing.insumo_name.trim()) continue;
+        const existing = DATA.insumos.find(i => i.name.toLowerCase() === ing.insumo_name.toLowerCase());
+        if (!existing) {
+          const newIns = { id: slugify(ing.insumo_name), name: ing.insumo_name.trim(), unit: ing.unit || 'g', price: 0 };
+          ing.insumo_id = newIns.id;
+          const clean = { ...newIns };
+          delete clean.id;
+          batch.set(doc(db, 'insumos', newIns.id), clean);
+          batchCount++;
+        } else {
+          ing.insumo_id = existing.id;
+        }
       }
-    });
-  });
-  DATA.insumos.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  if (originalId) {
-    const idx = DATA.dishes.findIndex(d => d.id === originalId);
-    if (idx >= 0) DATA.dishes[idx] = dish;
-    else DATA.dishes.push(dish);
-  } else {
-    DATA.dishes.push(dish);
+    }
+    if (batchCount > 0) await batch.commit();
+    // If id changed (on edit), delete old doc
+    if (originalId && originalId !== newId) {
+      await deleteDoc(doc(db, 'dishes', originalId));
+    }
+    await saveDishToFirestore(dish);
+    toast('Ficha salva');
+    location.hash = `#/ficha/${dish.id}`;
+  } catch (err) {
+    console.error(err);
+    toast('Erro ao salvar: ' + err.message);
   }
-  persist();
-  toast('Ficha salva');
-  location.hash = `#/ficha/${dish.id}`;
 }
 
-// ---------- Helpers for forms ----------
 function fieldInput(label, type, value, onChange) {
-  const wrap = el('label', { class: 'field' },
-    el('span', { class: 'label-text' }, label)
-  );
+  const wrap = el('label', { class: 'field' }, el('span', { class: 'label-text' }, label));
   const input = el('input', { type, value: value ?? '' });
   input.addEventListener('input', () => onChange(input.value));
   wrap.appendChild(input);
@@ -774,9 +942,8 @@ function exportFichaPDF(dish, state) {
 
   const isTrabalho = state.view === 'trabalho';
   const all = dishCost(dish);
-  const currentSf = dish.sub_fichas.find(s => s.id === state.activeSf) || dish.sub_fichas[0];
+  const currentSf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
 
-  // Header
   doc.setFont('times', 'italic');
   doc.setFontSize(10);
   doc.setTextColor(130);
@@ -793,7 +960,6 @@ function exportFichaPDF(dish, state) {
   y += 8;
 
   if (isTrabalho) {
-    // Just the selected sub-ficha
     doc.setFont('times', 'normal');
     doc.setFontSize(14);
     doc.setTextColor(20);
@@ -810,7 +976,7 @@ function exportFichaPDF(dish, state) {
       startY: y,
       margin: { left: margin, right: margin },
       head: [['Insumo', 'Quantidade', 'Unidade', 'Observação']],
-      body: currentSf.ingredientes.map(i => [
+      body: (currentSf.ingredientes || []).map(i => [
         i.insumo_name,
         i.is_qb ? 'Q.B' : (i.qty != null ? fmtNum(i.qty, i.qty % 1 === 0 ? 0 : 2) : (i.qty_raw || '—')),
         i.unit || '—',
@@ -862,7 +1028,6 @@ function exportFichaPDF(dish, state) {
       doc.text(lines, margin, y);
     }
   } else {
-    // Cost view: all sub-fichas with costs, then totals
     all.sfCosts.forEach(({ sf, rows, total }) => {
       if (y > 240) { doc.addPage(); y = margin; }
       doc.setFont('times', 'normal');
@@ -891,7 +1056,6 @@ function exportFichaPDF(dish, state) {
       y = doc.lastAutoTable.finalY + 6;
     });
     if (y > 240) { doc.addPage(); y = margin; }
-    // Totals block
     doc.setFillColor(26, 26, 26);
     doc.rect(margin, y, contentWidth, 28, 'F');
     doc.setTextColor(255);
@@ -922,12 +1086,11 @@ function exportFichaPDF(dish, state) {
 function exportFichaXLSX(dish) {
   const wb = XLSX.utils.book_new();
   const all = dishCost(dish);
-
-  // Summary sheet
+  const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
   const summaryData = [
     ['FICHA TÉCNICA'],
     ['Prato', dish.name],
-    ['Rendimento final', dish.sub_fichas[dish.sub_fichas.length - 1]?.rendimento || '—'],
+    ['Rendimento final', lastSf?.rendimento || '—'],
     [],
     ['Custo total', all.total],
     ['Porções', all.portions],
@@ -941,8 +1104,6 @@ function exportFichaXLSX(dish) {
   ];
   const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
   XLSX.utils.book_append_sheet(wb, wsSum, 'Resumo');
-
-  // One sheet per sub-ficha
   all.sfCosts.forEach(({ sf, rows, total }, idx) => {
     const data = [
       [sf.name],
@@ -967,17 +1128,35 @@ function exportFichaXLSX(dish) {
     const name = ('SF' + (idx + 1) + '-' + sf.name).replace(/[/\\?*\[\]:]/g, '').slice(0, 30);
     XLSX.utils.book_append_sheet(wb, ws, name);
   });
-
   XLSX.writeFile(wb, `${slugify(dish.name)}.xlsx`);
 }
 
 // ---------- Init ----------
-(async function init() {
-  await loadData();
-  route();
-  $('#btn-download-backup').addEventListener('click', downloadBackup);
-  $('#btn-reset').addEventListener('click', resetData);
-  $('#file-restore').addEventListener('change', e => {
-    if (e.target.files[0]) restoreBackup(e.target.files[0]);
-  });
-})();
+onAuthStateChanged(auth, (user) => {
+  currentUser = user;
+  isAdmin = !!(user && user.email === ADMIN_EMAIL);
+  updateAuthUI();
+  if (hasRenderedOnce) route();
+});
+
+setupListeners();
+
+// Wire up buttons
+$('#btn-auth').addEventListener('click', () => {
+  if (isAdmin) doLogout();
+  else openLoginModal();
+});
+$('#login-form').addEventListener('submit', e => {
+  e.preventDefault();
+  doLogin($('#login-email').value, $('#login-password').value);
+});
+$('#login-cancel').addEventListener('click', closeLoginModal);
+$('.modal-overlay').addEventListener('click', closeLoginModal);
+$('#btn-download-backup').addEventListener('click', downloadBackup);
+$('#btn-seed').addEventListener('click', seedFromJson);
+$('#file-restore').addEventListener('change', e => {
+  if (e.target.files[0]) restoreBackup(e.target.files[0]);
+});
+
+// Initial UI
+updateAuthUI();

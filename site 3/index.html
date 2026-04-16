@@ -23,27 +23,56 @@
     <nav class="site-nav">
       <a href="#/" data-nav="home">Cardápio</a>
       <a href="#/insumos" data-nav="insumos">Insumos</a>
-      <a href="#/admin" data-nav="admin">Gerenciar</a>
+      <a href="#/admin" data-nav="admin" id="nav-admin" style="display:none">Gerenciar</a>
+      <button class="link-btn auth-btn" id="btn-auth">Entrar</button>
     </nav>
   </div>
 </header>
 
-<main id="app" class="container"></main>
+<main id="app" class="container">
+  <div class="loading-state">
+    <p style="text-align:center; color:#888; font-style:italic; font-family:'Cormorant Garamond',serif; font-size:1.2rem; padding:4rem 0;">Carregando fichas…</p>
+  </div>
+</main>
 
 <footer class="site-footer">
   <div class="container">
     <span>Consultoria gastronômica · Fichas técnicas</span>
     <span class="footer-actions">
       <button class="link-btn" id="btn-download-backup">Baixar backup</button>
-      <label class="link-btn" for="file-restore">Restaurar backup</label>
+      <label class="link-btn admin-only" for="file-restore" style="display:none">Restaurar backup</label>
       <input type="file" id="file-restore" accept=".json" style="display:none" />
-      <button class="link-btn" id="btn-reset">Restaurar do original</button>
+      <button class="link-btn admin-only" id="btn-seed" style="display:none">Importar dados iniciais</button>
     </span>
   </div>
 </footer>
 
+<!-- Login modal -->
+<div id="login-modal" class="modal" hidden>
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <h2>Entrar como admin</h2>
+    <p class="modal-subtitle">Acesso restrito para edição das fichas</p>
+    <form id="login-form">
+      <label class="field">
+        <span class="label-text">Email</span>
+        <input type="email" id="login-email" required autocomplete="email" />
+      </label>
+      <label class="field">
+        <span class="label-text">Senha</span>
+        <input type="password" id="login-password" required autocomplete="current-password" />
+      </label>
+      <p id="login-error" class="login-error" hidden></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="login-cancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 
-<script src="js/app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
