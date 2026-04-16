@@ -104,15 +104,19 @@ function normalizePriceForDisplay(insumo) {
 function formatRendimento(rendStr, scaleFactor = 1) {
   if (!rendStr) return '';
   const parsed = parseRendimentoQty(rendStr);
-  // Preserve any suffix text after number+unit
   const s = String(rendStr).trim();
-  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ/]*)(.*)$/);
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ\/\u00c0-\u024f]*)(.*)$/);
   if (!m) return rendStr;
   const qty = parsed.qty * (scaleFactor || 1);
   const unit = parsed.unit;
   const n = normUnitForDisplay(qty, unit);
+  // Capitalize first letter of unit if it's a word (e.g. "porção" → "Porção")
+  let unitDisplay = n.unit;
+  if (unitDisplay && /^[a-záéíóúâêôãõàèìòùç]/i.test(unitDisplay) && unitDisplay.length > 2) {
+    unitDisplay = unitDisplay[0].toUpperCase() + unitDisplay.slice(1);
+  }
   const suffix = m[3].trim();
-  return `${n.text} ${n.unit}${suffix ? ' ' + suffix : ''}`.trim();
+  return `${n.text} ${unitDisplay}${suffix ? ' ' + suffix : ''}`.trim();
 }
 const slugify = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'item';
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -222,18 +226,26 @@ function subscribeCliente(cid) {
 }
 
 async function loadClientesList() {
-  // For master/staff: fetch all accessible clientes
   try {
-    const snap = await getDocs(collection(db, 'clientes'));
-    let all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (!isMaster()) {
-      const mine = new Set(STATE.userDoc?.clienteIds || []);
-      all = all.filter(c => mine.has(c.id));
+    if (isMaster()) {
+      // Master: lista toda a coleção
+      const snap = await getDocs(collection(db, 'clientes'));
+      STATE.clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else {
+      // Staff/cliente: busca apenas os que estão em clienteIds (regras bloqueiam collection query)
+      const ids = STATE.userDoc?.clienteIds || [];
+      if (ids.length === 0) { STATE.clientes = []; return; }
+      const docs = await Promise.all(ids.map(id => getDoc(doc(db, 'clientes', id))));
+      STATE.clientes = docs
+        .filter(d => d.exists())
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     }
-    STATE.clientes = all.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   } catch (err) {
-    console.error(err);
+    console.error('loadClientesList error:', err);
     STATE.clientes = [];
+    toast('Erro ao listar restaurantes: ' + err.message);
   }
 }
 
@@ -800,7 +812,7 @@ function detectSubref(dish, currentSfIdx, ingredientName) {
 function parseRendimentoQty(rendStr) {
   if (!rendStr) return { qty: 1, unit: '' };
   const s = String(rendStr).trim();
-  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ/]*)/);
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ\/\u00c0-\u024f]*)/);
   if (m) return { qty: parseFloat(m[1].replace(',', '.')), unit: (m[2] || '').toLowerCase() };
   return { qty: 1, unit: '' };
 }
