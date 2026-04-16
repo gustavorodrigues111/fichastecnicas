@@ -1,0 +1,3720 @@
+{
+  "version": 1,
+  "dishes": [
+    {
+      "id": "empada-de-frango-com-catupiry",
+      "sheet_name": "Empada de Frango com catupiry",
+      "name": "Empada de frango com catupiry",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "massa-de-empada",
+          "name": "MASSA DE EMPADA",
+          "rendimento": "820g",
+          "ingredientes": [
+            {
+              "insumo_id": "farinha-de-trigo",
+              "insumo_name": "Farinha de trigo",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "Peneirada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "manteiga",
+              "insumo_name": "Manteiga",
+              "qty": 200.0,
+              "qty_raw": "200g",
+              "unit": "g",
+              "observacao": "Gelada em cubos pequenos",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "banha",
+              "insumo_name": "Banha",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "Gelada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "gemas",
+              "insumo_name": "Gemas",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 70.0,
+              "qty_raw": "70.0",
+              "unit": "ml",
+              "observacao": "Adicionar aos poucos",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em um bowl, misture a farinha de trigo e o sal. Adicione a manteiga e a banha geladas. Com as pontas dos dedos, misture os ingredientes até obter uma textura de farofa grossa, garantindo que ainda restem pequenos pedaços de gordura visíveis.         Adicione as gemas e comece a incorporar. Acrescente a água gelada gradualmente, apenas o suficiente para a massa dar liga e soltar das mãos.                                                                                                                                                                                             Apenas pressione-a até que fique homogênea. O excesso de manuseio desenvolve o glúten e deixa a massa dura após assada.                                                                                                                                                                                                                Envolva a massa em filme plástico e leve à refrigeração por, no mínimo, 1 hora antes de abrir. Esse descanso é vital para que a gordura volte a gelar e a massa não encolha no forno."
+        },
+        {
+          "id": "recheio-de-frango-com-catupiry",
+          "name": "Recheio de Frango com Catupiry",
+          "rendimento": "1,5kg",
+          "ingredientes": [
+            {
+              "insumo_id": "frango-cozido-e-desfiado",
+              "insumo_name": "Frango cozido e desfiado",
+              "qty": 650.0,
+              "qty_raw": "650.0",
+              "unit": "g",
+              "observacao": "Desfiado Fino",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-brunoise",
+              "insumo_name": "Cebola Brunoise",
+              "qty": 130.0,
+              "qty_raw": "130.0",
+              "unit": "g",
+              "observacao": "Brunoise",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho-picado",
+              "insumo_name": "Alho Picado",
+              "qty": 50.0,
+              "qty_raw": "50.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "tomate-picado",
+              "insumo_name": "Tomate picado",
+              "qty": 200.0,
+              "qty_raw": "200.0",
+              "unit": "g",
+              "observacao": "Sem sementes (concasse)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "azeitona",
+              "insumo_name": "Azeitona",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "g",
+              "observacao": "Rodelas sem caroço",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "requeijao-tipo-catupiry",
+              "insumo_name": "Requeijão tipo Catupiry",
+              "qty": 130.0,
+              "qty_raw": "130.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "salsinha-picada",
+              "insumo_name": "Salsinha picada",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "Fresca",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovo-de-codorna-cozido-e-picado",
+              "insumo_name": "Ovo de codorna cozido e picado",
+              "qty": 200.0,
+              "qty_raw": "200.0",
+              "unit": "g",
+              "observacao": "Picado grosseiramente",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "pimenta-do-reino",
+              "insumo_name": "Pimenta-do-reino",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "ml",
+              "observacao": "Para Refogar",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em uma panela larga, aqueça o óleo e adicione a cebola brunoise. Refogue em fogo médio até que esteja translúcida. Adicione o alho e refogue brevemente, cuidando para não dourar excessivamente                                                                                                     Em uma panela larga, aqueça o óleo e adicione a cebola brunoise. Refogue em fogo médio até que esteja translúcida. Adicione o alho e refogue brevemente, cuidando para não dourar excessivamente.                                                                                              Adicione o frango desfiado e as azeitonas. Misture bem para que o frango absorva o sabor do refogado. Ajuste o sal e a pimenta-do-reino.                                                                                                                                                                                            Desligue o fogo. Adicione o requeijão tipo Catupiry e a salsinha picada. Misture até obter uma textura cremosa e homogênea. Por último, incorpore os ovos de codorna picados. Misture delicadamente para que os ovos não esfarelem totalmente, mantendo pedaços visíveis.                                                                                                                                                                          Transfira para um recipiente e deixe esfriar completamente antes de utilizar."
+        },
+        {
+          "id": "empada-de-frango-com-catupiry",
+          "name": "Empada de frango com catupiry",
+          "rendimento": "25 unidades",
+          "ingredientes": [
+            {
+              "insumo_id": "massa-de-empada-base",
+              "insumo_name": "Massa de Empada (Base)",
+              "qty": 32.5,
+              "qty_raw": "30-35",
+              "unit": "g",
+              "observacao": "Para forrar a forma",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "massa-de-empada-tampa",
+              "insumo_name": "Massa de Empada (Tampa)",
+              "qty": 60.0,
+              "qty_raw": "60.0",
+              "unit": "g",
+              "observacao": "Para dechar",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "recheiro-de-frango",
+              "insumo_name": "Recheiro de Frango",
+              "qty": 60.0,
+              "qty_raw": "60.0",
+              "unit": "g",
+              "observacao": "Deve estar Refriderado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "gema",
+              "insumo_name": "Gema",
+              "qty": 3.0,
+              "qty_raw": "3.0",
+              "unit": "und",
+              "observacao": "Para o egg wash",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "Col/sopa",
+              "observacao": "Para diluir a Gema",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Utilize uma forma de empada (7 cm de diâmetro x 3 cm de altura). Forre o fundo e as laterais com 20g de massa, garantindo uma espessura uniforme.                                                                                                                                                                                      Adicione 60g do recheio já frio. Atenção: O recheio não deve ultrapassar a borda da massa para não vazar durante o cozimento. Abra 15g de massa para a tampa. Cubra a empada e pressione firmemente as bordas para vedar (pode utilizar um garfo ou os dedos para o acabamento).                                                                                                                                                        Leve as empadas montadas ao freezer por 15 minutos. Isso ajuda a massa a não encolher no forno.                                           Misture as 3 gemas com a colher de água (isso deixa o brilho mais uniforme e menos espesso). Pincele delicadamente o topo de cada empada.                                                                                                                                                                                               Retorne ao freezer por mais 15 minutos. Esse segredo garante um acabamento muito mais bonito e crocante.                                 Asse em forno pré-aquecido a 180°C por 25 a 30 minutos, ou até que a superfície esteja bem dourada.                                       Após retirar do forno, deixe as empadas descansarem por 10 a 15 minutos na própria forma antes de desenformar. Isso evita que elas quebrem ainda quentes.                                                                                                                                                 Armazenar em recipiente hermético (bem fechado) para não absorver umidade.                                                                             Na hora de servir                                                                                                                                                                                                  Pré-aqueça a 160°C e aqueça a empada por 5 a 8 minutos. Isso garante que a gordura da massa \"acorde\" e devolva a crocância, e que o Catupiry no recheio fique cremoso novamente."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "espetinho-de-quiabo-com-curry-vermelho",
+      "sheet_name": "Espetinho de Quiabo com curry V",
+      "name": "Espetinho de Quiabo com curry Vermelho",
+      "description": "",
+      "photos": [],
+      "louca": "Travessa Oval 20 cm Inox + Seda Personalizada",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "curry-vermelho",
+          "name": "CURRY VERMELHO",
+          "rendimento": "1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-picada",
+              "insumo_name": "Cebola Picada",
+              "qty": 80.0,
+              "qty_raw": "80.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "gengibre-fresco-picado",
+              "insumo_name": "Gengibre fresco Picado",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho-picado",
+              "insumo_name": "Alho picado",
+              "qty": 12.0,
+              "qty_raw": "12.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "curry-vermelho",
+              "insumo_name": "Curry Vermelho",
+              "qty": 40.0,
+              "qty_raw": "40.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 5.0,
+              "qty_raw": "5.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "leite-de-coco",
+              "insumo_name": "Leite de coco",
+              "qty": 400.0,
+              "qty_raw": "400.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "caldo-de-legumes",
+              "insumo_name": "Caldo de legumes",
+              "qty": 300.0,
+              "qty_raw": "300.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "molho-de-peixe-nam-pla",
+              "insumo_name": "Molho de peixe(nam pla)",
+              "qty": 15.0,
+              "qty_raw": "15.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "acucar",
+              "insumo_name": "Açúcar",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "suco-de-limao",
+              "insumo_name": "Suco de Limão",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "raspas-de-limao",
+              "insumo_name": "Raspas de Limão",
+              "qty": 5.0,
+              "qty_raw": "5.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Refogar a cebola no óleo até ficar translúcida.\nAdicionar alho e gengibre, refogar rapidamente sem dourar.                                                                                                                                                                             Entrar com a pasta de curry vermelho e a páprica.\n                                                                                                                                                                                                                                                                 Refogar por 1–2 minutos até perfumar bem (etapa importante).\nAdicionar metade do leite de coco e reduzir levemente.\nEntrar com o restante do leite de coco + caldo. Adicionar molho de peixe e açúcar.\nAjustar sal se necessário.\nFinalizar com limão e ervas frescas. Ajustar textura (reduzir mais ou afinar com caldo)"
+        },
+        {
+          "id": "quiabo",
+          "name": "Quiabo",
+          "rendimento": "10 Porções",
+          "ingredientes": [],
+          "modo_preparo": "Lavar e secar muito bem os quiabos, retirar o cabinho e a parte de baixo do quiabo.                                                                                                                                  Misture o quiabo junto com o óleo, sal e pimenta do reino.                                                                                                                                                                                       Monte os espetos com 80g de quiabo e reserve."
+        },
+        {
+          "id": "espetinho-de-quiabo-com-curry-vermelho",
+          "name": "Espetinho de Quiabo com curry Vermelho",
+          "rendimento": "1Porção",
+          "ingredientes": [
+            {
+              "insumo_id": "espetinho-de-quiabo",
+              "insumo_name": "Espetinho de quiabo",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "curry-vermelho",
+              "insumo_name": "Curry vermelho",
+              "qty": 80.0,
+              "qty_raw": "80.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "coentro",
+              "insumo_name": "Coentro",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Grelha o quiabo na chapa ou saltese bem quente de 4-6 minutos, \nSelar por todos os lados até: estar levemente tostado macio, mas ainda firme.                                                                                                                                                                                                                                                                                                               Esquentar o molho e finalizar com as raspas de limão.                                                                                                                                                                                                                                                                                                                                                            Dispor o molho curry quente no fundo do prato, posicionar o espetinho sobre o molho e finalizar com coentro."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "polenta-de-rabada-com-agriao-e-queijo-tulha",
+      "sheet_name": "Polenta de rabada",
+      "name": "Polenta de Rabada com Agrião e Queijo Tulha",
+      "description": "",
+      "photos": [],
+      "louca": "Travessa Oval 20 cm Inox + Seda Personalizada",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "rabada-cozida-e-desfiada",
+          "name": "Rabada cozida e Desfiada",
+          "rendimento": "1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "rabada-crua",
+              "insumo_name": "Rabada Crua",
+              "qty": 3.4,
+              "qty_raw": "3.4",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "pimenta-do-reino-mooida",
+              "insumo_name": "Pimenta Do Reino mooída",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "cebola",
+              "insumo_name": "Cebola",
+              "qty": 340.0,
+              "qty_raw": "340.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cenoura",
+              "insumo_name": "Cenoura",
+              "qty": 240.0,
+              "qty_raw": "240.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "salsao",
+              "insumo_name": "Salsão",
+              "qty": 160.0,
+              "qty_raw": "160.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 50.0,
+              "qty_raw": "50.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "louro",
+              "insumo_name": "Louro",
+              "qty": 4.0,
+              "qty_raw": "4.0",
+              "unit": "Folhas",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Tempere a Rabada com sal e pimenta com 12h de antecedência; Selar em panela de pressão grande com óleo até dourar bem, Adicione a cebola, cenoura, salsão \nRefogar até começar a dourar e entre com alho.                                                                                                                                                                                                                                                       Entre com a água e o louro feche a panela e deixe pegar pressão. e cozinhar por 1h20min.                                                                                                                                                                        Retirar a carne Desfiar e descartar ossos e excesso de gordura, e reservar a rabada desfiada e limpa."
+        },
+        {
+          "id": "polenta-com-rabada",
+          "name": "Polenta com Rabada",
+          "rendimento": "5kg",
+          "ingredientes": [
+            {
+              "insumo_id": "fuba-mimoso",
+              "insumo_name": "Fubá mimoso",
+              "qty": 1.65,
+              "qty_raw": "1.65",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 3.0,
+              "qty_raw": "3.0",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 30.0,
+              "qty_raw": "30.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "rabada-cozida-e-desfiada",
+              "insumo_name": "Rabada cozida e desfiada",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "polvilho-azedo",
+              "insumo_name": "Polvilho azedo",
+              "qty": 150.0,
+              "qty_raw": "150.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "manteiga",
+              "insumo_name": "Manteiga",
+              "qty": 165.0,
+              "qty_raw": "165.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em uma Panela aqueça a água com manteiga até iniciar fervura branda; Misture o fubá, polvilho azedo e sal e adicione na panela com água e manteiga, misture bem e cozinhe até soltar da panela;                                                                                                                                                                                                                                                                                                                        Transfira para uma GN e sove a massa, quando a massa estiver em temperatura ambiente acrescente a rabada cozida e desfiada e sove até que a massa fique homogênea e seca. modele em pailitos e congele."
+        },
+        {
+          "id": "polenta-de-rabada-com-agriao-e-queijo-tulha",
+          "name": "Polenta de Rabada com Agrião e Queijo Tulha",
+          "rendimento": "1 Porção",
+          "ingredientes": [
+            {
+              "insumo_id": "polenta",
+              "insumo_name": "Polenta",
+              "qty": 240.0,
+              "qty_raw": "240.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "queijo-tulha",
+              "insumo_name": "Queijo tulha",
+              "qty": 17.5,
+              "qty_raw": "15 a 20",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agriao-fresco",
+              "insumo_name": "Agrião Fresco",
+              "qty": 15.0,
+              "qty_raw": "15.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Aqueça o óleo a 180°C. Frite os palitos de polenta (240g) ainda gelados para garantir o contraste de texturas. Frite até que estejam com uma crosta dourada e bem firme.\nRetire a polenta e coloque sobre papel absorvente ou grade de descanso por alguns segundos. O excesso de óleo deve ser removido para não murchar o queijo e o agrião.\n Transfira a polenta para um bowl e tempere com uma pitada de sal enquanto ainda estiver bem quente.\n Disponha a polenta no prato de servir (empilhada em formato de \"fogueira\" para dar altura). Rale o Queijo Tulha (20g) finamente por cima de toda a polenta. O calor residual da fritura deve fazer o queijo começar a aderir aos palitos.\n\n Coloque o Agrião (15g) no topo ou entre os palitos. As folhas devem estar bem secas e crocantes."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "crudo-de-atum-na-pururca-com-aioli-de-pimenta-fermentda",
+      "sheet_name": "crudo de atum na pururuca",
+      "name": "Crudo de atum na pururca com Aioli de pimenta fermentda",
+      "description": "",
+      "photos": [],
+      "louca": "Pratinho redondo de Sobremesa Ágata 14 cm + Seda Personalizada",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "pururuca",
+          "name": "Pururuca",
+          "rendimento": "36g",
+          "ingredientes": [
+            {
+              "insumo_id": "pele-de-porco-desidratada",
+              "insumo_name": "Pele de porco desidratada",
+              "qty": 32.0,
+              "qty_raw": "32.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Fritar a pele de porco a 180°C até dobrar de volume por cerca de 3 minutos, deixar um cesto de fritadeira por cima do outro durante a fritura. Deixe escorrer e reserve."
+        },
+        {
+          "id": "aioli-de-pimenta-fermentada",
+          "name": "Aioli de Pimenta fermentada",
+          "rendimento": "600g",
+          "ingredientes": [
+            {
+              "insumo_id": "leite-gelado",
+              "insumo_name": "Leite gelado",
+              "qty": 100.0,
+              "qty_raw": "100ml",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo-vegetal",
+              "insumo_name": "Óleo vegetal",
+              "qty": 450.0,
+              "qty_raw": "450ml",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-fermentada",
+              "insumo_name": "Pimenta Fermentada",
+              "qty": 60.0,
+              "qty_raw": "60g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "suco-de-limao",
+              "insumo_name": "suco de limão",
+              "qty": 10.0,
+              "qty_raw": "10ml",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Na Thermomix, adicione o leite, o alho e o sal. Bata em velocidade 6, remova a tampa central. Comece a verter o óleo em um fio contínuo e bem fino.Continue vertendo o óleo até que, a mistura pare de girar no centro, formando uma massa compacta e firme. Passe a emulsão para um bowl e incorpore a pimenta fermentada, ajuste a acidez e o sal e reserve.                                                                                                                                            Transfira para bisnagas ou potes herméticos imediatamente e mantenha sob refrigeração."
+        },
+        {
+          "id": "crudo-de-atum",
+          "name": "Crudo de atum",
+          "rendimento": "1porção",
+          "ingredientes": [
+            {
+              "insumo_id": "atum-fresco",
+              "insumo_name": "Atum Fresco",
+              "qty": 120.0,
+              "qty_raw": "120.0",
+              "unit": "g",
+              "observacao": "Limpo, sem nervos e partes escuras",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "azeite-de-oliva",
+              "insumo_name": "Azeite de oliva",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "pimenta-preta-moida-na-hora",
+              "insumo_name": "Pimenta preta moída na hora",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Moído na hora",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Mantenha o lombo de atum entre 0°C e 2°C. O atum oxida e perde textura rapidamente em temperaturas superiores. Use um bowl sobre gelo durante a manipulação, se necessário.\n\nLimpeza e Porcionamento: Limpe o lombo retirando membranas, nervos e as partes oxidadas (tons de marrom). Porcione em blocos de 500g para manter a estrutura da fibra e facilitar o corte rápido durante o serviço.\n                                                                                                                                                                                                                                                          corte o atum em cubos precisos de 0,5 cm. Cubos uniformes garantem que o tempero se distribua por igual e a estética do prato seja preservada.\n\nEm um bowl frio, tempere os cubos com o sal e a pimenta-preta moída na hora.\n\nAdicione o azeite de oliva e misture com movimentos leves (usando uma colher de silicone ou metal frio)peixe.\n\nSirva imediatamente para garantir o frescor e a cor vibrante do atum."
+        },
+        {
+          "id": "crudo-de-atum-na-pururca-com-aioli-de-pimenta-fermentda",
+          "name": "Crudo de atum na pururca com Aioli de pimenta fermentda",
+          "rendimento": "1porção",
+          "ingredientes": [
+            {
+              "insumo_id": "crudo-de-atum",
+              "insumo_name": "Crudo de atum",
+              "qty": 120.0,
+              "qty_raw": "120.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pururuca",
+              "insumo_name": "Pururuca",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "aioli-de-pimenta",
+              "insumo_name": "Aioli de pimenta",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "flor-de-sal",
+              "insumo_name": "Flor de Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "ciboulette",
+              "insumo_name": "Ciboulette",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": ""
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "bolinho-de-carne",
+      "sheet_name": "Bolinho de Carne Empanado com M",
+      "name": "Bolinho de Carne",
+      "description": "",
+      "photos": [],
+      "louca": "Pratinho redondo de Sobremesa Ágata 14 cm + Seda Personalizada",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "camada-bovina-base",
+          "name": "CAMADA BOVINA(BASE)",
+          "rendimento": "1,023kg",
+          "ingredientes": [
+            {
+              "insumo_id": "acem-moido",
+              "insumo_name": "Acém Moído",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 18.0,
+              "qty_raw": "18.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-preta-moida",
+              "insumo_name": "Pimenta Preta Moída",
+              "qty": 3.0,
+              "qty_raw": "3.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimeta-branca-moida",
+              "insumo_name": "Pimeta Branca Moída",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Misture o acém com sal e pimentas.\nTrabalhe a massa por 2–3 minutos até ficar ligeiramente pegajosa.                                                                                                                                                 E reserve."
+        },
+        {
+          "id": "camada-suina-topo",
+          "name": "CAMADA SUÍNA (TOPO)",
+          "rendimento": "1,023kg",
+          "ingredientes": [
+            {
+              "insumo_id": "copa-lombo-moida",
+              "insumo_name": "Copa Lombo Moída",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "barriga-suina-moida",
+              "insumo_name": "Barriga Suína Moída",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 18.0,
+              "qty_raw": "18.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-preta-moida",
+              "insumo_name": "Pimenta Preta Moída",
+              "qty": 3.0,
+              "qty_raw": "3.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-branca-moida",
+              "insumo_name": "Pimenta Branca Moída",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Misturar copa lombo e a barriga.\nAdicionar sal e pimentas.\nTrabalhar até mesma textura pegajosa.                                                                                                                                                                                                                     E reserve."
+        },
+        {
+          "id": "montagem-em-camdas-gn",
+          "name": "MONTAGEM EM CAMDAS (GN)",
+          "rendimento": "1,7kg- 34UND- DE 50G",
+          "ingredientes": [
+            {
+              "insumo_id": "acem-moido-e-temperado",
+              "insumo_name": "Acém moido e Temperado",
+              "qty": 1.023,
+              "qty_raw": "1.023",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "blend-suino-e-temperado",
+              "insumo_name": "Blend suíno e Temperado",
+              "qty": 1.023,
+              "qty_raw": "1.023",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Untar levemente a GN 1/1.\nBase: aplicar o acém moído, e pressionar muito bem Nivelar (sem ar)\nTopo: aplicar o blend suíno, e pressionar novamente para aderência entre camadas.                                                                                     Compactar usando plástico + outra GN ou peso e deixar descansar por 1hora no freezer.                                                                            Assar por 30minutos a 180 °C.                                                                                                                                                                                    Retirar do Forno e levar para o Freezer por mínimo 4 horas (ideal 8–12h).                                                                                            Cortar e porcionar em cubos de 50 g\nManter padrão uniforme."
+        },
+        {
+          "id": "maionese-de-mostarda",
+          "name": "MAIONESE DE MOSTARDA",
+          "rendimento": "1,6kg",
+          "ingredientes": [
+            {
+              "insumo_id": "leite-gelado",
+              "insumo_name": "Leite Gelado",
+              "qty": 250.0,
+              "qty_raw": "250.0",
+              "unit": "ml",
+              "observacao": "Bem Gelado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo-vegetal",
+              "insumo_name": "Óleo Vegetal",
+              "qty": 900.0,
+              "qty_raw": "900.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "Picado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "mostarda-djon",
+              "insumo_name": "Mostarda Djon",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Na Thermomix, adicione o leite, o alho e o sal. Bata em velocidade 6, remova a tampa central. Comece a verter o óleo em um fio contínuo e bem fino.Continue vertendo o óleo até que, a mistura pare de girar no centro, formando uma massa compacta e firme.Transfira para bisnagas ou potes herméticos imediatamente e mantenha sob refrigeração.                                                                                                                                                                                      Com a base da Maionese finalizada leve para um bowl e adicione a mostarda."
+        },
+        {
+          "id": "empanamento",
+          "name": "EMPANAMENTO",
+          "rendimento": "",
+          "ingredientes": [
+            {
+              "insumo_id": "bolinho-de-carne",
+              "insumo_name": "Bolinho de Carne",
+              "qty": 34.0,
+              "qty_raw": "34.0",
+              "unit": "dades",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovos",
+              "insumo_name": "Ovos",
+              "qty": 4.0,
+              "qty_raw": "4.0",
+              "unit": "dades",
+              "observacao": "Batidos com fuet",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "panko",
+              "insumo_name": "Panko",
+              "qty": 400.0,
+              "qty_raw": "400.0",
+              "unit": "g",
+              "observacao": "Temperar com sal e pimenta",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "farinha-de-trigo",
+              "insumo_name": "Farinha de Trigo",
+              "qty": 150.0,
+              "qty_raw": "150.0",
+              "unit": "g",
+              "observacao": "Temperar com sal e pimenta",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "pimenta-moida",
+              "insumo_name": "pimenta moída",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Estação 1: Farinha de Trigo temperada \n\nEstação 2: Ovos batidos e temperados\n\nEstação 3: Farinha Panko temperada \n\nCom uma mão, passe o bolinho/cubo na farinha de trigo, batendo levemente para retirar o excesso.\n\nCom a mesma mão, coloque-o no ovo. Use a outra mão para envolver o bolinho e retirá-lo, deixando escorrer o excesso.\n\nCaindo na Panko, use a mão seca para cobrir e pressionar bem. A pressão é vital para que os flocos de Panko não soltem no óleo.             Garanta que todos os lados do cubo estejam cobertos uniformemente para evitar que a carne \"estoure\" ou perca suculência durante a fritura.\n\nApós empanar, leve os bolinhos à geladeira por pelo menos 15 a 20 minutos antes de fritar. Isso ajuda a \"fixar\" o empanamento."
+        },
+        {
+          "id": "bolinho-de-carne",
+          "name": "Bolinho de Carne",
+          "rendimento": "2und",
+          "ingredientes": [
+            {
+              "insumo_id": "bolinho-de-carne-empanado",
+              "insumo_name": "Bolinho de carne empanado",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "maionese-de-mostarda",
+              "insumo_name": "Maionese de Mostarda",
+              "qty": 30.0,
+              "qty_raw": "30.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Aquecer o óleo a 180 °C\nFritar os bolinhos por 4 minutos.                                                                                                                                                             Dispor os bolinhos no prato\nAplicar o aioli em pontos sobre cada unidade."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "salpicao-de-frango-roll",
+      "sheet_name": "Salpicão deFrango Roll",
+      "name": "Salpicão de Frango Roll",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "frango-cozido-e-desfiado",
+          "name": "Frango Cozido e Desfiado",
+          "rendimento": "1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "peito-de-frango-cru",
+              "insumo_name": "Peito de Frango cru",
+              "qty": 1.4,
+              "qty_raw": "1,4kg",
+              "unit": "kg",
+              "observacao": "Sem pele e sem osso",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 2.0,
+              "qty_raw": "2kg",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-sem-casca",
+              "insumo_name": "Cebola sem casca",
+              "qty": 100.0,
+              "qty_raw": "100g",
+              "unit": "g",
+              "observacao": "Cortada em quatro partes sem casca",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 20.0,
+              "qty_raw": "20g",
+              "unit": "g",
+              "observacao": "Amassado sem casca",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "louro",
+              "insumo_name": "Louro",
+              "qty": 2.0,
+              "qty_raw": "2folhas",
+              "unit": "folhas",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Prepare a cebola em quartos, amasse os dentes de alho e separe as folhas de louro. Na panela de pressão, coloque o peito de frango, os aromáticos e o sal.                                                                                                                                                                                                                        Cubra com a água (garantindo o nível de 2 a 3 cm acima da carne).                                                                                                                                     Tampe e leve ao fogo alto. Assim que a panela atingir a pressão, reduza para fogo médio e conte 20 minutos. Desligue o fogo e espere a pressão sair naturalmente. Retire o frango do líquido.                                                                                                                                                                       Com o frango ainda morno, desfie e reserve"
+        },
+        {
+          "id": "base-de-maionese",
+          "name": "Base de Maionese",
+          "rendimento": "1,1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "leite-gelado",
+              "insumo_name": "Leite Gelado",
+              "qty": 250.0,
+              "qty_raw": "250.0",
+              "unit": "ml",
+              "observacao": "Bem Gelado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo-vegetal",
+              "insumo_name": "Óleo Vegetal",
+              "qty": 900.0,
+              "qty_raw": "900.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "Picado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Na Thermomix, adicione o leite, o alho e o sal. Bata em velocidade 6, remova a tampa central. Comece a verter o óleo em um fio contínuo e bem fino.Continue vertendo o óleo até que, a mistura pare de girar no centro, formando uma massa compacta e firme.Transfira para bisnagas ou potes herméticos imediatamente e mantenha sob refrigeração."
+        },
+        {
+          "id": "picles-de-cebola-roxa",
+          "name": "Picles de cebola roxa",
+          "rendimento": "1 litro",
+          "ingredientes": [
+            {
+              "insumo_id": "cebola-roxa",
+              "insumo_name": "Cebola roxa",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "Fatiada em julienne bem fino",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "vinagre-de-maca",
+              "insumo_name": "Vinagre de maçã",
+              "qty": 300.0,
+              "qty_raw": "300.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 200.0,
+              "qty_raw": "200.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "acucar-refinado",
+              "insumo_name": "Açúcar Refinado",
+              "qty": 60.0,
+              "qty_raw": "60.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 15.0,
+              "qty_raw": "15.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-do-reino-em-graos",
+              "insumo_name": "Pimenta do reino em grãos",
+              "qty": 5.0,
+              "qty_raw": "5.0",
+              "unit": "g",
+              "observacao": "Grãos",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "louro",
+              "insumo_name": "Louro",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "folhas",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cravo",
+              "insumo_name": "Cravo",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Descasque as cebolas e corte-as ao meio. e fatie forma bem fina e uniforme. Coloque as fatias em um pote de vidro esterilizado que tenha tampa hermética.\n\n Em uma panela pequena, combine o vinagre, a água, o açúcar, o sal, a pimenta em grãos, o louro e o cravo.\n\n Leve a panela ao fogo médio. Assim que iniciar a fervura e o açúcar/sal estiverem completamente dissolvidos, desligue o fogo.\n\nVerta o líquido ainda quente diretamente sobre as cebolas no pote de vidro, garantindo que todas fiquem completamente submersas.\n\n.Deixe o pote aberto até atingir a temperatura ambiente. Tampe e leve à refrigeração.\n\nO picles pode ser consumido após 2 horas, mas o equilíbrio ideal entre acidez e dulçor ocorre após 24 horas de descanso.\n                        \n                        \n                        -"
+        },
+        {
+          "id": "salpicao-finalizado",
+          "name": "Salpicão Finalizado",
+          "rendimento": "2,7kg",
+          "ingredientes": [
+            {
+              "insumo_id": "frango-desfiado",
+              "insumo_name": "Frango desfiado",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "Kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "maionese-base",
+              "insumo_name": "Maionese Base",
+              "qty": 900.0,
+              "qty_raw": "900.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "maca-verde-em-brunoise",
+              "insumo_name": "Maçã Verde em brunoise",
+              "qty": 310.0,
+              "qty_raw": "310.0",
+              "unit": "g",
+              "observacao": "Brunoise 3mm",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "dill",
+              "insumo_name": "Dill",
+              "qty": 120.0,
+              "qty_raw": "120.0",
+              "unit": "g",
+              "observacao": "Picado Finamente",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovo-cozido",
+              "insumo_name": "ovo cozido",
+              "qty": 311.0,
+              "qty_raw": "311.0",
+              "unit": "g",
+              "observacao": "Cubos médios aprox 6und",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "suco-de-limao",
+              "insumo_name": "Suco de Limão",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "Q.B",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "Q.B",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "folhas-de-dill",
+              "insumo_name": "Folhas de dill",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "Q.B",
+              "observacao": "Picado finamente",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Corte a Maçã Verde em brunoise (cubos pequenos e regulares).  Coloque-as imediatamente em água com um pouco de limão para evitar que escureçam.                                                                                                                                 Pique o Dill finamente (lâminas).Corte os Ovos Cozidos em cubos médios para que eles tragam textura e não \"sumam\" na mistura.                                                                                                                                                                                     Em um bowl grande e gelado, combine o Frango Desfiado com a Maionese Base. Misture até que todo o frango esteja hidratado.                                                                                                                                                                              Incorpore a maçã verde (escorrida), o dill picado e a erva-doce. Misture delicadamente para não esmagar os cubos de ovo                                                                                                                                                                                        . Tempere com o suco de limão e ajuste o sal. Reserve algumas folhas de dill inteiras para a finalização no prato. Mantenha sob refrigeração, e reserve."
+        },
+        {
+          "id": "salpicao-de-frango-roll",
+          "name": "Salpicão de Frango Roll",
+          "rendimento": "50und",
+          "ingredientes": [
+            {
+              "insumo_id": "mini-brioche",
+              "insumo_name": "Mini Brioche",
+              "qty": 50.0,
+              "qty_raw": "50und",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "salpicao-finalizado",
+              "insumo_name": "Salpicão finalizado",
+              "qty": 2.5,
+              "qty_raw": "2,5kg",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "manteiga",
+              "insumo_name": "Manteiga",
+              "qty": 80.0,
+              "qty_raw": "80g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "dill-para-finalizacao",
+              "insumo_name": "Dill Para finalização",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Em vez de cortar o brioche ao meio lateralmente, faça um corte longitudinal no topo do pão, sem chegar até o fundo. Isso cria uma \"cama\" profunda para o recheio e evita que ele vaze pelas laterais.                                                                                                                                                                          Pincele a manteiga nas faces internas do corte e, se desejar um visual mais rústico, nas laterais externas do pão. Leve à chapa ou frigideira quente até que o brioche esteja dourado e com aroma de avelã.  Com o pão ainda quente, abra-o delicadamente.\nCom o pão ainda quente, abra-o delicadamente.\n\nAdicione 50g do Salpicão (retirado direto da geladeira). \n\nFinalizar com ramos de Dill fresco e picles de cebola roxa."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "moela-no-molho",
+      "sheet_name": "Moela no molho",
+      "name": "Moela no molho",
+      "description": "",
+      "photos": [],
+      "louca": "Pratinho Fundo Sobremesa 19 cm",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "moela-temperada",
+          "name": "MOELA TEMPERADA",
+          "rendimento": "5kg",
+          "ingredientes": [
+            {
+              "insumo_id": "moela",
+              "insumo_name": "Moela",
+              "qty": 5.0,
+              "qty_raw": "5kg",
+              "unit": "kg",
+              "observacao": "Limpas sem gordura externa",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 50.0,
+              "qty_raw": "50g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 20.0,
+              "qty_raw": "20g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-picante",
+              "insumo_name": "Páprica picante",
+              "qty": 10.0,
+              "qty_raw": "10g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-do-reino-moida",
+              "insumo_name": "Pimenta do reino moida",
+              "qty": 10.0,
+              "qty_raw": "10g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho-em-po",
+              "insumo_name": "Alho em pó",
+              "qty": 15.0,
+              "qty_raw": "15g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cominho-em-po",
+              "insumo_name": "Cominho em Pó",
+              "qty": 5.0,
+              "qty_raw": "5g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Revise as moelas para garantir que não haja resíduos de membrana amarela ou excesso de gordura. Se necessário, corte-as em metades para padronizar o tamanho. Em um Bowl seco, misture todas as especiarias (sal, pápricas, pimenta, alho e cominho) até obter um pó uniforme. Envolva as moelas com o mix de temperos, massageando bem para que o tempero adira a todas as peças. deixe descansar sob refrigeração por no mínimo 30 minutos. O ideal para 5kg é o tempo de 2 horas. Mantenha resfriado até o momento do cozimento."
+        },
+        {
+          "id": "sofrito-base-do-molho",
+          "name": "Sofrito (Base do Molho)",
+          "rendimento": "2,5kg",
+          "ingredientes": [
+            {
+              "insumo_id": "tomate-italiano",
+              "insumo_name": "Tomate italiano",
+              "qty": 1.0,
+              "qty_raw": "1Kg",
+              "unit": "Kg",
+              "observacao": "concassé",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "extrato-de-tomate",
+              "insumo_name": "Extrato de Tomate",
+              "qty": 200.0,
+              "qty_raw": "200g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-branca-brunoise",
+              "insumo_name": "Cebola Branca brunoise",
+              "qty": 300.0,
+              "qty_raw": "300g",
+              "unit": "g",
+              "observacao": "Brunoise",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 80.0,
+              "qty_raw": "80g",
+              "unit": "g",
+              "observacao": "Picado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Oleo",
+              "qty": 150.0,
+              "qty_raw": "150ml",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "Q.B",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Em uma panela de fundo grosso, aqueça o óleo. Adicione a cebola e refogue em fogo médio até que fique translúcida e macia. Não deixe dourar para manter a doçura natural.\nAdicione o alho picado. Refogue por cerca de 1 minuto. Adicione o extrato de tomate diretamente no refogado de cebola e alho. Mexa por 2 a 3 minutos até que ele mude de um tom vermelho vivo para um bordô mais escuro.\nJunte o tomate italiano picado. Misture bem para deglaçar o fundo da panela.\n Reduza para fogo baixo e cozinhe, mexendo ocasionalmente, até que os tomates se desmanchem e o molho reduza, tornando-se espesso e encorpado.\nSe os tomates não soltarem líquido suficiente, você pode adicionar um pouco do seu Caldo Misto para ajudar na cocção.\nAjuste o sal. Se desejar um molho liso, você pode processar no mixer ou liquidificador."
+        },
+        {
+          "id": "caldo-misto-de-porco-e-frango",
+          "name": "Caldo misto de porco e frango",
+          "rendimento": "5 litros",
+          "ingredientes": [
+            {
+              "insumo_id": "pe-de-frango",
+              "insumo_name": "Pé de Frango",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "Kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ossos-de-porco",
+              "insumo_name": "Ossos de porco",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "Kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 6.0,
+              "qty_raw": "6.0",
+              "unit": "L",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola branca",
+              "qty": 200.0,
+              "qty_raw": "200g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cenoura",
+              "insumo_name": "Cenoura",
+              "qty": 100.0,
+              "qty_raw": "100g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "salsao",
+              "insumo_name": "Salsão",
+              "qty": 100.0,
+              "qty_raw": "100g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "louro",
+              "insumo_name": "louro",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "Folhas",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Espalhe os pés de frango e os ossos de porco em uma assadeira. Leve ao forno a 200°C por 30 minutos ou até que estejam bem dourados e aromáticos. Isso é vital para a cor escura do caldo.\nEm uma panela à parte, refogue a cebola, a cenoura e o salsão (cortados grosseiramente) até caramelizarem. Usar a cebola com casca (bem lavada) ajuda a intensificar o tom dourado.\n\nColoque os ossos tostados e os vegetais em um caldeirão. Cubra com os 6 litros de água fria.\n\nCozinhe em fogo mínimo (sem ferver agressivamente) por 3 horas. Utilize uma escumadeira para retirar a espuma e a gordura que subirem à superfície.\n\nDesligue o fogo e passe o caldo por uma peneira fina ou chinois. Não pressione os sólidos para não turvar o líquido.\nResfrie rapidamente e deixe descansar sob refrigeração por 12 horas.\nApós o descanso, a gordura terá solidificado no topo. Retire essa placa de gordura com uma colher. O resultado deve ser um caldo translúcido e gelatinoso."
+        },
+        {
+          "id": "molho-de-moela-finalizado",
+          "name": "MOLHO DE MOELA FINALIZADO",
+          "rendimento": "6,5kg",
+          "ingredientes": [
+            {
+              "insumo_id": "moela-temperada",
+              "insumo_name": "Moela temperada",
+              "qty": 5.0,
+              "qty_raw": "5.0",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sofrito",
+              "insumo_name": "Sofrito",
+              "qty": 2.5,
+              "qty_raw": "2.5",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "caldo",
+              "insumo_name": "Caldo",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "L",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cerveja-ipa",
+              "insumo_name": "Cerveja IPA",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "L",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Aqueça uma sauteuse grande ou caldeirão com um fio de óleo. Adicione as moelas em lotes para não baixar a temperatura. Sele até que criem uma crosta dourada (isso potencializa o sabor do molho).\n\nDeglaçagem: Com a panela bem quente, verta a Cerveja IPA. Use uma espátula para raspar o fundo da panela, soltando o \"suco\" da carne que grudou (fundo de panela). Deixe o álcool evaporar por 2 minutos.  Adicione o Sofrito de Tomate. Misture bem para que os sabores das especiarias da moela se fundam ao doce do tomate e da cebola.\n\nAdicione o Caldo Misto. O líquido deve cobrir as moelas. Reduza o fogo para o mínimo e cozinhe com a panela semi-tampada por 1h30 a 2 horas.\n\nNos últimos 20 minutos, retire a tampa para que o molho reduza e concentre. O ponto ideal é o Napê (o molho deve cobrir as costas de uma colher sem escorrer imediatamente).\n\nProve e ajuste o sal e a pimenta-do-reino."
+        },
+        {
+          "id": "moela-no-molho",
+          "name": "Moela no molho",
+          "rendimento": "160g",
+          "ingredientes": [
+            {
+              "insumo_id": "moela-com-molho",
+              "insumo_name": "Moela com molho",
+              "qty": 160.0,
+              "qty_raw": "160.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "caldo-misto",
+              "insumo_name": "Caldo misto",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Se nescessário",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "cebolinha",
+              "insumo_name": "Cebolinha",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Cortada na diagonal",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Em uma pequena sauteuse ou frigideira de bordas altas, coloque os 160g de moela com o molho.\n\nLeve ao fogo médio. Se o molho estiver muito espesso devido ao colágeno (gelatinoso), adicione os 15ml de caldo.\n\nAqueça mexendo delicadamente até que o molho comece a borbulhar e envolva as moelas de forma brilhante.\n\nCertifique-se de que o molho não seque demais. Ele deve estar em ponto de napê médio.\n\nColoque as moelas centralizadas com o molho vertido por cima.\n\nAdicione a cebolinha cortada na diagonal por cima."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "pastel-de-pao-de-queijo",
+      "sheet_name": "Pastel de pão de queijo",
+      "name": "Pastel de pão de queijo",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "massa-do-pastel",
+          "name": "Massa do pastel",
+          "rendimento": "1,4kg-40und",
+          "ingredientes": [
+            {
+              "insumo_id": "polvilho-azedo",
+              "insumo_name": "Polvilho Azedo",
+              "qty": 454.0,
+              "qty_raw": "454.0",
+              "unit": "g",
+              "observacao": "Peneirado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "mussarela",
+              "insumo_name": "Mussarela",
+              "qty": 454.0,
+              "qty_raw": "454.0",
+              "unit": "g",
+              "observacao": "Ralado fino",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "leite",
+              "insumo_name": "Leite",
+              "qty": 180.0,
+              "qty_raw": "180.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": 180.0,
+              "qty_raw": "180.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovo",
+              "insumo_name": "Ovo",
+              "qty": 115.0,
+              "qty_raw": "115.0",
+              "unit": "g",
+              "observacao": "aprox.2und",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 17.0,
+              "qty_raw": "17.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em uma panela, combine o leite, o óleo e o sal. Leve ao fogo médio até atingir o ponto de pré-fervura (quando começam a subir as primeiras bolhas laterais).\n\nColoque o polvilho azedo em um bowl grande. Verta o líquido quente sobre o polvilho e misture imediatamente.\n\nDeixe a mistura amornar por alguns minutos. Adicione os ovos  aos pucos, incorporando bem até que a massa comece a ganhar brilho.\nAdicione a mussarela ralada. Sove a massa manualmente ou em velocidade baixa até que ela fique lisa, homogênea e pare de desgrudar das mãos (ela deve estar moldável como uma massinha de modelar).\n\nDeixe a massa descansar por 15 a 20 minutos sob refrigeração antes de abrir e moldar os pastéis. Isso facilita o manuseio."
+        },
+        {
+          "id": "costelinha-suina-desfiada",
+          "name": "Costelinha Suína Desfiada",
+          "rendimento": "800g",
+          "ingredientes": [
+            {
+              "insumo_id": "costelinha-suina",
+              "insumo_name": "Costelinha Suína",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "kg",
+              "observacao": "Inteira",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-branca-picada",
+              "insumo_name": "Cebola Branca picada",
+              "qty": 200.0,
+              "qty_raw": "200.0",
+              "unit": "g",
+              "observacao": "Brunoise",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho-picado",
+              "insumo_name": "Alho Picado",
+              "qty": 33.0,
+              "qty_raw": "33.0",
+              "unit": "g",
+              "observacao": "Picado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 17.0,
+              "qty_raw": "17.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "pimenta-do-reino",
+              "insumo_name": "Pimenta do Reino",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "oleo",
+              "insumo_name": "Óleo",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Tempere as costelinhas com sal e pimenta-do-reino. Deixe descansar sob refrigeração por 30 minutos.\n\nEnvolva a costelinha em papel alumínio e leve ao forno pré-aquecido a 160°C por 2 horas.\n\n Remova o papel alumínio, suba a temperatura para 200°C e asse por mais 20 minutos até que a gordura esteja dourada e a carne comece a se soltar do osso.\n\n Deixe a carne descansar por 10 minutos (para os sucos redistribuírem). Retire todos os ossos e descarte o excesso de gordura externa. Desfie a carne em pedaços pequenos.\nEm uma panela larga, aqueça o óleo e refogue a cebola até ficar translúcida. Adicione o alho e a páprica doce, fritando rapidamente para liberar o aroma.\n\nAdicione a carne desfiada ao refogado. Misture bem para que a páprica e o sabor do alho envolvam todas as fibras. Ajuste o sal se necessário.\n\n Espalhe em uma GN para resfriar completamente antes de usar como recheio (isso evita que o vapor umedeça massas, como a do seu pastel)."
+        },
+        {
+          "id": "montagem-do-pastel",
+          "name": "Montagem do pastel",
+          "rendimento": "1und",
+          "ingredientes": [
+            {
+              "insumo_id": "massa-de-pastel",
+              "insumo_name": "Massa de pastel",
+              "qty": 35.0,
+              "qty_raw": "35.0",
+              "unit": "g",
+              "observacao": "Prépesada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "recheio-de-costelinha",
+              "insumo_name": "Recheio de costelinha",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "Refrigerado",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em uma superfície levemente polvilhada ou entre plásticos, abra a massa com o rolo até atingir a espessura de 3 mm. Use o aro de 12 cm para cortar o disco perfeito.\nColoque os 20g de Costelinha exatamente no centro do disco.\n\nMantenha as bordas (cerca de 1cm) totalmente limpas. Se cair gordura do recheio na borda, o pastel pode abrir durante a fritura.\n\nDobre a massa em formato de meia-lua. Ao fechar, use os dedos para pressionar o ar para fora. O ar preso faz o pastel inflar e pode causar rompimentos.\n\nUtilize um garfo para selar a borda levemente. Como esta massa é elástica (pelo polvilho e queijo), não é necessário usar água para colar, mas a pressão deve ser firme.\n\nDisponha os pastéis em uma GN e leve ao freezer por, no mínimo, 30 minutos."
+        },
+        {
+          "id": "pastel-de-pao-de-queijo-finalizacao",
+          "name": "Pastel de pão de queijo (finalização)",
+          "rendimento": "",
+          "ingredientes": [
+            {
+              "insumo_id": "pastel-de-pao-de-queijo-finalizado",
+              "insumo_name": "Pastel de pão de queijo finalizado",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Certifique-se de que o óleo atingiu 180°C. Se estiver abaixo disso, a massa de pão de queijo vai absorver gordura e ficar \"murcha\".\nColoque os pastéis congelados cuidadosamente no óleo. Frite por 4 minutos.\n\nRetire os pastéis quando estiverem com uma cor dourada uniforme e casca rígida. Deixe descansar em papel absorvente ou grade por 30 segundos antes de servir (isso ajuda a terminar de secar a massa)."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "joelhada-na-canjiquinha",
+      "sheet_name": "Joelhada na canjica",
+      "name": "Joelhada na canjiquinha",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "quirera-de-milho-cozida",
+          "name": "Quirera de milho cozida",
+          "rendimento": "1,7kg",
+          "ingredientes": [
+            {
+              "insumo_id": "quirera-de-milho",
+              "insumo_name": "Quirera de milho",
+              "qty": 566.0,
+              "qty_raw": "566.0",
+              "unit": "g",
+              "observacao": "Lavada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 2.3,
+              "qty_raw": "2.3",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Lave a quirera em água corrente abundante, utilizando uma peneira fina, até que a água saia límpida. Em uma panela de fundo grosso, combine a quirera lavada e a água. Leve ao fogo alto até atingir a fervura. Reduza para fogo baixo e cozinhe por aproximadamente 30 minutos. Mexa ocasionalmente para evitar que os grãos grudem no fundo da panela (o amido do milho tende a assentar) A quirera deve estar macia ao toque, mas ainda mantendo a estrutura do grão. O aspecto final deve ser cremoso, sem excesso de líquido livre Espalhe a quirera em uma GN rasa para resfriar rapidamente."
+        },
+        {
+          "id": "joelho-de-porco-defumado-cozido-e-desfiado",
+          "name": "Joelho de Porco Defumado Cozido e Desfiado",
+          "rendimento": "1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "joelho-de-porco-defumado",
+              "insumo_name": "Joelho de porco defumado",
+              "qty": 1.7,
+              "qty_raw": "1.7",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "caldo-misto",
+              "insumo_name": "Caldo misto",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Coloque o joelho defumado em uma panela de Pressão e Cubra completamente com o Caldo Misto. Leve ao fogo baixo  Cozinhe por aproximadamente 1hora a pós pegar pressão ou até que a carne esteja se soltando do osso ao toque de um garfo Retire o joelho do líquido e deixe esfriar levemente (apenas o suficiente para manusear). Remova o osso, a pele e o excesso de capa de gordura Desfie a carne em pedaços médios/longos, seguindo o sentido das fibras, para manter a suculência. Coe o líquido do cozimento e reserve."
+        },
+        {
+          "id": "joelhada-na-canjiquinha",
+          "name": "Joelhada na canjiquinha",
+          "rendimento": "24Porções de 200g",
+          "ingredientes": [
+            {
+              "insumo_id": "canjiquinha-cozida",
+              "insumo_name": "Canjiquinha cozida",
+              "qty": 1.7,
+              "qty_raw": "1.7",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "joelho-desfiado",
+              "insumo_name": "Joelho Desfiado",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "caldo-reservado-do-joelho",
+              "insumo_name": "Caldo reservado do joelho",
+              "qty": 1.7,
+              "qty_raw": "1.7",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-branca-em-brunoise",
+              "insumo_name": "cebola branca em brunoise",
+              "qty": 220.0,
+              "qty_raw": "220.0",
+              "unit": "g",
+              "observacao": "Brunoise",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "verduras",
+              "insumo_name": "verduras",
+              "qty": 330.0,
+              "qty_raw": "330.0",
+              "unit": "g",
+              "observacao": "Picadas grosseiramente (rasgadas)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-do-reino",
+              "insumo_name": "pimenta do reino",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Moída na hora",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "azeite",
+              "insumo_name": "Azeite",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Em uma panela grande, aqueça a gordura e refogue a cebola branca até que fique translúcida (não deixe dourar demais para não amargar o milho).\n\n Adicione o Joelho Desfiado e o Caldo reservado. Deixe levantar fervura para que a carne solte todo o sabor defumado no líquido.\n\n Incorpore a Canjiquinha cozida. Mexa vigorosamente  para que o amido da quirera emulsione com o caldo e o colágeno do joelho.\n\n Com o fogo ainda ligado, adicione as verduras. Elas devem apenas murchar levemente com o calor residual, mantendo a cor verde vibrante e a textura.\n Ajuste o sal (cuidado, pois o joelho defumado já é salgado) e a pimenta-do-reino."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "taco-de-peixe",
+      "sheet_name": "Taco de peixe",
+      "name": "Taco de Peixe",
+      "description": "",
+      "photos": [],
+      "louca": "Marcenaria Hand Roll",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "massa-de-tempura",
+          "name": "Massa de Tempurá",
+          "rendimento": "2,7kg",
+          "ingredientes": [
+            {
+              "insumo_id": "farinha-de-trigo",
+              "insumo_name": "Farinha de Trigo",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "kg",
+              "observacao": "Peneirada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "amido-de-milho",
+              "insumo_name": "Amido de Milho",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "g",
+              "observacao": "Peneirada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 15.0,
+              "qty_raw": "15.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua-com-gas",
+              "insumo_name": "Água com Gás",
+              "qty": 1.5,
+              "qty_raw": "1.5",
+              "unit": "l",
+              "observacao": "Bem Gelada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovos",
+              "insumo_name": "Ovos",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em um bowl grande, misture a farinha de trigo, o amido de milho, o sal e a páprica doce.\n Adicione os ovos levemente batidos e, em seguida, verta a água com gás gelada aos poucos.\n\nMisture levemente com um batedor de arame (fouet) ou hashis. Atenção: Não bata excessivamente. É normal e desejável que fiquem alguns pequenos grumos de farinha; se bater demais, você desenvolve o glúten e a massa fica borrachuda em vez de crocante.\n\nDeixe a massa descansar sob refrigeração por 10 a 15 minutos antes de usar.\n\nUso: Mantenha o bowl da massa sobre um recipiente com gelo durante o serviço para preservar a temperatura baixa."
+        },
+        {
+          "id": "vinagrete-de-banana",
+          "name": "Vinagrete De Banana",
+          "rendimento": "1,1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "banana-da-terra",
+              "insumo_name": "Banana Da Terra",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "Brunoise",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "tomate-maduro",
+              "insumo_name": "Tomate Maduro",
+              "qty": 300.0,
+              "qty_raw": "300.0",
+              "unit": "g",
+              "observacao": "Brunoise (sem sementes)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-roxa",
+              "insumo_name": "Cebola roxa",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "g",
+              "observacao": "Julienne fina",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "azeite-de-oliva",
+              "insumo_name": "Azeite de oliva",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "suco-de-limao",
+              "insumo_name": "Suco de Limão",
+              "qty": 80.0,
+              "qty_raw": "80.0",
+              "unit": "ml",
+              "observacao": "aprox. 3limões",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Descasque as bananas e, Corte em cubos pequenos e uniformes. Misture a cebola roxa em julienne com o suco de limão e deixe descansar por 5 minutos (isso suaviza a picância da cebola e a deixa mais rosada).Em um bowl, combine a banana, o tomate em brunoise e a cebola marinada. Adicione o azeite de oliva e o sal. Misture delicadamente para não desmanchar os cubos de banana. Deixe descansar na geladeira por pelo menos 30 minutos antes de servir para que os sabores se integrem."
+        },
+        {
+          "id": "base-de-maionese",
+          "name": "Base de Maionese",
+          "rendimento": "1,1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "leite-gelado",
+              "insumo_name": "Leite Gelado",
+              "qty": 250.0,
+              "qty_raw": "250.0",
+              "unit": "ml",
+              "observacao": "Bem Gelado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo-vegetal",
+              "insumo_name": "Óleo Vegetal",
+              "qty": 900.0,
+              "qty_raw": "900.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "Picado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Na Thermomix, adicione o leite, o alho e o sal. Bata em velocidade 6, remova a tampa central. Comece a verter o óleo em um fio contínuo e bem fino.Continue vertendo o óleo até que, a mistura pare de girar no centro, formando uma massa compacta e firme.Transfira para bisnagas ou potes herméticos imediatamente e mantenha sob refrigeração."
+        },
+        {
+          "id": "salmoura-e-porcionamento-do-peixe",
+          "name": "Salmoura e porcionamento do peixe.",
+          "rendimento": "",
+          "ingredientes": [
+            {
+              "insumo_id": "peixe-limpo",
+              "insumo_name": "Peixe  Limpo",
+              "qty": 3.0,
+              "qty_raw": "3.0",
+              "unit": "kg",
+              "observacao": "Tiras de 30g (aprox. 8 a 10cm)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 3000.0,
+              "qty_raw": "3000.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 90.0,
+              "qty_raw": "90.0",
+              "unit": "g",
+              "observacao": "Proporção de 3% (salmoura leve)",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Com o peixe ainda bem frio, corte-o em tiras uniformes de 30g.                                                                                                                                                                                                                                  Em uma GN 1/1 funda, dissolva completamente o sal na água fria. Submerja as tiras de peixe na solução de forma que fiquem totalmente cobertas. Deixe descansar sob refrigeração por exatos 15 minutos.                                                                                                                                                                                                                                                                                                           Retire o peixe da salmoura. Seque cada pedaço com papel toalha . Mantenha as tiras secas em um recipiente com grade (se possível) para evitar o acúmulo de líquidos, sob refrigeração até o momento de passar na massa."
+        },
+        {
+          "id": "taco-de-peixe",
+          "name": "Taco de Peixe",
+          "rendimento": "2 Porções",
+          "ingredientes": [
+            {
+              "insumo_id": "tortilha",
+              "insumo_name": "Tortilha",
+              "qty": 2.0,
+              "qty_raw": "2.0",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "peixe-empanado-no-tempura",
+              "insumo_name": "Peixe empanado no tempurá",
+              "qty": 60.0,
+              "qty_raw": "60.0",
+              "unit": "g",
+              "observacao": "2und de 30g",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "maionese-base",
+              "insumo_name": "Maionese Base",
+              "qty": 15.0,
+              "qty_raw": "15.0",
+              "unit": "g",
+              "observacao": "Aplicar na base da tortilha",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "vinagrete-de-banana-finalizado",
+              "insumo_name": "Vinagrete de banana finalizado",
+              "qty": 40.0,
+              "qty_raw": "40.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "molho-sweet-chili",
+              "insumo_name": "molho sweet chili",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "Finalização",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "coentro-fresco",
+              "insumo_name": "coentro fresco",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Folhas inteiras",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "limao-cortado",
+              "insumo_name": "Limão Cortado",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "und",
+              "observacao": "Cortado à francesa",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Passe as tiras de peixe (secas) na Massa de Tempurá gelada.\n\nFrite em óleo por imersão a 180°C por 3 a 4 minutos até que a massa esteja dourada e crocante.\n\nEscorra bem em papel absorvente ou grade.\n\nAqueça as tortilhas em uma sauteuse ou chapa bem quente até que fiquem levemente douradas, mas ainda maleáveis (não deixe virar uma torrada, senão o taco quebra ao dobrar).\n\nEspalhe a Maionese Base no centro de cada tortilha.Coloque uma tira de peixe frito em cada taco. Cubra com o Vinagrete de Banana Verde (aproximadamente 20g por taco).\n\nAplique o Molho Sweet Chili em fio sobre o vinagrete.\nFinalizar com folhas de Coentro Fresco.\n acompanhado de uma fatia de limão para trazer acidez extra e frescor."
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "lula-salteada-com-linguica-e-milho",
+      "sheet_name": "Lula salteada com linguiça e mi",
+      "name": "Lula Salteada Com Linguiça e milho",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "lula-limpa",
+          "name": "Lula Limpa",
+          "rendimento": "1kg",
+          "ingredientes": [
+            {
+              "insumo_id": "lula",
+              "insumo_name": "Lula",
+              "qty": 1.6,
+              "qty_raw": "1.6",
+              "unit": "kg",
+              "observacao": "Fresca/Descongelada",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Retire a cabeça do corpo da lula com cuidado para não romper, emova a cartilagem interna (pena) e todas as vísceras. Lave o interior do tubo em água corrente fria. Remova a pele fina e arroxeada que envolve o tubo. Para facilitar, você pode usar um papel toalha para dar aderência e puxar a pele em uma única direção.                                                                                                    Corte o tubo em fatias transversais de aproximadamente 1,5 cm de espessura (ou conforme o padrão do prato).                   Após o corte, seque bem os pedaços, Manter refrigerada até o uso."
+        },
+        {
+          "id": "milho-verde-cozido",
+          "name": "Milho verde Cozido",
+          "rendimento": "600g",
+          "ingredientes": [
+            {
+              "insumo_id": "milho-verde-em-espigas",
+              "insumo_name": "Milho verde em espigas",
+              "qty": 1.2,
+              "qty_raw": "1.2",
+              "unit": "KG",
+              "observacao": "Com Palha e cabelo",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Para Água do cozimento",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Remova completamente a palha e os fios (cabelo) das espigas. Lave-as em água corrente abundante. em uma panela grande, coloque as espigas inteiras e cubra totalmente com água. Adicione uma pitada de sal. Leve ao fogo médio-alto e, após iniciar a fervura, cozinhe por 10 a 15 minutos, ou até que os grãos estejam macios e com cor vibrante. Retire as espigas da água quente e, se possível, passe por água gelada para interromper o cozimento (isso mantém os grãos firmes). Corte as extremidades da espiga para que ela fique com as pontas retas. poie a espiga em pé (verticalmente) na tábua e corte-a ao meio no sentido do comprimento. Deite as duas metades com o lado do sabugo para baixo e corte-as ao meio novamente (obtendo 4 partes. Repita o processo em cada quarto, cortando-os ao meio mais uma vez no sentido longitudinal."
+        },
+        {
+          "id": "linguica",
+          "name": "Linguiça",
+          "rendimento": "450g",
+          "ingredientes": [
+            {
+              "insumo_id": "linguica-fresca",
+              "insumo_name": "Linguiça Fresca",
+              "qty": 500.0,
+              "qty_raw": "500.0",
+              "unit": "g",
+              "observacao": "Inteira",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Aqueça uma frigideira de fundo grosso ou chapa em fogo médio, coloque os gomos da linguiça inteiros. Deixe dourar bem de todos os lados, virando com um pegador.  Retire a linguiça da fonte de calor e deixe descansar por 2 a 3 minutos antes de cortar. Apoie a linguiça na tábua e, com uma faca bem afiada, faça cortes inclinados (diagonal) com cerca de 1 cm a 1,5 cm de espessura. Esse corte alonga a fatia e melhora a apresentação no prato.Reserve."
+        },
+        {
+          "id": "mix-de-papricas",
+          "name": "Mix de Pápricas",
+          "rendimento": "100g",
+          "ingredientes": [
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 70.0,
+              "qty_raw": "70.0",
+              "unit": "g",
+              "observacao": "Em pó",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-picante",
+              "insumo_name": "Páprica Picante",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "Em pó",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal refinado",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Pesar todos os ingredientes separadamente.\nMisturar até completa homogeneização.\nArmazenar em um snaker de tempero."
+        },
+        {
+          "id": "lula-salteada-com-linguica-e-milho",
+          "name": "Lula Salteada Com Linguiça e milho",
+          "rendimento": "10Porções de 200g",
+          "ingredientes": [
+            {
+              "insumo_id": "lula-limpa",
+              "insumo_name": "Lula Limpa",
+              "qty": 1.0,
+              "qty_raw": "1kg",
+              "unit": "kg",
+              "observacao": "Secar antes de usar",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "linguica-cozida",
+              "insumo_name": "Linguiça cozida",
+              "qty": 450.0,
+              "qty_raw": "450g",
+              "unit": "g",
+              "observacao": "Pré-preparada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "milho-cozido-em-graos",
+              "insumo_name": "Milho Cozido em Grãos",
+              "qty": 550.0,
+              "qty_raw": "550g",
+              "unit": "g",
+              "observacao": "Pré-preparada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "mix-de-papricas",
+              "insumo_name": "Mix De Pápricas",
+              "qty": 30.0,
+              "qty_raw": "30g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "cebolinha",
+              "insumo_name": "Cebolinha",
+              "qty": 100.0,
+              "qty_raw": "100G",
+              "unit": "G",
+              "observacao": "corte fino na diagonal",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pao-de-fermentacao-natural",
+              "insumo_name": "Pão de fermentação natural",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "Fatias",
+              "observacao": "80g por fatia",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "azeite",
+              "insumo_name": "Azeite",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "coentro",
+              "insumo_name": "Coentro",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Finalização",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": "Aqueça uma sauteuse (ou frigideira larga) em fogo alto até que esteja levemente fumegante. Adicione um fio de azeite. Adicione a Lula. Salteie rapidamente por 1 a 2 minutos. Incorpore a Linguiça fatiada e o Milho. Misture rapidamente apenas para aquecer e integrar os sabores (cerca de 1 minuto). Adicione o Mix de Pápricas e ajuste o Sal. A páprica deve envolver todos os ingredientes.Desligue o fogo imediatamente. Adicione a Cebolinha fresca e misture delicadamente. Enquanto salteia, as fatias de Pão de Fermentação Natural devem ser levemente tostadas (na chapa ou forno) para garantir a base crocante.  Em um prato fundo ou tigela de serviço, coloque a mistura de lula, linguiça e milho centralizada.\nPosicione a fatia de Pão tostado ao lado ou na borda do prato, permitindo que o cliente use o pão para aproveitar o \"molhinho\" que se forma do azeite com a páprica Finalize com Coentro fresco por cima para dar frescor visual.                        \n                        \n                        \n                        \n                        \n                        \n                        \n                        \n                        -"
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    },
+    {
+      "id": "espetinho-de-coracao-com-sweet-chili",
+      "sheet_name": "Espetinho de coração",
+      "name": "Espetinho de coração com sweet chili",
+      "description": "",
+      "photos": [],
+      "louca": "",
+      "equipamentos": [],
+      "sub_fichas": [
+        {
+          "id": "marinada-do-coracao-de-frango",
+          "name": "MARINADA DO CORAÇÃO DE FRANGO",
+          "rendimento": "50 espetinhos",
+          "ingredientes": [
+            {
+              "insumo_id": "coracao-de-frango-limpo",
+              "insumo_name": "Coração de frango limpo",
+              "qty": 5.0,
+              "qty_raw": "5.0",
+              "unit": "kg",
+              "observacao": "Inteiro e resfriado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho-picado",
+              "insumo_name": "Alho picado",
+              "qty": 80.0,
+              "qty_raw": "80.0",
+              "unit": "g",
+              "observacao": "Bem miúdo (brunoise)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal refinado",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "acucar-cristal",
+              "insumo_name": "Açúcar cristal",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica doce",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "pimenta-do-reino",
+              "insumo_name": "Pimenta-do-reino",
+              "qty": 10.0,
+              "qty_raw": "10.0",
+              "unit": "g",
+              "observacao": "Moída na hora",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "shoyu",
+              "insumo_name": "Shoyu",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "ml",
+              "observacao": "Tradicional",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "limao-suco",
+              "insumo_name": "Limão (suco)",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "ml",
+              "observacao": "Coado (sem sementes)",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de soja",
+              "qty": 100.0,
+              "qty_raw": "100.0",
+              "unit": "ml",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Mise en Place (Organização): Reúna todos os ingredientes. Em um bowl de aço inox, misture o alho, o sal, o açúcar, a páprica, a pimenta-do-reino, o shoyu, o suco de limão e o óleo. Mexa até que o açúcar e o sal estejam parcialmente dissolvidos e a mistura esteja homogênea.                                                                                                                                                                                                                                                                                                                                                                        Adicione os corações de frango à marinada. Misture bem com as mãos (usando luvas) ou uma espátula, garantindo que o tempero envolva cada peça.                                                                                                                                                             Descanso Térmico: Cubra o recipiente com filme plástico ou tampa hermética. Deixe descansar sob refrigeração por no mínimo 30 minutos.                                                                                                                                                                                                                                                                                                                 Drenagem: Antes de iniciar a montagem, verta o conteúdo em um escorredor para retirar o excesso de líquido. Isso evita que o espetinho \"cozinhe\" em vez de assar na brasa.                                                                                                                                                                                                                                     Montagem: Espete os corações seguindo o padrão da casa. Utilize a balança para garantir que cada espetinho tenha exatamente 150g."
+        },
+        {
+          "id": "massa-de-tempura",
+          "name": "Massa de Tempurá",
+          "rendimento": "50 Porções",
+          "ingredientes": [
+            {
+              "insumo_id": "farinha-de-trigo",
+              "insumo_name": "Farinha de Trigo",
+              "qty": 1.0,
+              "qty_raw": "1kg",
+              "unit": "kg",
+              "observacao": "Peneirada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "amido-de-milho",
+              "insumo_name": "Amido de Milho",
+              "qty": 100.0,
+              "qty_raw": "100g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "paprica-doce",
+              "insumo_name": "Páprica Doce",
+              "qty": 15.0,
+              "qty_raw": "15g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua-com-gas",
+              "insumo_name": "Água com Gás",
+              "qty": 1.5,
+              "qty_raw": "1,5L",
+              "unit": "L",
+              "observacao": "Muito Gelada",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "ovos",
+              "insumo_name": "Ovos",
+              "qty": 2.0,
+              "qty_raw": "2und",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal",
+              "insumo_name": "Sal",
+              "qty": 20.0,
+              "qty_raw": "20g",
+              "unit": "g",
+              "observacao": "",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Peneire a farinha de trigo e o amido de milho em um bowl grande. Adicione a páprica doce e o sal. Misture os secos.                                                                                                                                                                                                                                                                                        Em outro recipiente, bata levemente os ovos e misture com a água com gás muito gelada.                                                                                                                                                                                                                                                                                                                               Verta os líquidos sobre os secos. Misture levemente com um batedor de arame (fouet) ou hashis.                                                                                                                                                                                                                                                                                                   Cubra e mantenha sob refrigeração por 10 minutos antes do uso.                                                                                                                                                                                                                                                                                                                                                                  Durante o serviço, se possível, mantenha o bowl da massa sobre uma base de gelo para preservar a temperatura e a crocância final após a fritura."
+        },
+        {
+          "id": "espetinho-de-coracao-com-sweet-chili",
+          "name": "Espetinho de coração com sweet chili",
+          "rendimento": "1Porção",
+          "ingredientes": [
+            {
+              "insumo_id": "espetinho-montado",
+              "insumo_name": "Espetinho montado",
+              "qty": 1.0,
+              "qty_raw": "1.0",
+              "unit": "und",
+              "observacao": "Padrão 150g",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "massa-de-tempura",
+              "insumo_name": "Massa De Tempurá",
+              "qty": 40.0,
+              "qty_raw": "40.0",
+              "unit": "g",
+              "observacao": "Deve estar bem gelado",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sweet-chili",
+              "insumo_name": "Sweet chili",
+              "qty": 20.0,
+              "qty_raw": "20.0",
+              "unit": "g",
+              "observacao": "finalização",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebolinha",
+              "insumo_name": "Cebolinha",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "corte fino na diagonal",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "flor-de-sal",
+              "insumo_name": "Flor de Sal",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "",
+              "is_qb": true
+            }
+          ],
+          "modo_preparo": ""
+        }
+      ],
+      "markup": 300,
+      "created": ""
+    }
+  ],
+  "insumos": [
+    {
+      "id": "acem-moido-e-temperado",
+      "name": "Acém moido e Temperado",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "acem-moido",
+      "name": "Acém Moído",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "agriao-fresco",
+      "name": "Agrião Fresco",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "aioli-de-pimenta",
+      "name": "Aioli de pimenta",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "alho",
+      "name": "Alho",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "alho-em-po",
+      "name": "Alho em pó",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "alho-picado",
+      "name": "Alho Picado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "amido-de-milho",
+      "name": "Amido de Milho",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "atum-fresco",
+      "name": "Atum Fresco",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "azeite",
+      "name": "Azeite",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "azeite-de-oliva",
+      "name": "Azeite de oliva",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "azeitona",
+      "name": "Azeitona",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "acucar",
+      "name": "Açúcar",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "acucar-cristal",
+      "name": "Açúcar cristal",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "acucar-refinado",
+      "name": "Açúcar Refinado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "banana-da-terra",
+      "name": "Banana Da Terra",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "banha",
+      "name": "Banha",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "barriga-suina-moida",
+      "name": "Barriga Suína Moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "blend-suino-e-temperado",
+      "name": "Blend suíno e Temperado",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "bolinho-de-carne",
+      "name": "Bolinho de Carne",
+      "unit": "dades",
+      "price": 0.0
+    },
+    {
+      "id": "bolinho-de-carne-empanado",
+      "name": "Bolinho de carne empanado",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "caldo",
+      "name": "Caldo",
+      "unit": "L",
+      "price": 0.0
+    },
+    {
+      "id": "caldo-de-legumes",
+      "name": "Caldo de legumes",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "caldo-misto",
+      "name": "Caldo misto",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "caldo-reservado-do-joelho",
+      "name": "Caldo reservado do joelho",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "canjiquinha-cozida",
+      "name": "Canjiquinha cozida",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "cebola",
+      "name": "Cebola",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-branca",
+      "name": "Cebola branca",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-branca-brunoise",
+      "name": "Cebola Branca brunoise",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-branca-em-brunoise",
+      "name": "cebola branca em brunoise",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-branca-picada",
+      "name": "Cebola Branca picada",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-brunoise",
+      "name": "Cebola Brunoise",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-picada",
+      "name": "Cebola Picada",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-roxa",
+      "name": "Cebola roxa",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebola-sem-casca",
+      "name": "Cebola sem casca",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cebolinha",
+      "name": "Cebolinha",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cenoura",
+      "name": "Cenoura",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cerveja-ipa",
+      "name": "Cerveja IPA",
+      "unit": "L",
+      "price": 0.0
+    },
+    {
+      "id": "ciboulette",
+      "name": "Ciboulette",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "coentro",
+      "name": "Coentro",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "coentro-fresco",
+      "name": "coentro fresco",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "cominho-em-po",
+      "name": "Cominho em Pó",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "copa-lombo-moida",
+      "name": "Copa Lombo Moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "coracao-de-frango-limpo",
+      "name": "Coração de frango limpo",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "costelinha-suina",
+      "name": "Costelinha Suína",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "cravo",
+      "name": "Cravo",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "crudo-de-atum",
+      "name": "Crudo de atum",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "curry-vermelho",
+      "name": "Curry Vermelho",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "dill",
+      "name": "Dill",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "dill-para-finalizacao",
+      "name": "Dill Para finalização",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "espetinho-de-quiabo",
+      "name": "Espetinho de quiabo",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "espetinho-montado",
+      "name": "Espetinho montado",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "extrato-de-tomate",
+      "name": "Extrato de Tomate",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "farinha-de-trigo",
+      "name": "Farinha de trigo",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "flor-de-sal",
+      "name": "Flor de Sal",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "folhas-de-dill",
+      "name": "Folhas de dill",
+      "unit": "Q.B",
+      "price": 0.0
+    },
+    {
+      "id": "frango-cozido-e-desfiado",
+      "name": "Frango cozido e desfiado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "frango-desfiado",
+      "name": "Frango desfiado",
+      "unit": "Kg",
+      "price": 0.0
+    },
+    {
+      "id": "fuba-mimoso",
+      "name": "Fubá mimoso",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "gema",
+      "name": "Gema",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "gemas",
+      "name": "Gemas",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "gengibre-fresco-picado",
+      "name": "Gengibre fresco Picado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "joelho-de-porco-defumado",
+      "name": "Joelho de porco defumado",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "joelho-desfiado",
+      "name": "Joelho Desfiado",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "leite",
+      "name": "Leite",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "leite-de-coco",
+      "name": "Leite de coco",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "leite-gelado",
+      "name": "Leite gelado",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "limao-suco",
+      "name": "Limão (suco)",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "limao-cortado",
+      "name": "Limão Cortado",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "linguica-cozida",
+      "name": "Linguiça cozida",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "linguica-fresca",
+      "name": "Linguiça Fresca",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "louro",
+      "name": "Louro",
+      "unit": "Folhas",
+      "price": 0.0
+    },
+    {
+      "id": "lula",
+      "name": "Lula",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "lula-limpa",
+      "name": "Lula Limpa",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "maionese-base",
+      "name": "Maionese Base",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "maionese-de-mostarda",
+      "name": "Maionese de Mostarda",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "manteiga",
+      "name": "Manteiga",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "massa-de-empada-base",
+      "name": "Massa de Empada (Base)",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "massa-de-empada-tampa",
+      "name": "Massa de Empada (Tampa)",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "massa-de-pastel",
+      "name": "Massa de pastel",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "massa-de-tempura",
+      "name": "Massa De Tempurá",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "maca-verde-em-brunoise",
+      "name": "Maçã Verde em brunoise",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "milho-cozido-em-graos",
+      "name": "Milho Cozido em Grãos",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "milho-verde-em-espigas",
+      "name": "Milho verde em espigas",
+      "unit": "KG",
+      "price": 0.0
+    },
+    {
+      "id": "mini-brioche",
+      "name": "Mini Brioche",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "mix-de-papricas",
+      "name": "Mix De Pápricas",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "moela",
+      "name": "Moela",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "moela-com-molho",
+      "name": "Moela com molho",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "moela-temperada",
+      "name": "Moela temperada",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "molho-de-peixe-nam-pla",
+      "name": "Molho de peixe(nam pla)",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "molho-sweet-chili",
+      "name": "molho sweet chili",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "mostarda-djon",
+      "name": "Mostarda Djon",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "mussarela",
+      "name": "Mussarela",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "ossos-de-porco",
+      "name": "Ossos de porco",
+      "unit": "Kg",
+      "price": 0.0
+    },
+    {
+      "id": "ovo",
+      "name": "Ovo",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "ovo-cozido",
+      "name": "ovo cozido",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "ovo-de-codorna-cozido-e-picado",
+      "name": "Ovo de codorna cozido e picado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "ovos",
+      "name": "Ovos",
+      "unit": "dades",
+      "price": 0.0
+    },
+    {
+      "id": "panko",
+      "name": "Panko",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pastel-de-pao-de-queijo-finalizado",
+      "name": "Pastel de pão de queijo finalizado",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "peito-de-frango-cru",
+      "name": "Peito de Frango cru",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "peixe-limpo",
+      "name": "Peixe  Limpo",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "peixe-empanado-no-tempura",
+      "name": "Peixe empanado no tempurá",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pele-de-porco-desidratada",
+      "name": "Pele de porco desidratada",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-branca-moida",
+      "name": "Pimenta Branca Moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-do-reino",
+      "name": "Pimenta do Reino",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-do-reino-em-graos",
+      "name": "Pimenta do reino em grãos",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-do-reino-moida",
+      "name": "Pimenta do reino moida",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-do-reino-mooida",
+      "name": "Pimenta Do Reino mooída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-fermentada",
+      "name": "Pimenta Fermentada",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-moida",
+      "name": "pimenta moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-preta-moida",
+      "name": "Pimenta Preta Moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-preta-moida-na-hora",
+      "name": "Pimenta preta moída na hora",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimenta-do-reino",
+      "name": "Pimenta-do-reino",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pimeta-branca-moida",
+      "name": "Pimeta Branca Moída",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "polenta",
+      "name": "Polenta",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "polvilho-azedo",
+      "name": "Polvilho azedo",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pururuca",
+      "name": "Pururuca",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "paprica-doce",
+      "name": "Páprica Doce",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "paprica-picante",
+      "name": "Páprica picante",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "pao-de-fermentacao-natural",
+      "name": "Pão de fermentação natural",
+      "unit": "Fatias",
+      "price": 0.0
+    },
+    {
+      "id": "pe-de-frango",
+      "name": "Pé de Frango",
+      "unit": "Kg",
+      "price": 0.0
+    },
+    {
+      "id": "queijo-tulha",
+      "name": "Queijo tulha",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "quirera-de-milho",
+      "name": "Quirera de milho",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "rabada-cozida-e-desfiada",
+      "name": "Rabada cozida e desfiada",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "rabada-crua",
+      "name": "Rabada Crua",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "raspas-de-limao",
+      "name": "Raspas de Limão",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "recheio-de-costelinha",
+      "name": "Recheio de costelinha",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "recheiro-de-frango",
+      "name": "Recheiro de Frango",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "requeijao-tipo-catupiry",
+      "name": "Requeijão tipo Catupiry",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "sal",
+      "name": "Sal",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "sal-refinado",
+      "name": "Sal Refinado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "salpicao-finalizado",
+      "name": "Salpicão finalizado",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "salsinha-picada",
+      "name": "Salsinha picada",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "salsao",
+      "name": "Salsão",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "shoyu",
+      "name": "Shoyu",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "sofrito",
+      "name": "Sofrito",
+      "unit": "kg",
+      "price": 0.0
+    },
+    {
+      "id": "suco-de-limao",
+      "name": "Suco de Limão",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "sweet-chili",
+      "name": "Sweet chili",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "tomate-italiano",
+      "name": "Tomate italiano",
+      "unit": "Kg",
+      "price": 0.0
+    },
+    {
+      "id": "tomate-maduro",
+      "name": "Tomate Maduro",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "tomate-picado",
+      "name": "Tomate picado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "tortilha",
+      "name": "Tortilha",
+      "unit": "und",
+      "price": 0.0
+    },
+    {
+      "id": "verduras",
+      "name": "verduras",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "vinagre-de-maca",
+      "name": "Vinagre de maçã",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "vinagrete-de-banana-finalizado",
+      "name": "Vinagrete de banana finalizado",
+      "unit": "g",
+      "price": 0.0
+    },
+    {
+      "id": "agua",
+      "name": "Água",
+      "unit": "Col/sopa",
+      "price": 0.0
+    },
+    {
+      "id": "agua-com-gas",
+      "name": "Água com Gás",
+      "unit": "l",
+      "price": 0.0
+    },
+    {
+      "id": "oleo",
+      "name": "Óleo",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "oleo-de-soja",
+      "name": "Óleo de soja",
+      "unit": "ml",
+      "price": 0.0
+    },
+    {
+      "id": "oleo-vegetal",
+      "name": "Óleo vegetal",
+      "unit": "ml",
+      "price": 0.0
+    }
+  ],
+  "equipamentos_disponiveis": [
+    "Mixer de Mão",
+    "Thermomix",
+    "Liquidificador",
+    "Gn's 1/1 Rasa",
+    "Gn's 1/1 Funda",
+    "Gn's 1/2",
+    "Gn's 1/3",
+    "Gn's 1/6",
+    "Gn's 1/9",
+    "Bowl pequeno",
+    "Bowl médio",
+    "Bowl Grande",
+    "Baixelas",
+    "Panela de pressão 20litros",
+    "Panela inox de 12,5 Litros",
+    "Panela Inox Fundo Triplo 2,9 Litros De 20 Cm",
+    "Panela Inox Fundo Triplo 1 litro 15cm",
+    "Frigideira 30cm",
+    "Caldeirão 20litros",
+    "Ralador",
+    "Microplane",
+    "Balança",
+    "Placas de Corte",
+    "Facas",
+    "Caixas Plásticas Organizadoras C/tampa 5L",
+    "Caixas Plásticas Organizadoras C/tampa 8L",
+    "Peneira funda",
+    "Peneira Inox Chinoy",
+    "Colher Grande Inox",
+    "Concha Grande inox",
+    "Espátula de Silicone",
+    "Fuet",
+    "Pegadores de Inox",
+    "Chaira",
+    "Polvilhador de inox",
+    "Bisnagas",
+    "Porta Condimentos C/ 6 divisórias",
+    "Moedor de pimenta",
+    "Espátulas",
+    "Ralador Legumes Mandolin",
+    "Descascador de Legumes",
+    "termômetro infravermelho",
+    "Timer",
+    "Escumadeira",
+    "Caixas Monobloco",
+    "Molheiras de 5litros (Canudos)",
+    "Termômetro de espeto",
+    "Pincel de silicone"
+  ],
+  "meta": {
+    "source": "FICHAS TECNICAS.xlsx",
+    "total_dishes": 12,
+    "total_insumos": 151
+  }
+}

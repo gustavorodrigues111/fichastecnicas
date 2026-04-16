@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fichas Técnicas — Consultoria</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="#/" class="brand">
+      <span class="brand-mark">—</span>
+      <span class="brand-name">Fichas Técnicas</span>
+    </a>
+    <nav class="site-nav">
+      <a href="#/" data-nav="home">Cardápio</a>
+      <a href="#/insumos" data-nav="insumos">Insumos</a>
+      <a href="#/admin" data-nav="admin">Gerenciar</a>
+    </nav>
+  </div>
+</header>
+
+<main id="app" class="container"></main>
+
+<footer class="site-footer">
+  <div class="container">
+    <span>Consultoria gastronômica · Fichas técnicas</span>
+    <span class="footer-actions">
+      <button class="link-btn" id="btn-download-backup">Baixar backup</button>
+      <label class="link-btn" for="file-restore">Restaurar backup</label>
+      <input type="file" id="file-restore" accept=".json" style="display:none" />
+      <button class="link-btn" id="btn-reset">Restaurar do original</button>
+    </span>
+  </div>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
