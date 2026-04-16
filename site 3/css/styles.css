@@ -314,6 +314,12 @@ table.ficha-table {
   padding-top: 1rem;
 }
 
+/* Sub-ficha reference styling */
+.row-subref td:first-child { color: #1a1a1a; }
+.subref-cell { font-style: italic; }
+.subref-arrow { color: #b8955e; font-style: normal; font-weight: 600; margin-right: 0.2rem; }
+.subref-note { color: #999; font-size: 0.82rem; font-style: italic; }
+
 .ficha-section { margin-top: 2.5rem; }
 .ficha-section h3 {
   font-size: 1rem;

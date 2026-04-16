@@ -182,7 +182,8 @@
               "qty_raw": "30-35",
               "unit": "g",
               "observacao": "Para forrar a forma",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "massa-de-empada"
             },
             {
               "insumo_id": "massa-de-empada-tampa",
@@ -191,7 +192,8 @@
               "qty_raw": "60.0",
               "unit": "g",
               "observacao": "Para dechar",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "massa-de-empada"
             },
             {
               "insumo_id": "recheiro-de-frango",
@@ -380,7 +382,8 @@
               "qty_raw": "80.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "curry-vermelho"
             },
             {
               "insumo_id": "coentro",
@@ -544,7 +547,8 @@
               "qty_raw": "1.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "rabada-cozida-e-desfiada"
             },
             {
               "insumo_id": "polvilho-azedo",
@@ -752,7 +756,8 @@
               "qty_raw": "120.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "crudo-de-atum"
             },
             {
               "insumo_id": "pururuca",
@@ -761,7 +766,8 @@
               "qty_raw": "20.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "pururuca"
             },
             {
               "insumo_id": "aioli-de-pimenta",
@@ -770,7 +776,8 @@
               "qty_raw": "20.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "aioli-de-pimenta-fermentada"
             },
             {
               "insumo_id": "flor-de-sal",
@@ -1068,7 +1075,8 @@
               "qty_raw": "30.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "maionese-de-mostarda"
             }
           ],
           "modo_preparo": "Aquecer o óleo a 180 °C\nFritar os bolinhos por 4 minutos.                                                                                                                                                             Dispor os bolinhos no prato\nAplicar o aioli em pontos sobre cada unidade."
@@ -1375,7 +1383,8 @@
               "qty_raw": "2,5kg",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "salpicao-finalizado"
             },
             {
               "insumo_id": "manteiga",
@@ -1629,7 +1638,8 @@
               "qty_raw": "5.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "moela-temperada"
             },
             {
               "insumo_id": "sofrito",
@@ -1638,7 +1648,8 @@
               "qty_raw": "2.5",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "sofrito-base-do-molho"
             },
             {
               "insumo_id": "caldo",
@@ -2309,7 +2320,8 @@
               "qty_raw": "40.0",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "vinagrete-de-banana"
             },
             {
               "insumo_id": "molho-sweet-chili",
@@ -2472,7 +2484,8 @@
               "qty_raw": "1kg",
               "unit": "kg",
               "observacao": "Secar antes de usar",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "lula-limpa"
             },
             {
               "insumo_id": "linguica-cozida",
@@ -2499,7 +2512,8 @@
               "qty_raw": "30g",
               "unit": "g",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "mix-de-papricas"
             },
             {
               "insumo_id": "sal",
@@ -2736,7 +2750,8 @@
               "qty_raw": "40.0",
               "unit": "g",
               "observacao": "Deve estar bem gelado",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "massa-de-tempura"
             },
             {
               "insumo_id": "sweet-chili",
@@ -2789,12 +2804,6 @@
     {
       "id": "agriao-fresco",
       "name": "Agrião Fresco",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "aioli-de-pimenta",
-      "name": "Aioli de Pimenta",
       "unit": "g",
       "price": 0.0
     },
@@ -3051,12 +3060,6 @@
       "price": 0.0
     },
     {
-      "id": "crudo-de-atum",
-      "name": "Crudo de Atum",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
       "id": "curry-vermelho",
       "name": "Curry Vermelho",
       "unit": "g",
@@ -3213,20 +3216,8 @@
       "price": 0.0
     },
     {
-      "id": "lula-limpa",
-      "name": "Lula Limpa",
-      "unit": "kg",
-      "price": 0.0
-    },
-    {
       "id": "maionese-base",
       "name": "Maionese Base",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "maionese-de-mostarda",
-      "name": "Maionese de Mostarda",
       "unit": "g",
       "price": 0.0
     },
@@ -3237,26 +3228,8 @@
       "price": 0.0
     },
     {
-      "id": "massa-de-empada-base",
-      "name": "Massa de Empada (base)",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "massa-de-empada-tampa",
-      "name": "Massa de Empada (tampa)",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
       "id": "massa-de-pastel",
       "name": "Massa de Pastel",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "massa-de-tempura",
-      "name": "Massa de Tempurá",
       "unit": "g",
       "price": 0.0
     },
@@ -3285,12 +3258,6 @@
       "price": 0.0
     },
     {
-      "id": "mix-de-papricas",
-      "name": "Mix de Pápricas",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
       "id": "moela",
       "name": "Moela",
       "unit": "kg",
@@ -3300,12 +3267,6 @@
       "id": "moela-com-molho",
       "name": "Moela com Molho",
       "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "moela-temperada",
-      "name": "Moela Temperada",
-      "unit": "kg",
       "price": 0.0
     },
     {
@@ -3477,12 +3438,6 @@
       "price": 0.0
     },
     {
-      "id": "pururuca",
-      "name": "Pururuca",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
       "id": "paprica-doce",
       "name": "Páprica Doce",
       "unit": "g",
@@ -3516,12 +3471,6 @@
       "id": "quirera-de-milho",
       "name": "Quirera de Milho",
       "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "rabada-cozida-e-desfiada",
-      "name": "Rabada Cozida e Desfiada",
-      "unit": "kg",
       "price": 0.0
     },
     {
@@ -3567,12 +3516,6 @@
       "price": 0.0
     },
     {
-      "id": "salpicao-finalizado",
-      "name": "Salpicão Finalizado",
-      "unit": "kg",
-      "price": 0.0
-    },
-    {
       "id": "salsinha-picada",
       "name": "Salsinha Picada",
       "unit": "g",
@@ -3588,12 +3531,6 @@
       "id": "shoyu",
       "name": "Shoyu",
       "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "sofrito",
-      "name": "Sofrito",
-      "unit": "kg",
       "price": 0.0
     },
     {
@@ -3641,12 +3578,6 @@
     {
       "id": "vinagre-de-maca",
       "name": "Vinagre de Maçã",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "vinagrete-de-banana-finalizado",
-      "name": "Vinagrete de Banana Finalizado",
       "unit": "g",
       "price": 0.0
     },

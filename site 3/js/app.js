@@ -128,32 +128,59 @@ function maybeRender() {
 // ---------- Seed initial data from data.json ----------
 async function seedFromJson() {
   if (!isAdmin) { toast('Faça login como admin'); return; }
-  if (!confirm('Importar dados iniciais do arquivo data.json? Isso sobrescreve o que estiver no banco.')) return;
+  const wipe = confirm('Importar dados iniciais do arquivo data.json?\n\n• OK = limpa o banco atual e importa tudo do zero (recomendado se quer preservar apenas os preços já inseridos — eles serão perdidos)\n• Cancelar = não importa');
+  if (!wipe) return;
   try {
     toast('Importando...');
     const resp = await fetch('data/data.json');
     const seed = await resp.json();
-    // Batch in chunks of 400 (firestore limit 500)
+
+    // Collect existing IDs to compare with seed (to delete orphans)
+    const [existingDishesSnap, existingInsumosSnap] = await Promise.all([
+      getDocs(collection(db, 'dishes')),
+      getDocs(collection(db, 'insumos'))
+    ]);
+    const seedDishIds = new Set(seed.dishes.map(d => d.id));
+    const seedInsumoIds = new Set(seed.insumos.map(i => i.id));
+
     let batch = writeBatch(db);
     let count = 0;
+    const flush = async () => {
+      if (count > 0) { await batch.commit(); batch = writeBatch(db); count = 0; }
+    };
+    const add = (op, ref, data) => {
+      if (op === 'set') batch.set(ref, data);
+      else batch.delete(ref);
+      count++;
+      if (count >= 400) return flush();
+    };
+
+    // Delete orphans
+    for (const d of existingDishesSnap.docs) {
+      if (!seedDishIds.has(d.id)) await add('delete', doc(db, 'dishes', d.id));
+    }
+    for (const d of existingInsumosSnap.docs) {
+      if (!seedInsumoIds.has(d.id)) await add('delete', doc(db, 'insumos', d.id));
+    }
+    // Keep existing prices when re-seeding (merge)
+    const existingPrices = {};
+    existingInsumosSnap.docs.forEach(d => { existingPrices[d.id] = d.data().price || 0; });
+
     for (const dish of seed.dishes) {
       const clean = { ...dish };
       delete clean.id;
-      batch.set(doc(db, 'dishes', dish.id), clean);
-      count++;
-      if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+      await add('set', doc(db, 'dishes', dish.id), clean);
     }
     for (const ins of seed.insumos) {
       const clean = { ...ins };
       delete clean.id;
-      batch.set(doc(db, 'insumos', ins.id), clean);
-      count++;
-      if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+      // Preserve existing price if available
+      if (existingPrices[ins.id] != null) clean.price = existingPrices[ins.id];
+      await add('set', doc(db, 'insumos', ins.id), clean);
     }
-    batch.set(doc(db, 'config', 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
-    count++;
-    if (count > 0) await batch.commit();
-    toast('Dados importados com sucesso!');
+    await add('set', doc(db, 'config', 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
+    await flush();
+    toast('Dados importados! Preços existentes preservados.');
   } catch (err) {
     console.error(err);
     toast('Erro ao importar: ' + err.message);
@@ -257,17 +284,102 @@ function updateAuthUI() {
 
 // ---------- Cost calculations ----------
 function findInsumo(id) { return DATA.insumos.find(i => i.id === id); }
-function subfichaCost(sf) {
+
+// Normalize a string for sub-ficha reference matching
+function nrm(s) {
+  if (!s) return '';
+  return String(s).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().replace(/[,.;:\s]+$/, '');
+}
+// Runtime detection: find if ingredient name matches an earlier sub-ficha in the dish
+function detectSubref(dish, currentSfIdx, ingredientName) {
+  const ingClean = nrm(ingredientName);
+  if (ingClean.length < 4) return null;
+  let best = null, bestScore = 0;
+  for (let j = 0; j < currentSfIdx; j++) {
+    const other = dish.sub_fichas[j];
+    const otherN = nrm(other.name);
+    if (!otherN) continue;
+    if (otherN === ingClean) return other;
+    if (otherN.includes(ingClean) || ingClean.includes(otherN)) {
+      const ratio = Math.min(otherN.length, ingClean.length) / Math.max(otherN.length, ingClean.length);
+      if (ratio > bestScore) { bestScore = ratio; best = other; }
+    }
+  }
+  return bestScore > 0.55 ? best : null;
+}
+
+// Parse rendimento string to { qty, unit } for proportion calculations
+function parseRendimentoQty(rendStr) {
+  if (!rendStr) return { qty: 1, unit: '' };
+  const s = String(rendStr).trim();
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ/]*)/);
+  if (m) {
+    const qty = parseFloat(m[1].replace(',', '.'));
+    const unit = (m[2] || '').toLowerCase();
+    return { qty, unit };
+  }
+  return { qty: 1, unit: '' };
+}
+
+// Calculate sub-ficha cost with optional sub-ficha references (no double-counting).
+// Memoize results per dish.sub_fichas to avoid recalc.
+function subfichaCost(sf, dish, cache = null, visited = null) {
+  cache = cache || new Map();
+  visited = visited || new Set();
+  if (cache.has(sf.id)) return cache.get(sf.id);
+  if (visited.has(sf.id)) return { rows: [], total: 0 };
+  visited.add(sf.id);
+
+  const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
   let total = 0;
-  const rows = sf.ingredientes.map(ing => {
+  const rows = (sf.ingredientes || []).map(ing => {
+    // Determine subref: explicit subref_id OR runtime detection
+    let subSf = null;
+    if (ing.subref_id) {
+      subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
+    }
+    if (!subSf && sfIdx > 0) {
+      subSf = detectSubref(dish, sfIdx, ing.insumo_name);
+    }
+    if (subSf) {
+      // Proportional cost from the referenced sub-ficha
+      const subResult = subfichaCost(subSf, dish, cache, new Set(visited));
+      const subRend = parseRendimentoQty(subSf.rendimento);
+      const ingQty = ing.qty;
+      let cost = 0;
+      if (ingQty != null && subRend.qty > 0) {
+        // Normalize units: convert ingredient qty to sub-ficha rendimento's unit if possible
+        const [qConverted] = normalizeSubrefQty(ingQty, ing.unit, subRend.unit);
+        cost = (qConverted / subRend.qty) * subResult.total;
+      }
+      total += cost;
+      return { ing, insumo: null, cost, subSf, isSubref: true };
+    }
+    // Real insumo
     const insumo = findInsumo(ing.insumo_id);
     const [qNorm, priceNorm] = normalizeQtyPrice(ing, insumo);
     const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm : 0;
     total += cost;
-    return { ing, insumo, cost };
+    return { ing, insumo, cost, isSubref: false };
   });
-  return { rows, total };
+  const result = { rows, total };
+  cache.set(sf.id, result);
+  return result;
 }
+
+function normalizeSubrefQty(qty, ingUnit, subUnit) {
+  const iu = (ingUnit || '').toLowerCase().trim();
+  const su = (subUnit || '').toLowerCase().trim();
+  if (iu === su || !iu || !su) return [qty, qty];
+  if (iu === 'g' && su === 'kg') return [qty / 1000, qty];
+  if (iu === 'kg' && su === 'g') return [qty * 1000, qty];
+  if (iu === 'ml' && (su === 'l' || su === 'lt' || su === 'litro')) return [qty / 1000, qty];
+  if (iu === 'l' && su === 'ml') return [qty * 1000, qty];
+  return [qty, qty];
+}
+
 function normalizeQtyPrice(ing, insumo) {
   if (!insumo || ing.qty == null) return [null, null];
   const iu = (ing.unit || '').toLowerCase().trim();
@@ -281,10 +393,17 @@ function normalizeQtyPrice(ing, insumo) {
   if (iu === 'l' && pu === 'ml') return [q * 1000, p];
   return [q, p];
 }
+
 function dishCost(dish) {
-  const sfCosts = (dish.sub_fichas || []).map(sf => ({ ...subfichaCost(sf), sf }));
-  const total = sfCosts.reduce((s, x) => s + x.total, 0);
+  const cache = new Map();
+  const sfCosts = (dish.sub_fichas || []).map(sf => {
+    const r = subfichaCost(sf, dish, cache);
+    return { ...r, sf };
+  });
+  // Dish total = cost of the FINAL sub-ficha (propagates references, no double-count)
   const finalSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
+  const finalResult = finalSf ? sfCosts.find(x => x.sf.id === finalSf.id) : null;
+  const total = finalResult ? finalResult.total : 0;
   const portions = parsePortions(finalSf ? finalSf.rendimento : '');
   const costPerPortion = portions > 0 ? total / portions : 0;
   const markup = dish.markup || 300;
@@ -292,6 +411,7 @@ function dishCost(dish) {
   const cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
   return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv };
 }
+
 function parsePortions(rendStr) {
   if (!rendStr) return 1;
   const s = String(rendStr).toLowerCase();
@@ -461,6 +581,7 @@ function renderFichaTrabalho(dish, sf) {
   wrap.appendChild(el('h2', {}, sf.name));
   if (sf.rendimento) wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Rendimento: ', el('strong', {}, sf.rendimento)));
 
+  const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
   const tbl = el('table', { class: 'ficha-table' },
     el('thead', {}, el('tr', {},
       el('th', {}, 'Insumo'),
@@ -468,12 +589,25 @@ function renderFichaTrabalho(dish, sf) {
       el('th', {}, 'Unidade'),
       el('th', {}, 'Observação / Processamento')
     )),
-    el('tbody', {}, ...(sf.ingredientes || []).map(ing => el('tr', {},
-      el('td', { 'data-label': 'Insumo' }, ing.insumo_name),
-      el('td', { class: 'num', 'data-label': 'Quantidade' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
-      el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
-      el('td', { 'data-label': 'Observação' }, ing.observacao || '—')
-    )))
+    el('tbody', {}, ...(sf.ingredientes || []).map(ing => {
+      // Detect if this ingredient is a sub-ficha reference
+      let subSf = null;
+      if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
+      if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
+      const nameCell = subSf
+        ? el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
+            el('span', { class: 'subref-arrow' }, '↪ '),
+            ing.insumo_name,
+            el('span', { class: 'subref-note' }, ' (ver preparação)')
+          )
+        : el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
+      return el('tr', { class: subSf ? 'row-subref' : '' },
+        nameCell,
+        el('td', { class: 'num', 'data-label': 'Quantidade' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
+        el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
+        el('td', { 'data-label': 'Observação' }, ing.observacao || '—')
+      );
+    }))
   );
   wrap.appendChild(tbl);
 
@@ -520,11 +654,24 @@ function renderFichaCusto(dish, currentSf) {
         el('th', { class: 'num' }, 'Preço unit.'),
         el('th', { class: 'num' }, 'Custo')
       )),
-      el('tbody', {}, ...rows.map(({ ing, insumo, cost }) => {
-        const priceTxt = insumo ? `${fmtBRL(insumo.price || 0)} / ${insumo.unit || '—'}` : '—';
+      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf }) => {
         const qtyTxt = ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'));
-        return el('tr', {},
-          el('td', { 'data-label': 'Insumo' }, ing.insumo_name),
+        let priceTxt;
+        let nameCell;
+        if (isSubref && subSf) {
+          // Sub-ficha reference — different display
+          const subRend = parseRendimentoQty(subSf.rendimento);
+          priceTxt = el('span', { class: 'subref-note' }, `sub-ficha (${subSf.rendimento || '—'})`);
+          nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
+            el('span', { class: 'subref-arrow' }, '↪ '),
+            ing.insumo_name
+          );
+        } else {
+          priceTxt = insumo ? `${fmtBRL(insumo.price || 0)} / ${insumo.unit || '—'}` : '—';
+          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
+        }
+        return el('tr', { class: isSubref ? 'row-subref' : '' },
+          nameCell,
           el('td', { class: 'num', 'data-label': 'Quantidade' }, qtyTxt),
           el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
           el('td', { class: 'num', 'data-label': 'Preço unit.' }, priceTxt),
@@ -1039,11 +1186,11 @@ function exportFichaPDF(dish, state) {
         startY: y,
         margin: { left: margin, right: margin },
         head: [['Insumo', 'Qtd', 'Un.', 'Preço unit.', 'Custo']],
-        body: rows.map(({ ing, insumo, cost }) => [
-          ing.insumo_name,
+        body: rows.map(({ ing, insumo, cost, isSubref, subSf }) => [
+          (isSubref ? '↪ ' : '') + ing.insumo_name,
           ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—')),
           ing.unit || '—',
-          insumo ? `${fmtBRL(insumo.price || 0)}/${insumo.unit || '—'}` : '—',
+          isSubref ? `sub-ficha (${subSf?.rendimento || '—'})` : (insumo ? `${fmtBRL(insumo.price || 0)}/${insumo.unit || '—'}` : '—'),
           fmtBRL(cost)
         ]),
         foot: [['', '', '', 'Subtotal', fmtBRL(total)]],
