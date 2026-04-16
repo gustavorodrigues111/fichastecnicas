@@ -317,7 +317,7 @@
             },
             {
               "insumo_id": "molho-de-peixe-nam-pla",
-              "insumo_name": "Molho de Peixe(nam Pla)",
+              "insumo_name": "Molho de Peixe (nam Pla)",
               "qty": 15.0,
               "qty_raw": "15.0",
               "unit": "ml",
@@ -742,7 +742,7 @@
               "is_qb": true
             }
           ],
-          "modo_preparo": "Mantenha o lombo de atum entre 0°C e 2°C. O atum oxida e perde textura rapidamente em temperaturas superiores. Use um bowl sobre gelo durante a manipulação, se necessário. Limpeza e Porcionamento: Limpe o lombo retirando membranas, nervos e as partes oxidadas (tons de marrom). Porcione em blocos de 500g para manter a estrutura da fibra e facilitar o corte rápido durante o serviço. corte o atum em cubos precisos de 0,5 cm. Cubos uniformes garantem que o tempero se distribua por igual e a estética do prato seja preservada. Em um bowl frio, tempere os cubos com o sal e a pimenta-preta moída na hora. Adicione o azeite de oliva e misture com movimentos leves (usando uma colher de silicone ou metal frio)peixe. Sirva imediatamente para garantir o frescor e a cor vibrante do atum."
+          "modo_preparo": "Mantenha o lombo de atum entre 0°C e 2°C. O atum oxida e perde textura rapidamente em temperaturas superiores. Use um bowl sobre gelo durante a manipulação, se necessário. Limpeza e Porcionamento: Limpe o lombo retirando membranas, nervos e as partes oxidadas (tons de marrom). Porcione em blocos de 500g para manter a estrutura da fibra e facilitar o corte rápido durante o serviço. corte o atum em cubos precisos de 0,5 cm. Cubos uniformes garantem que o tempero se distribua por igual e a estética do prato seja preservada. Em um bowl frio, tempere os cubos com o sal e a pimenta-preta moída na hora. Adicione o azeite de oliva e misture com movimentos leves (usando uma colher de silicone ou metal frio) peixe. Sirva imediatamente para garantir o frescor e a cor vibrante do atum."
         },
         {
           "id": "crudo-de-atum-na-pururca-com-aioli-de-pimenta-fermentda",
@@ -818,7 +818,7 @@
       "sub_fichas": [
         {
           "id": "camada-bovina-base",
-          "name": "Camada Bovina(base)",
+          "name": "Camada Bovina (base)",
           "rendimento": "1,023kg",
           "ingredientes": [
             {
@@ -3236,7 +3236,7 @@
     },
     {
       "id": "molho-de-peixe-nam-pla",
-      "name": "Molho de Peixe(nam Pla)",
+      "name": "Molho de Peixe (nam Pla)",
       "unit": "ml",
       "price": 0.0
     },
