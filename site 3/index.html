@@ -20,10 +20,9 @@
       <span class="brand-mark">—</span>
       <span class="brand-name">Fichas Técnicas</span>
     </a>
-    <nav class="site-nav">
-      <a href="#/" data-nav="home">Cardápio</a>
-      <a href="#/insumos" data-nav="insumos">Insumos</a>
-      <a href="#/admin" data-nav="admin" id="nav-admin" style="display:none">Gerenciar</a>
+    <nav class="site-nav" id="site-nav">
+      <a href="#/clientes" id="nav-clientes" data-nav="clientes" style="display:none">Restaurantes</a>
+      <a href="#/admin/usuarios" id="nav-usuarios" data-nav="usuarios" style="display:none">Usuários</a>
       <button class="link-btn auth-btn" id="btn-auth">Entrar</button>
     </nav>
   </div>
@@ -31,7 +30,7 @@
 
 <main id="app" class="container">
   <div class="loading-state">
-    <p style="text-align:center; color:#888; font-style:italic; font-family:'Cormorant Garamond',serif; font-size:1.2rem; padding:4rem 0;">Carregando fichas…</p>
+    <p>Carregando…</p>
   </div>
 </main>
 
@@ -39,10 +38,7 @@
   <div class="container">
     <span>Consultoria gastronômica · Fichas técnicas</span>
     <span class="footer-actions">
-      <button class="link-btn" id="btn-download-backup">Baixar backup</button>
-      <label class="link-btn admin-only" for="file-restore" style="display:none">Restaurar backup</label>
-      <input type="file" id="file-restore" accept=".json" style="display:none" />
-      <button class="link-btn admin-only" id="btn-seed" style="display:none">Importar dados iniciais</button>
+      <button class="link-btn" id="btn-download-backup">Baixar backup do cliente</button>
     </span>
   </div>
 </footer>
@@ -51,8 +47,8 @@
 <div id="login-modal" class="modal" hidden>
   <div class="modal-overlay"></div>
   <div class="modal-content">
-    <h2>Entrar como admin</h2>
-    <p class="modal-subtitle">Acesso restrito para edição das fichas</p>
+    <h2>Entrar</h2>
+    <p class="modal-subtitle">Acesso restrito</p>
     <form id="login-form">
       <label class="field">
         <span class="label-text">Email</span>

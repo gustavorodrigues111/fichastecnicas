@@ -3,11 +3,80 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regra global: qualquer um lê, só admin escreve
-    match /{document=**} {
-      allow read: if true;
-      allow write: if request.auth != null
-                   && request.auth.token.email == 'gustavo@quibebe.com.br';
+    // ---------- helpers ----------
+    function isSignedIn() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isMaster() {
+      // Master: static email OR role=master on user doc
+      return isSignedIn() && (
+        request.auth.token.email == 'gustavo@quibebe.com.br'
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && userDoc().role == 'master')
+      );
+    }
+    function hasClienteAccess(cid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (userDoc().role == 'master'
+            || (userDoc().clienteIds is list && userDoc().clienteIds.hasAny([cid])));
+    }
+    function isStaffOf(cid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role in ['master', 'staff']
+        && (userDoc().role == 'master' || userDoc().clienteIds.hasAny([cid]));
+    }
+    function isClienteUserOf(cid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'cliente'
+        && userDoc().clienteIds.hasAny([cid]);
+    }
+    function onlyPriceFields() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['price', 'unit']);
+    }
+
+    // ---------- users collection ----------
+    match /users/{uid} {
+      // Read own doc or master reads all
+      allow read: if isSignedIn() && (request.auth.uid == uid || isMaster());
+      // Create self as master (bootstrap) — only if email matches master
+      allow create: if isSignedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.role == 'master'
+                    && request.auth.token.email == 'gustavo@quibebe.com.br';
+      // Master creates any user doc
+      allow create: if isMaster();
+      // Master updates any; self update limited
+      allow update: if isMaster();
+      allow delete: if isMaster();
+    }
+
+    // ---------- clientes (top-level) ----------
+    match /clientes/{cid} {
+      allow read: if hasClienteAccess(cid);
+      allow create, update, delete: if isMaster();
+
+      // dishes subcollection
+      match /dishes/{dishId} {
+        allow read: if hasClienteAccess(cid);
+        allow write: if isStaffOf(cid);
+      }
+
+      // insumos subcollection
+      match /insumos/{insumoId} {
+        allow read: if hasClienteAccess(cid);
+        allow create, delete: if isStaffOf(cid);
+        // Staff can update anything; cliente can only update price/unit
+        allow update: if isStaffOf(cid) || (isClienteUserOf(cid) && onlyPriceFields());
+      }
+
+      // config subcollection
+      match /config/{configId} {
+        allow read: if hasClienteAccess(cid);
+        allow write: if isStaffOf(cid);
+      }
     }
   }
 }

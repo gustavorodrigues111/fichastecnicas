@@ -1,16 +1,18 @@
 /* ================================================================
-   Fichas Técnicas — single-page app (Firebase + vanilla JS)
+   Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
-  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs, writeBatch
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot,
+  getDoc, getDocs, writeBatch, collectionGroup, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  sendPasswordResetEmail, onAuthStateChanged, signOut
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-// ---------- Firebase config (safe to be public — security comes from rules) ----------
+// ---------- Firebase config ----------
 const firebaseConfig = {
   apiKey: "AIzaSyDF3jKFty1lQrib9lwsRoRxBFTsO-2boMY",
   authDomain: "fichastecnicas-c3829.firebaseapp.com",
@@ -19,21 +21,25 @@ const firebaseConfig = {
   messagingSenderId: "461159721803",
   appId: "1:461159721803:web:922a9a8a39f4c5ec2416ce"
 };
-const ADMIN_EMAIL = "gustavo@quibebe.com.br";
+const MASTER_EMAIL = "gustavo@quibebe.com.br";
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 
 // ---------- State ----------
-const DATA = {
+const STATE = {
+  user: null,           // Firebase auth user
+  userDoc: null,        // { role, clienteIds, email, name }
+  currentClienteId: null,
+  currentCliente: null, // { id, name, ... }
+  clientes: [],         // list of accessible clientes (for master/staff picker)
   dishes: [],
   insumos: [],
-  equipamentos_disponiveis: [],
-  loaded: { dishes: false, insumos: false, config: false }
+  equipamentos: [],
+  loaded: false,
+  unsubs: { dishes: null, insumos: null, config: null, clientes: null }
 };
-let currentUser = null;
-let isAdmin = false;
 
 // ---------- Utilities ----------
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -63,187 +69,181 @@ function toast(msg) {
   t.textContent = msg;
   t.hidden = false;
   clearTimeout(t._to);
-  t._to = setTimeout(() => { t.hidden = true; }, 2400);
+  t._to = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
-// ---------- Debouncing for Firestore writes ----------
+// ---------- Debouncing ----------
 const pendingWrites = new Map();
-function scheduleSave(key, saveFn, delay = 800) {
+function scheduleSave(key, fn, delay = 700) {
   const existing = pendingWrites.get(key);
   if (existing) clearTimeout(existing);
   pendingWrites.set(key, setTimeout(async () => {
     pendingWrites.delete(key);
-    try { await saveFn(); } catch (e) { console.error(e); toast('Erro ao salvar: ' + e.message); }
+    try { await fn(); } catch (e) { console.error(e); toast('Erro: ' + e.message); }
   }, delay));
 }
 
-// ---------- Firestore I/O ----------
-async function saveDishToFirestore(dish) {
-  if (!isAdmin) { toast('Faça login como admin para editar'); return; }
+// ---------- Permission helpers ----------
+const isMaster = () => STATE.userDoc && (STATE.userDoc.role === 'master' || STATE.user?.email === MASTER_EMAIL);
+const isStaff = () => STATE.userDoc && STATE.userDoc.role === 'staff';
+const isClienteUser = () => STATE.userDoc && STATE.userDoc.role === 'cliente';
+const canEditCliente = (cid) => isMaster() || (isStaff() && (STATE.userDoc.clienteIds || []).includes(cid));
+const canViewCliente = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
+const canEditInsumoPrice = (cid) => canEditCliente(cid) || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
+const canManageUsers = () => isMaster();
+const canManageClientes = () => isMaster();
+
+// ---------- Firestore paths ----------
+const dishesCol = (cid) => collection(db, 'clientes', cid, 'dishes');
+const dishDoc = (cid, did) => doc(db, 'clientes', cid, 'dishes', did);
+const insumosCol = (cid) => collection(db, 'clientes', cid, 'insumos');
+const insumoDoc = (cid, iid) => doc(db, 'clientes', cid, 'insumos', iid);
+const configDoc = (cid, name) => doc(db, 'clientes', cid, 'config', name);
+const clienteDoc = (cid) => doc(db, 'clientes', cid);
+
+// ---------- Firestore writes ----------
+async function saveDish(cid, dish) {
   const clean = { ...dish };
-  delete clean.id; // id goes in doc path
-  await setDoc(doc(db, 'dishes', dish.id), clean);
+  delete clean.id;
+  await setDoc(dishDoc(cid, dish.id), clean);
 }
-async function deleteDishFromFirestore(dishId) {
-  if (!isAdmin) return;
-  await deleteDoc(doc(db, 'dishes', dishId));
+async function deleteDish(cid, did) {
+  await deleteDoc(dishDoc(cid, did));
 }
-async function saveInsumoToFirestore(insumo) {
-  if (!isAdmin) return;
+async function saveInsumo(cid, insumo) {
   const clean = { ...insumo };
   delete clean.id;
-  await setDoc(doc(db, 'insumos', insumo.id), clean);
+  await setDoc(insumoDoc(cid, insumo.id), clean, { merge: true });
 }
-async function deleteInsumoFromFirestore(id) {
-  if (!isAdmin) return;
-  await deleteDoc(doc(db, 'insumos', id));
+async function deleteInsumo(cid, iid) {
+  await deleteDoc(insumoDoc(cid, iid));
+}
+async function saveCliente(cliente) {
+  const clean = { ...cliente };
+  delete clean.id;
+  await setDoc(clienteDoc(cliente.id), clean, { merge: true });
+}
+async function deleteCliente(cid) {
+  // Warning: doesn't cascade delete subcollections (Firestore limitation in client SDK).
+  // For MVP: delete just the cliente doc; user should be warned.
+  await deleteDoc(clienteDoc(cid));
 }
 
 // ---------- Real-time listeners ----------
-function setupListeners() {
-  onSnapshot(collection(db, 'dishes'), (snap) => {
-    DATA.dishes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Sort by name
-    DATA.dishes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    DATA.loaded.dishes = true;
-    maybeRender();
-  });
-  onSnapshot(collection(db, 'insumos'), (snap) => {
-    DATA.insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    DATA.insumos.sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()));
-    DATA.loaded.insumos = true;
-    maybeRender();
-  });
-  onSnapshot(doc(db, 'config', 'equipamentos'), (snap) => {
-    DATA.equipamentos_disponiveis = snap.exists() ? (snap.data().list || []) : [];
-    DATA.loaded.config = true;
-    maybeRender();
-  });
+function clearListeners() {
+  Object.entries(STATE.unsubs).forEach(([k, u]) => { if (u) { u(); STATE.unsubs[k] = null; } });
+  STATE.dishes = []; STATE.insumos = []; STATE.equipamentos = []; STATE.currentCliente = null;
+  STATE.loaded = false;
 }
 
-let hasRenderedOnce = false;
-function maybeRender() {
-  if (DATA.loaded.dishes && DATA.loaded.insumos) {
-    if (!hasRenderedOnce) hasRenderedOnce = true;
-    route();
-  }
+function subscribeCliente(cid) {
+  clearListeners();
+  STATE.currentClienteId = cid;
+  let pendingLoads = 4;
+  const maybeRender = () => {
+    if (--pendingLoads <= 0) { STATE.loaded = true; route(); }
+  };
+  // Cliente doc
+  STATE.unsubs.clienteDoc = onSnapshot(clienteDoc(cid), (snap) => {
+    if (snap.exists()) STATE.currentCliente = { id: snap.id, ...snap.data() };
+    else STATE.currentCliente = null;
+    if (pendingLoads > 0) maybeRender(); else route();
+  });
+  // Dishes
+  STATE.unsubs.dishes = onSnapshot(dishesCol(cid), (snap) => {
+    STATE.dishes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    STATE.dishes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (pendingLoads > 0) maybeRender(); else route();
+  }, err => { console.error('dishes err', err); if (pendingLoads > 0) maybeRender(); });
+  // Insumos
+  STATE.unsubs.insumos = onSnapshot(insumosCol(cid), (snap) => {
+    STATE.insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    STATE.insumos.sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()));
+    if (pendingLoads > 0) maybeRender(); else route();
+  }, err => { console.error('insumos err', err); if (pendingLoads > 0) maybeRender(); });
+  // Equipamentos
+  STATE.unsubs.config = onSnapshot(configDoc(cid, 'equipamentos'), (snap) => {
+    STATE.equipamentos = snap.exists() ? (snap.data().list || []) : [];
+    if (pendingLoads > 0) maybeRender(); else route();
+  }, err => { console.error('config err', err); if (pendingLoads > 0) maybeRender(); });
 }
 
-// ---------- Seed initial data from data.json ----------
-async function seedFromJson() {
-  if (!isAdmin) { toast('Faça login como admin'); return; }
-  const wipe = confirm('Importar dados iniciais do arquivo data.json?\n\n• OK = limpa o banco atual e importa tudo do zero (recomendado se quer preservar apenas os preços já inseridos — eles serão perdidos)\n• Cancelar = não importa');
-  if (!wipe) return;
+async function loadClientesList() {
+  // For master/staff: fetch all accessible clientes
   try {
-    toast('Importando...');
-    const resp = await fetch('data/data.json');
-    const seed = await resp.json();
-
-    // Collect existing IDs to compare with seed (to delete orphans)
-    const [existingDishesSnap, existingInsumosSnap] = await Promise.all([
-      getDocs(collection(db, 'dishes')),
-      getDocs(collection(db, 'insumos'))
-    ]);
-    const seedDishIds = new Set(seed.dishes.map(d => d.id));
-    const seedInsumoIds = new Set(seed.insumos.map(i => i.id));
-
-    let batch = writeBatch(db);
-    let count = 0;
-    const flush = async () => {
-      if (count > 0) { await batch.commit(); batch = writeBatch(db); count = 0; }
-    };
-    const add = (op, ref, data) => {
-      if (op === 'set') batch.set(ref, data);
-      else batch.delete(ref);
-      count++;
-      if (count >= 400) return flush();
-    };
-
-    // Delete orphans
-    for (const d of existingDishesSnap.docs) {
-      if (!seedDishIds.has(d.id)) await add('delete', doc(db, 'dishes', d.id));
+    const snap = await getDocs(collection(db, 'clientes'));
+    let all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!isMaster()) {
+      const mine = new Set(STATE.userDoc?.clienteIds || []);
+      all = all.filter(c => mine.has(c.id));
     }
-    for (const d of existingInsumosSnap.docs) {
-      if (!seedInsumoIds.has(d.id)) await add('delete', doc(db, 'insumos', d.id));
-    }
-    // Keep existing prices when re-seeding (merge)
-    const existingPrices = {};
-    existingInsumosSnap.docs.forEach(d => { existingPrices[d.id] = d.data().price || 0; });
-
-    for (const dish of seed.dishes) {
-      const clean = { ...dish };
-      delete clean.id;
-      await add('set', doc(db, 'dishes', dish.id), clean);
-    }
-    for (const ins of seed.insumos) {
-      const clean = { ...ins };
-      delete clean.id;
-      // Preserve existing price if available
-      if (existingPrices[ins.id] != null) clean.price = existingPrices[ins.id];
-      await add('set', doc(db, 'insumos', ins.id), clean);
-    }
-    await add('set', doc(db, 'config', 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
-    await flush();
-    toast('Dados importados! Preços existentes preservados.');
+    STATE.clientes = all.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   } catch (err) {
     console.error(err);
-    toast('Erro ao importar: ' + err.message);
+    STATE.clientes = [];
   }
 }
 
-// ---------- Backup / Restore ----------
-function downloadBackup() {
-  const blob = new Blob([JSON.stringify({
-    version: 1,
-    dishes: DATA.dishes,
-    insumos: DATA.insumos,
-    equipamentos_disponiveis: DATA.equipamentos_disponiveis
-  }, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `fichas-backup-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('Backup baixado');
-}
+// ---------- Seed / migration ----------
+async function seedClienteFromJson(cid, clienteName) {
+  toast('Importando dados do arquivo inicial...');
+  const resp = await fetch('data/data.json');
+  const seed = await resp.json();
 
-function restoreBackup(file) {
-  if (!isAdmin) { toast('Apenas admin pode restaurar'); return; }
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      const d = JSON.parse(e.target.result);
-      if (!d.dishes || !d.insumos) throw new Error('formato inválido');
-      if (!confirm('Restaurar backup? Sobrescreve tudo no banco.')) return;
-      toast('Restaurando...');
-      let batch = writeBatch(db);
-      let count = 0;
-      for (const dish of d.dishes) {
-        const clean = { ...dish };
-        delete clean.id;
-        batch.set(doc(db, 'dishes', dish.id), clean);
-        count++;
-        if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
-      }
-      for (const ins of d.insumos) {
-        const clean = { ...ins };
-        delete clean.id;
-        batch.set(doc(db, 'insumos', ins.id), clean);
-        count++;
-        if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
-      }
-      if (d.equipamentos_disponiveis) {
-        batch.set(doc(db, 'config', 'equipamentos'), { list: d.equipamentos_disponiveis });
-      }
-      if (count > 0) await batch.commit();
-      toast('Backup restaurado');
-    } catch (err) { alert('Erro: ' + err.message); }
+  // Ensure cliente doc
+  await setDoc(clienteDoc(cid), { name: clienteName || cid, slug: cid, createdAt: serverTimestamp() }, { merge: true });
+
+  // Keep existing prices
+  const existingPricesSnap = await getDocs(insumosCol(cid));
+  const existingPrices = {};
+  existingPricesSnap.docs.forEach(d => { existingPrices[d.id] = d.data().price || 0; });
+
+  // Delete orphans from dishes + insumos (exist but not in seed)
+  const existingDishes = await getDocs(dishesCol(cid));
+  const seedDishIds = new Set(seed.dishes.map(d => d.id));
+  const seedInsumoIds = new Set(seed.insumos.map(i => i.id));
+  let batch = writeBatch(db);
+  let count = 0;
+  const flush = async () => { if (count > 0) { await batch.commit(); batch = writeBatch(db); count = 0; } };
+  const add = async (op, ref, data) => {
+    if (op === 'set') batch.set(ref, data);
+    else batch.delete(ref);
+    count++;
+    if (count >= 400) await flush();
   };
-  reader.readAsText(file);
+  for (const d of existingDishes.docs) if (!seedDishIds.has(d.id)) await add('delete', dishDoc(cid, d.id));
+  for (const d of existingPricesSnap.docs) if (!seedInsumoIds.has(d.id)) await add('delete', insumoDoc(cid, d.id));
+  for (const dish of seed.dishes) {
+    const clean = { ...dish };
+    delete clean.id;
+    await add('set', dishDoc(cid, dish.id), clean);
+  }
+  for (const ins of seed.insumos) {
+    const clean = { ...ins };
+    delete clean.id;
+    if (existingPrices[ins.id] != null) clean.price = existingPrices[ins.id];
+    await add('set', insumoDoc(cid, ins.id), clean);
+  }
+  await add('set', configDoc(cid, 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
+  await flush();
+  toast('Importação concluída!');
 }
 
 // ---------- Auth ----------
+async function ensureUserDoc(user) {
+  const ref = doc(db, 'users', user.uid);
+  const snap = await getDoc(ref);
+  if (snap.exists()) { STATE.userDoc = { uid: user.uid, ...snap.data() }; return; }
+  // Bootstrap: if matches master email, auto-create as master
+  if (user.email === MASTER_EMAIL) {
+    const d = { email: user.email, role: 'master', clienteIds: [], name: 'Master', createdAt: serverTimestamp() };
+    await setDoc(ref, d);
+    STATE.userDoc = { uid: user.uid, ...d };
+  } else {
+    STATE.userDoc = null;
+  }
+}
+
 function openLoginModal() {
   $('#login-modal').hidden = false;
   $('#login-email').focus();
@@ -266,37 +266,468 @@ async function doLogin(email, password) {
 }
 async function doLogout() {
   await signOut(auth);
+  STATE.user = null;
+  STATE.userDoc = null;
+  clearListeners();
+  location.hash = '#/';
   toast('Saiu');
-  if (location.hash.startsWith('#/admin')) location.hash = '#/';
+  updateAuthUI();
+  renderLoginLanding();
 }
 
 function updateAuthUI() {
   const authBtn = $('#btn-auth');
-  const navAdmin = $('#nav-admin');
-  if (isAdmin) {
+  const nav = $('#site-nav');
+  if (STATE.user && STATE.userDoc) {
     authBtn.textContent = 'Sair';
     authBtn.classList.add('logged-in');
-    navAdmin.style.display = '';
-    $$('.admin-only').forEach(el => el.style.display = '');
+    // Show navigation
+    nav.classList.add('logged');
+    // Show admin-only items
+    const navClientes = $('#nav-clientes');
+    const navUsuarios = $('#nav-usuarios');
+    navClientes && (navClientes.style.display = (isMaster() || isStaff()) ? '' : 'none');
+    navUsuarios && (navUsuarios.style.display = canManageUsers() ? '' : 'none');
   } else {
     authBtn.textContent = 'Entrar';
     authBtn.classList.remove('logged-in');
-    navAdmin.style.display = 'none';
-    $$('.admin-only').forEach(el => el.style.display = 'none');
+    nav.classList.remove('logged');
   }
 }
 
-// ---------- Cost calculations ----------
-function findInsumo(id) { return DATA.insumos.find(i => i.id === id); }
+// ---------- Router ----------
+function parseHash() {
+  const h = location.hash.slice(1) || '/';
+  return h.split('/').filter(Boolean);
+}
 
-// Normalize a string for sub-ficha reference matching
+async function route() {
+  const parts = parseHash();
+  $$('.site-nav a').forEach(a => a.classList.remove('active'));
+
+  // Not logged in — show login landing
+  if (!STATE.user) {
+    renderLoginLanding();
+    return;
+  }
+  // Logged in but no user doc (not authorized)
+  if (!STATE.userDoc) {
+    renderUnauthorized();
+    return;
+  }
+
+  // Determine where to route
+  // Bootstrap route '/'
+  if (parts.length === 0) {
+    if (isMaster() || isStaff()) { location.hash = '#/clientes'; return; }
+    if (isClienteUser()) {
+      const cids = STATE.userDoc.clienteIds || [];
+      if (cids.length === 0) { renderNoAccess(); return; }
+      location.hash = `#/c/${cids[0]}`;
+      return;
+    }
+    renderNoAccess();
+    return;
+  }
+
+  // Master-only routes
+  if (parts[0] === 'admin') {
+    if (!isMaster()) { renderNoAccess(); return; }
+    if (parts[1] === 'clientes') { await renderClientesAdmin(); return; }
+    if (parts[1] === 'usuarios') { await renderUsuariosAdmin(); return; }
+  }
+
+  // Clientes list (master + staff)
+  if (parts[0] === 'clientes') {
+    $('#nav-clientes')?.classList.add('active');
+    await renderClientesList();
+    return;
+  }
+
+  // Cliente-scoped routes: /c/{cid}/...
+  if (parts[0] === 'c' && parts[1]) {
+    const cid = parts[1];
+    if (!canViewCliente(cid)) { renderNoAccess(); return; }
+    // Subscribe if not already
+    if (STATE.currentClienteId !== cid) {
+      subscribeCliente(cid);
+      // Render loading while we wait
+      renderLoadingScreen();
+      return;
+    }
+    // Wait for loaded
+    if (!STATE.loaded) { renderLoadingScreen(); return; }
+
+    const rest = parts.slice(2);
+    if (rest.length === 0) { renderClienteHome(cid); return; }
+    if (rest[0] === 'ficha' && rest[1]) { renderFicha(cid, rest[1]); return; }
+    if (rest[0] === 'insumos') { renderInsumos(cid); return; }
+    if (rest[0] === 'admin') {
+      if (!canEditCliente(cid)) { renderNoAccess(); return; }
+      if (rest[1] === 'new') { renderAdminEdit(cid, null); return; }
+      if (rest[1] === 'edit' && rest[2]) { renderAdminEdit(cid, rest[2]); return; }
+      renderAdminList(cid); return;
+    }
+  }
+
+  // Fallback
+  location.hash = '#/';
+}
+window.addEventListener('hashchange', route);
+
+// ---------- Views: Login / bootstrap / errors ----------
+function renderLoginLanding() {
+  const app = $('#app');
+  app.innerHTML = '';
+  const box = el('section', { class: 'login-landing' },
+    el('h1', {}, 'Fichas Técnicas'),
+    el('p', { class: 'subtitle' }, 'Acesso para consultoria gastronômica'),
+    el('button', { class: 'btn btn-primary btn-lg', onclick: openLoginModal }, 'Entrar')
+  );
+  app.appendChild(box);
+}
+
+function renderUnauthorized() {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'login-landing' },
+    el('h1', {}, 'Sem acesso'),
+    el('p', { class: 'subtitle' }, 'Sua conta existe mas ainda não foi autorizada por um administrador.'),
+    el('button', { class: 'btn', onclick: doLogout }, 'Sair')
+  ));
+}
+
+function renderNoAccess() {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'login-landing' },
+    el('h1', {}, 'Acesso negado'),
+    el('p', { class: 'subtitle' }, 'Você não tem permissão para ver essa página.'),
+    el('a', { class: 'btn', href: '#/' }, 'Voltar ao início')
+  ));
+}
+
+function renderLoadingScreen() {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('div', { class: 'loading-state' },
+    el('p', {}, 'Carregando…')
+  ));
+}
+
+// ---------- Views: Clientes list (master/staff picker) ----------
+async function renderClientesList() {
+  const app = $('#app');
+  app.innerHTML = '';
+  renderLoadingScreen();
+  await loadClientesList();
+  app.innerHTML = '';
+
+  const header = el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Restaurantes'),
+      el('p', {}, isMaster() ? 'Todos os restaurantes cadastrados. Clique para entrar.' : 'Restaurantes nos quais você tem acesso.')
+    ),
+    isMaster() ? el('a', { class: 'btn btn-primary', href: '#/admin/clientes' }, '+ Gerenciar') : null
+  );
+  app.appendChild(header);
+
+  if (STATE.clientes.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', {}, isMaster()
+        ? 'Nenhum restaurante ainda. Clique em Gerenciar para criar o primeiro.'
+        : 'Você ainda não tem acesso a nenhum restaurante. Fale com o administrador.')
+    ));
+    return;
+  }
+
+  const grid = el('div', { class: 'cliente-grid' });
+  STATE.clientes.forEach(c => {
+    const card = el('a', { class: 'cliente-card', href: `#/c/${c.id}` },
+      el('h3', {}, c.name || c.id),
+      el('p', { class: 'muted' }, c.slug || c.id)
+    );
+    grid.appendChild(card);
+  });
+  app.appendChild(grid);
+}
+
+// ---------- Views: Admin Clientes (master only) ----------
+async function renderClientesAdmin() {
+  const app = $('#app');
+  renderLoadingScreen();
+  await loadClientesList();
+  app.innerHTML = '';
+
+  app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar'));
+  const header = el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Gerenciar restaurantes'),
+      el('p', {}, 'Crie, renomeie ou exclua restaurantes (clientes).')
+    )
+  );
+  app.appendChild(header);
+
+  // Create new form
+  const createPanel = el('div', { class: 'admin-panel' },
+    el('h3', {}, 'Novo restaurante')
+  );
+  const nameInput = el('input', { type: 'text', placeholder: 'Nome do restaurante', style: 'padding:0.6rem;border:1px solid #d8d5cb;flex:1;' });
+  const createBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
+    const name = nameInput.value.trim();
+    if (!name) { alert('Informe o nome'); return; }
+    const id = slugify(name);
+    try {
+      await saveCliente({ id, name, slug: id, createdAt: serverTimestamp() });
+      // If I'm master or staff, ensure my clienteIds includes this? Master doesn't need it.
+      // Seed with initial data? No — user picks.
+      toast('Restaurante criado');
+      nameInput.value = '';
+      renderClientesAdmin();
+    } catch (err) { toast('Erro: ' + err.message); }
+  } }, 'Criar');
+  const form = el('div', { style: 'display:flex;gap:0.5rem;margin-top:0.5rem;' }, nameInput, createBtn);
+  createPanel.appendChild(form);
+  app.appendChild(createPanel);
+
+  // List existing
+  const listPanel = el('div', { class: 'admin-panel' },
+    el('h3', {}, 'Restaurantes existentes')
+  );
+  if (STATE.clientes.length === 0) {
+    listPanel.appendChild(el('p', { class: 'muted' }, 'Nenhum restaurante cadastrado.'));
+  } else {
+    const list = el('div', { class: 'dish-admin-list' });
+    STATE.clientes.forEach(c => {
+      const item = el('div', { class: 'dish-admin-item' },
+        el('div', { class: 'info' },
+          el('h4', {}, c.name),
+          el('p', {}, c.id)
+        ),
+        el('div', { class: 'dish-admin-actions' },
+          el('a', { class: 'btn btn-small', href: `#/c/${c.id}` }, 'Abrir'),
+          el('button', { class: 'btn btn-small', onclick: async () => {
+            const newName = prompt('Novo nome:', c.name);
+            if (!newName || newName === c.name) return;
+            try { await saveCliente({ ...c, name: newName }); toast('Renomeado'); renderClientesAdmin(); }
+            catch (err) { toast('Erro: ' + err.message); }
+          } }, 'Renomear'),
+          el('button', { class: 'btn btn-small', onclick: () => {
+            if (!confirm(`Seed de dados iniciais (da planilha) em "${c.name}"? Sobrescreve fichas e insumos — preços existentes são preservados.`)) return;
+            seedClienteFromJson(c.id, c.name).catch(e => toast('Erro: ' + e.message));
+          } }, 'Seed inicial'),
+          el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+            if (!confirm(`EXCLUIR "${c.name}"?\n\nAtenção: vai tentar deletar também todas as fichas e insumos desse cliente. Baixe um backup antes se não quiser perder.`)) return;
+            try {
+              // Delete all subcollections
+              const [dSnap, iSnap] = await Promise.all([getDocs(dishesCol(c.id)), getDocs(insumosCol(c.id))]);
+              let batch = writeBatch(db), cnt = 0;
+              for (const d of dSnap.docs) { batch.delete(dishDoc(c.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
+              for (const d of iSnap.docs) { batch.delete(insumoDoc(c.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
+              batch.delete(configDoc(c.id, 'equipamentos'));
+              batch.delete(clienteDoc(c.id));
+              await batch.commit();
+              toast('Restaurante excluído'); renderClientesAdmin();
+            } catch (err) { toast('Erro: ' + err.message); }
+          } }, 'Excluir')
+        )
+      );
+      list.appendChild(item);
+    });
+    listPanel.appendChild(list);
+  }
+  app.appendChild(listPanel);
+}
+
+// ---------- Views: Usuários Admin (master only) ----------
+async function renderUsuariosAdmin() {
+  const app = $('#app');
+  renderLoadingScreen();
+  // Load users + clientes
+  const [usersSnap] = await Promise.all([getDocs(collection(db, 'users'))]);
+  await loadClientesList();
+  const users = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+  app.innerHTML = '';
+
+  app.appendChild(el('a', { href: '#/', class: 'back-link' }, '← Voltar'));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Usuários'),
+      el('p', {}, 'Adicione equipe e clientes. Papel define o que podem fazer.')
+    )
+  ));
+
+  // Invite form
+  const invitePanel = el('div', { class: 'admin-panel' },
+    el('h3', {}, 'Convidar novo usuário')
+  );
+  const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
+  const nameInput = el('input', { type: 'text', placeholder: 'Nome' });
+  const roleSelect = el('select', {},
+    el('option', { value: 'staff' }, 'Equipe (admin nos clientes atribuídos)'),
+    el('option', { value: 'cliente' }, 'Cliente (só visualiza + edita preços do seu cliente)'),
+    el('option', { value: 'master' }, 'Master (acesso total)')
+  );
+  const clienteChecks = el('div', { class: 'equipamentos-select', style: 'max-height:180px;' });
+  STATE.clientes.forEach(c => {
+    const lbl = el('label', {},
+      (() => { const i = el('input', { type: 'checkbox', value: c.id }); return i; })(),
+      document.createTextNode(' ' + c.name)
+    );
+    clienteChecks.appendChild(lbl);
+  });
+  const inviteForm = el('div', { class: 'form-grid' },
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Email'), emailInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect),
+  );
+  const clienteField = el('label', { class: 'field' },
+    el('span', { class: 'label-text' }, 'Restaurantes autorizados'),
+    clienteChecks
+  );
+  const inviteBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
+    const email = emailInput.value.trim();
+    const name = nameInput.value.trim() || email;
+    const role = roleSelect.value;
+    const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
+    if (!email) { alert('Informe email'); return; }
+    if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+    try {
+      await inviteUser(email, name, role, selected);
+    } catch (err) { alert('Erro: ' + err.message); }
+  } }, 'Criar + Enviar email de senha');
+  invitePanel.appendChild(inviteForm);
+  invitePanel.appendChild(clienteField);
+  invitePanel.appendChild(el('div', { style: 'margin-top:1rem;' }, inviteBtn));
+  invitePanel.appendChild(el('p', { class: 'muted', style: 'font-size:0.85rem;margin-top:0.5rem;' },
+    'Ao criar, será enviado um email automático do Firebase com link para o usuário definir sua própria senha.'));
+  app.appendChild(invitePanel);
+
+  // Existing users list
+  const listPanel = el('div', { class: 'admin-panel' },
+    el('h3', {}, 'Usuários cadastrados')
+  );
+  if (users.length === 0) {
+    listPanel.appendChild(el('p', { class: 'muted' }, 'Nenhum usuário ainda.'));
+  } else {
+    const tbl = el('table', { class: 'users-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'Nome / Email'),
+        el('th', {}, 'Papel'),
+        el('th', {}, 'Restaurantes'),
+        el('th', {}, '')
+      )),
+      el('tbody', {}, ...users.map(u => el('tr', {},
+        el('td', {}, (u.name || '—') + ' · ' + el('span', { class: 'muted' }, u.email).outerHTML || u.email),
+        el('td', {}, u.role || '—'),
+        el('td', {}, (u.clienteIds || []).map(cid => STATE.clientes.find(c => c.id === cid)?.name || cid).join(', ') || '—'),
+        el('td', {},
+          el('button', { class: 'btn btn-small', onclick: () => editUserDialog(u) }, 'Editar'),
+          ' ',
+          u.uid !== STATE.user.uid
+            ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+                if (!confirm(`Remover acesso de ${u.email}? (não deleta a conta no Firebase Auth, apenas remove permissões no site)`)) return;
+                try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
+                catch (err) { toast('Erro: ' + err.message); }
+              } }, 'Remover')
+            : null
+        )
+      )))
+    );
+    // Fix innerHTML workaround: rebuild rows cleanly
+    listPanel.appendChild(buildUsersTable(users));
+  }
+  app.appendChild(listPanel);
+}
+
+function buildUsersTable(users) {
+  const tbl = el('table', { class: 'users-table' },
+    el('thead', {}, el('tr', {},
+      el('th', {}, 'Email'),
+      el('th', {}, 'Nome'),
+      el('th', {}, 'Papel'),
+      el('th', {}, 'Restaurantes'),
+      el('th', {}, '')
+    ))
+  );
+  const tbody = el('tbody', {});
+  users.forEach(u => {
+    const clienteNames = (u.clienteIds || []).map(cid =>
+      STATE.clientes.find(c => c.id === cid)?.name || cid).join(', ') || '—';
+    tbody.appendChild(el('tr', {},
+      el('td', { 'data-label': 'Email' }, u.email),
+      el('td', { 'data-label': 'Nome' }, u.name || '—'),
+      el('td', { 'data-label': 'Papel' }, u.role || '—'),
+      el('td', { 'data-label': 'Restaurantes' }, clienteNames),
+      el('td', { 'data-label': '' },
+        el('button', { class: 'btn btn-small', onclick: () => editUserDialog(u) }, 'Editar'),
+        ' ',
+        u.uid !== STATE.user.uid
+          ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+              if (!confirm(`Remover acesso de ${u.email}?`)) return;
+              try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
+              catch (err) { toast('Erro: ' + err.message); }
+            } }, 'Remover')
+          : el('span', { class: 'muted' }, '(você)')
+      )
+    ));
+  });
+  tbl.appendChild(tbody);
+  return tbl;
+}
+
+async function editUserDialog(u) {
+  const newRole = prompt('Papel (master / staff / cliente):', u.role || 'staff');
+  if (!newRole) return;
+  if (!['master', 'staff', 'cliente'].includes(newRole)) { alert('Papel inválido'); return; }
+  const idsStr = prompt('IDs dos restaurantes autorizados (separados por vírgula):', (u.clienteIds || []).join(','));
+  if (idsStr == null) return;
+  const clienteIds = idsStr.split(',').map(s => s.trim()).filter(Boolean);
+  try {
+    await setDoc(doc(db, 'users', u.uid), { ...u, role: newRole, clienteIds }, { merge: true });
+    toast('Atualizado');
+    renderUsuariosAdmin();
+  } catch (err) { toast('Erro: ' + err.message); }
+}
+
+async function inviteUser(email, name, role, clienteIds) {
+  // Create user with a random temp password via secondary Firebase app (doesn't affect current session)
+  const tempPw = 'Temp' + Math.random().toString(36).slice(2, 10) + '!1';
+  const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + uid());
+  const secondaryAuth = getAuth(secondaryApp);
+  let newUid = null;
+  try {
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPw);
+    newUid = cred.user.uid;
+    await signOut(secondaryAuth);
+  } catch (err) {
+    if (err.code === 'auth/email-already-in-use') {
+      // If already exists, we can't know the UID from client-side. Ask admin to input UID or just create user doc with email-indexed hack.
+      // For simplicity: use email as doc id fallback (though UID indexing is better)
+      alert('Email já possui conta. Crie o doc manualmente ou contate suporte.');
+      return;
+    }
+    throw err;
+  }
+  // Create user doc
+  await setDoc(doc(db, 'users', newUid), {
+    email, name, role, clienteIds, createdAt: serverTimestamp()
+  });
+  // Send password reset email
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (err) { console.warn('reset email failed', err); }
+  toast('Usuário criado. Email de definição de senha enviado.');
+  renderUsuariosAdmin();
+}
+
+// ---------- Cost calculations (same core as before) ----------
+function findInsumo(id) { return STATE.insumos.find(i => i.id === id); }
 function nrm(s) {
   if (!s) return '';
-  return String(s).trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return String(s).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().replace(/[,.;:\s]+$/, '');
 }
-// Runtime detection: find if ingredient name matches an earlier sub-ficha in the dish
 function detectSubref(dish, currentSfIdx, ingredientName) {
   const ingClean = nrm(ingredientName);
   if (ingClean.length < 4) return null;
@@ -313,55 +744,37 @@ function detectSubref(dish, currentSfIdx, ingredientName) {
   }
   return bestScore > 0.55 ? best : null;
 }
-
-// Parse rendimento string to { qty, unit } for proportion calculations
 function parseRendimentoQty(rendStr) {
   if (!rendStr) return { qty: 1, unit: '' };
   const s = String(rendStr).trim();
   const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ/]*)/);
-  if (m) {
-    const qty = parseFloat(m[1].replace(',', '.'));
-    const unit = (m[2] || '').toLowerCase();
-    return { qty, unit };
-  }
+  if (m) return { qty: parseFloat(m[1].replace(',', '.')), unit: (m[2] || '').toLowerCase() };
   return { qty: 1, unit: '' };
 }
-
-// Calculate sub-ficha cost with optional sub-ficha references (no double-counting).
-// Memoize results per dish.sub_fichas to avoid recalc.
 function subfichaCost(sf, dish, cache = null, visited = null) {
   cache = cache || new Map();
   visited = visited || new Set();
   if (cache.has(sf.id)) return cache.get(sf.id);
   if (visited.has(sf.id)) return { rows: [], total: 0 };
   visited.add(sf.id);
-
   const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
   let total = 0;
   const rows = (sf.ingredientes || []).map(ing => {
-    // Determine subref: explicit subref_id OR runtime detection
     let subSf = null;
-    if (ing.subref_id) {
-      subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
-    }
-    if (!subSf && sfIdx > 0) {
-      subSf = detectSubref(dish, sfIdx, ing.insumo_name);
-    }
+    if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
+    if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
     if (subSf) {
-      // Proportional cost from the referenced sub-ficha
       const subResult = subfichaCost(subSf, dish, cache, new Set(visited));
       const subRend = parseRendimentoQty(subSf.rendimento);
       const ingQty = ing.qty;
       let cost = 0;
       if (ingQty != null && subRend.qty > 0) {
-        // Normalize units: convert ingredient qty to sub-ficha rendimento's unit if possible
         const [qConverted] = normalizeSubrefQty(ingQty, ing.unit, subRend.unit);
         cost = (qConverted / subRend.qty) * subResult.total;
       }
       total += cost;
       return { ing, insumo: null, cost, subSf, isSubref: true };
     }
-    // Real insumo
     const insumo = findInsumo(ing.insumo_id);
     const [qNorm, priceNorm] = normalizeQtyPrice(ing, insumo);
     const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm : 0;
@@ -372,7 +785,6 @@ function subfichaCost(sf, dish, cache = null, visited = null) {
   cache.set(sf.id, result);
   return result;
 }
-
 function normalizeSubrefQty(qty, ingUnit, subUnit) {
   const iu = (ingUnit || '').toLowerCase().trim();
   const su = (subUnit || '').toLowerCase().trim();
@@ -383,7 +795,6 @@ function normalizeSubrefQty(qty, ingUnit, subUnit) {
   if (iu === 'l' && su === 'ml') return [qty * 1000, qty];
   return [qty, qty];
 }
-
 function normalizeQtyPrice(ing, insumo) {
   if (!insumo || ing.qty == null) return [null, null];
   const iu = (ing.unit || '').toLowerCase().trim();
@@ -397,14 +808,12 @@ function normalizeQtyPrice(ing, insumo) {
   if (iu === 'l' && pu === 'ml') return [q * 1000, p];
   return [q, p];
 }
-
 function dishCost(dish) {
   const cache = new Map();
   const sfCosts = (dish.sub_fichas || []).map(sf => {
     const r = subfichaCost(sf, dish, cache);
     return { ...r, sf };
   });
-  // Dish total = cost of the FINAL sub-ficha (propagates references, no double-count)
   const finalSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
   const finalResult = finalSf ? sfCosts.find(x => x.sf.id === finalSf.id) : null;
   const total = finalResult ? finalResult.total : 0;
@@ -415,7 +824,6 @@ function dishCost(dish) {
   const cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
   return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv };
 }
-
 function parsePortions(rendStr) {
   if (!rendStr) return 1;
   const s = String(rendStr).toLowerCase();
@@ -426,79 +834,62 @@ function parsePortions(rendStr) {
   return 1;
 }
 
-// ---------- Router ----------
-function route() {
-  const hash = location.hash.slice(1) || '/';
-  const parts = hash.split('/').filter(Boolean);
-  $$('.site-nav a').forEach(a => a.classList.remove('active'));
-  // If not loaded yet, keep loading state
-  if (!DATA.loaded.dishes || !DATA.loaded.insumos) return;
-  // Empty database state
-  if (DATA.dishes.length === 0 && DATA.insumos.length === 0) {
-    renderEmptyState();
-    return;
-  }
-  if (parts.length === 0) {
-    $('[data-nav="home"]').classList.add('active');
-    renderHome();
-  } else if (parts[0] === 'ficha' && parts[1]) {
-    renderFicha(parts[1]);
-  } else if (parts[0] === 'insumos') {
-    $('[data-nav="insumos"]').classList.add('active');
-    renderInsumos();
-  } else if (parts[0] === 'admin') {
-    if (!isAdmin) { openLoginModal(); renderHome(); return; }
-    $('[data-nav="admin"]').classList.add('active');
-    if (parts[1] === 'edit' && parts[2]) renderAdminEdit(parts[2]);
-    else if (parts[1] === 'new') renderAdminEdit(null);
-    else renderAdminList();
-  } else {
-    renderHome();
-  }
-  window.scrollTo(0, 0);
+// Scale an ingredient quantity by a factor
+function scaleQty(qty, factor) {
+  if (qty == null) return qty;
+  return qty * factor;
 }
-window.addEventListener('hashchange', route);
-
-// ---------- Empty state ----------
-function renderEmptyState() {
-  const app = $('#app');
-  app.innerHTML = '';
-  const box = el('div', { style: 'max-width:600px;margin:4rem auto;text-align:center;' },
-    el('h1', {}, 'Banco de dados vazio'),
-    el('p', { style: 'color:#888;font-style:italic;font-family:"Cormorant Garamond",serif;font-size:1.2rem;margin-bottom:2rem;' },
-      'As fichas ainda não foram importadas para o banco.'),
-    isAdmin
-      ? el('button', { class: 'btn btn-primary', onclick: seedFromJson }, 'Importar dados iniciais agora')
-      : el('div', {},
-          el('p', {}, 'Entre como administrador para importar os dados iniciais.'),
-          el('button', { class: 'btn btn-primary', onclick: openLoginModal }, 'Entrar como admin')
-        )
-  );
-  app.appendChild(box);
+function scaleRendStr(rendStr, factor) {
+  // Multiply the leading number in rendimento string
+  if (!rendStr) return rendStr;
+  return String(rendStr).replace(/^(\d+(?:[.,]\d+)?)/, (m) => {
+    const n = parseFloat(m.replace(',', '.')) * factor;
+    // Round to at most 2 decimals
+    const rounded = Math.round(n * 100) / 100;
+    return String(rounded).replace('.', ',');
+  });
 }
 
-// ---------- Views ----------
-function renderHome() {
+// ---------- Views: Cliente home (cardápio) ----------
+function renderClienteHome(cid) {
   const app = $('#app');
   app.innerHTML = '';
-  const totalSubfichas = DATA.dishes.reduce((s, d) => s + (d.sub_fichas || []).length, 0);
+  const totalSubfichas = STATE.dishes.reduce((s, d) => s + (d.sub_fichas || []).length, 0);
+
+  // Breadcrumb / context bar
+  const ctx = renderClienteContext(cid);
+  app.appendChild(ctx);
+
   const hero = el('section', { class: 'home-hero' },
     el('h1', {}, 'Cardápio'),
-    el('p', { class: 'subtitle' }, 'Fichas técnicas operacionais e custeio por rendimento'),
+    el('p', { class: 'subtitle' }, STATE.currentCliente?.name || ''),
     el('div', { class: 'home-stats' },
-      el('span', {}, el('strong', {}, DATA.dishes.length.toString()), 'Pratos'),
+      el('span', {}, el('strong', {}, STATE.dishes.length.toString()), 'Pratos'),
       el('span', {}, el('strong', {}, totalSubfichas.toString()), 'Sub-fichas'),
-      el('span', {}, el('strong', {}, DATA.insumos.length.toString()), 'Insumos'),
+      el('span', {}, el('strong', {}, STATE.insumos.length.toString()), 'Insumos')
     )
   );
   app.appendChild(hero);
 
+  if (STATE.dishes.length === 0) {
+    const empty = el('div', { class: 'empty-state' },
+      el('p', {}, 'Esse cliente ainda não tem fichas cadastradas.'),
+      canEditCliente(cid) ? el('button', { class: 'btn btn-primary', onclick: () => {
+        if (confirm(`Importar dados iniciais (da planilha original) em "${STATE.currentCliente?.name || cid}"?`))
+          seedClienteFromJson(cid, STATE.currentCliente?.name).catch(e => toast('Erro: ' + e.message));
+      } }, 'Importar dados iniciais') : null,
+      canEditCliente(cid) ? el('a', { class: 'btn', href: `#/c/${cid}/admin/new` }, '+ Criar primeira ficha') : null,
+    );
+    app.appendChild(empty);
+    return;
+  }
+
   const grid = el('div', { class: 'grid-dishes' });
-  DATA.dishes.forEach(dish => {
+  STATE.dishes.forEach(dish => {
     const { costPerPortion } = dishCost(dish);
     const photo = dish.photos && dish.photos[0];
     const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
-    const card = el('a', { class: 'card-dish', href: `#/ficha/${dish.id}` },
+    const card = el('a', { class: 'card-dish', href: `#/c/${cid}/ficha/${dish.id}` },
       el('div', { class: 'card-photo' },
         photo ? el('img', { src: photo, alt: dish.name }) : el('span', { class: 'placeholder' }, 'sem foto')
       ),
@@ -506,7 +897,7 @@ function renderHome() {
         el('h3', {}, dish.name),
         el('div', { class: 'card-meta' },
           el('span', {}, 'Rendimento', el('br'), el('strong', {}, lastSf?.rendimento || '—')),
-          el('span', {}, 'Custo/porção', el('br'), el('strong', {}, fmtBRL(costPerPortion)))
+          canEditInsumoPrice(cid) ? el('span', {}, 'Custo/porção', el('br'), el('strong', {}, fmtBRL(costPerPortion))) : null
         )
       )
     );
@@ -515,22 +906,39 @@ function renderHome() {
   app.appendChild(grid);
 }
 
-function renderFicha(dishId) {
-  const dish = DATA.dishes.find(d => d.id === dishId);
+function renderClienteContext(cid) {
+  const bar = el('div', { class: 'context-bar' });
+  if (isMaster() || isStaff()) {
+    bar.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Todos os restaurantes'));
+  }
+  bar.appendChild(el('div', { class: 'ctx-links' },
+    el('a', { class: 'ctx-link', href: `#/c/${cid}` }, 'Cardápio'),
+    el('a', { class: 'ctx-link', href: `#/c/${cid}/insumos` }, 'Insumos'),
+    canEditCliente(cid) ? el('a', { class: 'ctx-link', href: `#/c/${cid}/admin` }, 'Gerenciar') : null,
+  ));
+  return bar;
+}
+
+// ---------- Views: Ficha (with scaling + kitchen mode on mobile) ----------
+function renderFicha(cid, dishId) {
+  const dish = STATE.dishes.find(d => d.id === dishId);
   const app = $('#app');
   app.innerHTML = '';
   if (!dish) {
-    app.appendChild(el('p', {}, 'Prato não encontrado. ', el('a', { href: '#/' }, 'Voltar')));
+    app.appendChild(el('p', {}, 'Prato não encontrado. ', el('a', { href: `#/c/${cid}` }, 'Voltar')));
     return;
   }
+  app.appendChild(renderClienteContext(cid));
 
   const state = {
     view: 'trabalho',
     activeSf: (dish.sub_fichas || [])[dish.sub_fichas.length - 1]?.id || (dish.sub_fichas || [])[0]?.id,
+    scaleFactor: 1,
+    targetYield: null, // user-entered target, as {qty, unit}
   };
 
   const header = el('div', { class: 'ficha-header' },
-    el('a', { class: 'back-link', href: '#/' }, '← Voltar ao cardápio'),
+    el('a', { class: 'back-link', href: `#/c/${cid}` }, '← Voltar ao cardápio'),
     el('h1', {}, dish.name)
   );
   app.appendChild(header);
@@ -558,7 +966,7 @@ function renderFicha(dishId) {
 
   const actions = el('div', { class: 'ficha-actions' },
     el('button', { class: 'btn', onclick: () => exportFichaPDF(dish, state) }, 'Exportar PDF'),
-    el('button', { class: 'btn', onclick: () => exportFichaXLSX(dish) }, 'Exportar Excel')
+    el('button', { class: 'btn', onclick: () => exportFichaXLSX(dish, state) }, 'Exportar Excel')
   );
   app.appendChild(actions);
 
@@ -567,62 +975,87 @@ function renderFicha(dishId) {
     $$('.subficha-tabs button', tabs).forEach(b => b.classList.toggle('active', b.dataset.sf === state.activeSf));
     const sf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
     body.innerHTML = '';
-    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf));
-    else body.appendChild(renderFichaCusto(dish, sf));
+    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf, state, updateUI));
+    else body.appendChild(renderFichaCusto(dish, sf, cid));
   }
-  toggle.addEventListener('click', e => {
-    if (e.target.dataset.view) { state.view = e.target.dataset.view; updateUI(); }
-  });
-  tabs.addEventListener('click', e => {
-    if (e.target.dataset.sf) { state.activeSf = e.target.dataset.sf; updateUI(); }
-  });
+  toggle.addEventListener('click', e => { if (e.target.dataset.view) { state.view = e.target.dataset.view; updateUI(); } });
+  tabs.addEventListener('click', e => { if (e.target.dataset.sf) { state.activeSf = e.target.dataset.sf; updateUI(); } });
   updateUI();
 }
 
-function renderFichaTrabalho(dish, sf) {
-  const wrap = el('div', { class: 'ficha-body' });
+function renderFichaTrabalho(dish, sf, state, rerender) {
+  const wrap = el('div', { class: 'ficha-body kitchen-mode' });
   wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha Técnica Operacional'));
   wrap.appendChild(el('h2', {}, sf.name));
-  if (sf.rendimento) wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Rendimento: ', el('strong', {}, sf.rendimento)));
 
-  const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
-  const tbl = el('table', { class: 'ficha-table' },
-    el('thead', {}, el('tr', {},
-      el('th', {}, 'Insumo'),
-      el('th', { class: 'num' }, 'Quantidade'),
-      el('th', {}, 'Unidade'),
-      el('th', {}, 'Observação / Processamento')
-    )),
-    el('tbody', {}, ...(sf.ingredientes || []).map(ing => {
-      // Detect if this ingredient is a sub-ficha reference
-      let subSf = null;
-      if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
-      if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
-      const nameCell = subSf
-        ? el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
-            el('span', { class: 'subref-arrow' }, '↪ '),
-            ing.insumo_name,
-            el('span', { class: 'subref-note' }, ' (ver preparação)')
-          )
-        : el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
-      return el('tr', { class: subSf ? 'row-subref' : '' },
-        nameCell,
-        el('td', { class: 'num', 'data-label': 'Quantidade' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
-        el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
-        el('td', { 'data-label': 'Observação' }, ing.observacao || '—')
-      );
-    }))
+  // Scaling controls
+  const originalRend = sf.rendimento || '';
+  const parsedRend = parseRendimentoQty(originalRend);
+  const scaledRendStr = state.scaleFactor !== 1 ? scaleRendStr(originalRend, state.scaleFactor) : originalRend;
+  const rendBar = el('div', { class: 'rend-bar' },
+    el('div', { class: 'rend-info' },
+      el('span', { class: 'rend-label' }, 'Rendimento'),
+      el('span', { class: 'rend-value' }, scaledRendStr || '—')
+    ),
+    el('div', { class: 'scale-ctrl' },
+      el('span', { class: 'scale-label' }, 'Produzir:'),
+      (() => {
+        const input = el('input', { type: 'number', step: '0.1', min: '0.1',
+          value: state.targetYield != null ? state.targetYield : parsedRend.qty,
+          placeholder: String(parsedRend.qty) });
+        input.addEventListener('change', () => {
+          const v = parseFloat(input.value);
+          if (isNaN(v) || v <= 0) return;
+          state.targetYield = v;
+          state.scaleFactor = parsedRend.qty > 0 ? (v / parsedRend.qty) : 1;
+          rerender();
+        });
+        return input;
+      })(),
+      el('span', { class: 'scale-unit' }, parsedRend.unit || 'unid.'),
+      state.scaleFactor !== 1
+        ? el('button', { class: 'btn btn-small btn-ghost', onclick: () => { state.scaleFactor = 1; state.targetYield = null; rerender(); } }, 'Resetar')
+        : null
+    ),
+    state.scaleFactor !== 1
+      ? el('div', { class: 'scale-note muted' }, `Original: ${originalRend}  ·  Fator ${fmtNum(state.scaleFactor, 2)}×`)
+      : null
   );
-  wrap.appendChild(tbl);
+  wrap.appendChild(rendBar);
+
+  // Ingredients (kitchen style)
+  const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
+  const ingList = el('ul', { class: 'kitchen-ingredients' });
+  (sf.ingredientes || []).forEach(ing => {
+    let subSf = null;
+    if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
+    if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
+
+    const scaledQty = ing.qty != null ? scaleQty(ing.qty, state.scaleFactor) : null;
+    const qtyStr = ing.is_qb ? 'Q.B' : (scaledQty != null
+      ? fmtNum(scaledQty, scaledQty % 1 === 0 ? 0 : 2)
+      : (ing.qty_raw || '—'));
+
+    const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
+      el('div', { class: 'k-qty' },
+        el('span', { class: 'qty-num' }, qtyStr),
+        el('span', { class: 'qty-unit' }, ing.unit || '')
+      ),
+      el('div', { class: 'k-info' },
+        el('span', { class: 'k-name' }, (subSf ? '↪ ' : '') + ing.insumo_name),
+        ing.observacao ? el('span', { class: 'k-obs' }, ing.observacao) : null,
+        subSf ? el('span', { class: 'k-sub-note' }, 'ver preparação: ' + subSf.name) : null
+      )
+    );
+    ingList.appendChild(li);
+  });
+  wrap.appendChild(el('h3', { class: 'k-section-title' }, 'Ingredientes'));
+  wrap.appendChild(ingList);
 
   if (sf.modo_preparo) {
-    const sec = el('div', { class: 'ficha-section' },
-      el('h3', {}, 'Modo de Preparo'),
-      el('div', { class: 'modo-preparo' }, sf.modo_preparo)
-    );
-    wrap.appendChild(sec);
+    wrap.appendChild(el('h3', { class: 'k-section-title' }, 'Modo de preparo'));
+    wrap.appendChild(el('div', { class: 'kitchen-preparo' }, sf.modo_preparo));
   }
-
   if (dish.louca) {
     wrap.appendChild(el('div', { class: 'info-box' },
       el('strong', {}, 'Apresentação / Louça'),
@@ -640,8 +1073,12 @@ function renderFichaTrabalho(dish, sf) {
   return wrap;
 }
 
-function renderFichaCusto(dish, currentSf) {
+function renderFichaCusto(dish, currentSf, cid) {
   const wrap = el('div', { class: 'ficha-body' });
+  if (!canEditInsumoPrice(cid)) {
+    wrap.appendChild(el('p', { class: 'muted' }, 'Ficha de custo não disponível para seu perfil.'));
+    return wrap;
+  }
   wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha de Custo por Rendimento'));
   wrap.appendChild(el('h2', {}, dish.name));
 
@@ -660,16 +1097,11 @@ function renderFichaCusto(dish, currentSf) {
       )),
       el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf }) => {
         const qtyTxt = ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'));
-        let priceTxt;
-        let nameCell;
+        let priceTxt, nameCell;
         if (isSubref && subSf) {
-          // Sub-ficha reference — different display
-          const subRend = parseRendimentoQty(subSf.rendimento);
           priceTxt = el('span', { class: 'subref-note' }, `sub-ficha (${subSf.rendimento || '—'})`);
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
-            el('span', { class: 'subref-arrow' }, '↪ '),
-            ing.insumo_name
-          );
+            el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
         } else {
           priceTxt = insumo ? `${fmtBRL(insumo.price || 0)} / ${insumo.unit || '—'}` : '—';
           nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
@@ -692,160 +1124,137 @@ function renderFichaCusto(dish, currentSf) {
   });
 
   const total = el('div', { class: 'total-dish-cost' },
-    el('div', {},
-      el('span', { class: 'stat-label' }, 'Custo total do prato'),
-      el('span', { class: 'stat-value' }, fmtBRL(all.total))
-    ),
-    el('div', {},
-      el('span', { class: 'stat-label' }, 'Porções (aprox.)'),
-      el('span', { class: 'stat-value' }, fmtNum(all.portions, 0))
-    ),
-    el('div', {},
-      el('span', { class: 'stat-label' }, 'Custo por porção'),
-      el('span', { class: 'stat-value gold' }, fmtBRL(all.costPerPortion))
-    )
+    el('div', {}, el('span', { class: 'stat-label' }, 'Custo total do prato'),
+      el('span', { class: 'stat-value' }, fmtBRL(all.total))),
+    el('div', {}, el('span', { class: 'stat-label' }, 'Porções (aprox.)'),
+      el('span', { class: 'stat-value' }, fmtNum(all.portions, 0))),
+    el('div', {}, el('span', { class: 'stat-label' }, 'Custo por porção'),
+      el('span', { class: 'stat-value gold' }, fmtBRL(all.costPerPortion)))
   );
   wrap.appendChild(total);
 
-  // Markup + CMV editor
   const cost = el('div', { class: 'cost-summary' });
   const markupInput = el('input', { type: 'number', min: '0', step: '5', value: String(dish.markup || 300) });
-  if (!isAdmin) markupInput.disabled = true;
+  if (!canEditCliente(cid)) markupInput.disabled = true;
   cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'Markup (%)'),
-    markupInput
-  ));
+    el('span', { class: 'stat-label' }, 'Markup (%)'), markupInput));
   const priceSpan = el('span', { class: 'stat-value accent' }, fmtBRL(all.suggestedPrice));
   cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'Preço de venda sugerido'),
-    priceSpan
-  ));
+    el('span', { class: 'stat-label' }, 'Preço de venda sugerido'), priceSpan));
   const cmvSpan = el('span', { class: 'stat-value' }, fmtNum(all.cmv, 1) + '%');
   cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'CMV (food cost)'),
-    cmvSpan
-  ));
+    el('span', { class: 'stat-label' }, 'CMV (food cost)'), cmvSpan));
   markupInput.addEventListener('input', () => {
     const newMarkup = parseFloat(markupInput.value) || 0;
     dish.markup = newMarkup;
     const newPrice = all.costPerPortion * (1 + newMarkup / 100);
     priceSpan.textContent = fmtBRL(newPrice);
     cmvSpan.textContent = newPrice > 0 ? fmtNum(all.costPerPortion / newPrice * 100, 1) + '%' : '—';
-    scheduleSave('dish-' + dish.id, () => saveDishToFirestore(dish));
+    scheduleSave('dish-' + dish.id, () => saveDish(STATE.currentClienteId, dish));
   });
   wrap.appendChild(cost);
 
   return wrap;
 }
 
-// ---------- Insumos page ----------
-function renderInsumos() {
+// ---------- Views: Insumos ----------
+function renderInsumos(cid) {
   const app = $('#app');
   app.innerHTML = '';
-  const header = el('div', { class: 'insumos-header' },
+  app.appendChild(renderClienteContext(cid));
+  const canEdit = canEditInsumoPrice(cid);
+  const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Insumos'),
-      el('p', {}, isAdmin
+      el('p', {}, canEdit
         ? 'Atualize os preços — salva automaticamente e todas as fichas recalculam.'
-        : 'Preços dos insumos. Faça login para editar.')
+        : 'Preços dos insumos.')
     ),
     el('input', { type: 'search', class: 'insumos-search', placeholder: 'Buscar insumo…' })
   );
   app.appendChild(header);
 
-  const table = el('table', { class: 'insumos-table' },
+  const tbl = el('table', { class: 'insumos-table' },
     el('thead', {}, el('tr', {},
       el('th', {}, 'Insumo'),
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
       el('th', {}, 'Usado em'),
-      isAdmin ? el('th', {}, '') : null
+      canEditCliente(cid) ? el('th', {}, '') : null
     ))
   );
   const tbody = el('tbody', {});
-
   const usageMap = {};
-  DATA.dishes.forEach(d => {
-    (d.sub_fichas || []).forEach(sf => {
-      (sf.ingredientes || []).forEach(i => {
-        usageMap[i.insumo_id] = (usageMap[i.insumo_id] || 0) + 1;
-      });
-    });
-  });
-
+  STATE.dishes.forEach(d => (d.sub_fichas || []).forEach(sf =>
+    (sf.ingredientes || []).forEach(i => { usageMap[i.insumo_id] = (usageMap[i.insumo_id] || 0) + 1; })
+  ));
   function buildRows(filter) {
     tbody.innerHTML = '';
     const f = (filter || '').toLowerCase().trim();
-    DATA.insumos
-      .filter(i => !f || i.name.toLowerCase().includes(f))
-      .forEach(insumo => {
-        const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
-        const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
-        if (!isAdmin) { unitInput.disabled = true; priceInput.disabled = true; }
-        unitInput.addEventListener('change', () => {
-          insumo.unit = unitInput.value.trim();
-          scheduleSave('insumo-' + insumo.id, () => saveInsumoToFirestore(insumo));
-        });
-        priceInput.addEventListener('input', () => {
-          insumo.price = parseFloat(priceInput.value) || 0;
-          scheduleSave('insumo-' + insumo.id, () => saveInsumoToFirestore(insumo));
-        });
-        const cells = [
-          el('td', { 'data-label': 'Insumo' }, insumo.name),
-          el('td', { 'data-label': 'Unidade' }, unitInput),
-          el('td', { 'data-label': 'Preço (R$)' }, priceInput),
-          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
-        ];
-        if (isAdmin) {
-          const delBtn = el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-            const uses = usageMap[insumo.id] || 0;
-            const msg = uses > 0
-              ? `Excluir "${insumo.name}"? Ele é usado em ${uses} receita(s) — essas referências ficarão sem preço até você corrigir.`
-              : `Excluir "${insumo.name}"?`;
-            if (!confirm(msg)) return;
-            try {
-              await deleteInsumoFromFirestore(insumo.id);
-              toast('Insumo excluído');
-            } catch (err) { toast('Erro: ' + err.message); }
-          } }, 'Excluir');
-          cells.push(el('td', { 'data-label': '' }, delBtn));
-        }
-        const tr = el('tr', {}, ...cells);
-        tbody.appendChild(tr);
+    STATE.insumos.filter(i => !f || i.name.toLowerCase().includes(f)).forEach(insumo => {
+      const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
+      const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
+      if (!canEdit) { unitInput.disabled = true; priceInput.disabled = true; }
+      unitInput.addEventListener('change', () => {
+        insumo.unit = unitInput.value.trim();
+        scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
       });
+      priceInput.addEventListener('input', () => {
+        insumo.price = parseFloat(priceInput.value) || 0;
+        scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+      });
+      const cells = [
+        el('td', { 'data-label': 'Insumo' }, insumo.name),
+        el('td', { 'data-label': 'Unidade' }, unitInput),
+        el('td', { 'data-label': 'Preço (R$)' }, priceInput),
+        el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
+      ];
+      if (canEditCliente(cid)) {
+        cells.push(el('td', { 'data-label': '' },
+          el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+            const uses = usageMap[insumo.id] || 0;
+            if (!confirm(uses > 0 ? `Excluir "${insumo.name}"? Usado em ${uses} receita(s).` : `Excluir "${insumo.name}"?`)) return;
+            try { await deleteInsumo(cid, insumo.id); toast('Excluído'); } catch (e) { toast('Erro: ' + e.message); }
+          } }, 'Excluir')
+        ));
+      }
+      tbody.appendChild(el('tr', {}, ...cells));
+    });
   }
   buildRows('');
-  table.appendChild(tbody);
-  app.appendChild(table);
-
+  tbl.appendChild(tbody);
+  app.appendChild(tbl);
   $('.insumos-search', header).addEventListener('input', e => buildRows(e.target.value));
 }
 
-// ---------- Admin: list ----------
-function renderAdminList() {
+// ---------- Views: Admin dishes ----------
+function renderAdminList(cid) {
   const app = $('#app');
   app.innerHTML = '';
-  const header = el('div', { class: 'insumos-header' },
+  app.appendChild(renderClienteContext(cid));
+  const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar fichas'),
-      el('p', {}, 'Adicione, edite ou exclua pratos. Até 3 fotos por prato. Salva automaticamente no banco.')
+      el('p', {}, 'Adicione, edite ou exclua pratos. Salva automaticamente.')
     ),
-    el('a', { class: 'btn btn-primary', href: '#/admin/new' }, '+ Nova ficha')
+    el('a', { class: 'btn btn-primary', href: `#/c/${cid}/admin/new` }, '+ Nova ficha')
   );
   app.appendChild(header);
-
   const panel = el('div', { class: 'admin-panel' });
   const list = el('div', { class: 'dish-admin-list' });
-  DATA.dishes.forEach(dish => {
+  STATE.dishes.forEach(dish => {
     const item = el('div', { class: 'dish-admin-item' },
       el('div', { class: 'info' },
         el('h4', {}, dish.name),
         el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
       el('div', { class: 'dish-admin-actions' },
-        el('a', { class: 'btn btn-small', href: `#/ficha/${dish.id}` }, 'Ver'),
-        el('a', { class: 'btn btn-small btn-primary', href: `#/admin/edit/${dish.id}` }, 'Editar'),
-        el('button', { class: 'btn btn-small btn-danger', onclick: () => deleteDishAction(dish.id) }, 'Excluir')
+        el('a', { class: 'btn btn-small', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver'),
+        el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar'),
+        el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+          if (!confirm(`Excluir "${dish.name}"?`)) return;
+          try { await deleteDish(cid, dish.id); toast('Excluída'); } catch (e) { toast('Erro: ' + e.message); }
+        } }, 'Excluir')
       )
     );
     list.appendChild(item);
@@ -854,51 +1263,29 @@ function renderAdminList() {
   app.appendChild(panel);
 }
 
-async function deleteDishAction(id) {
-  const d = DATA.dishes.find(x => x.id === id);
-  if (!d) return;
-  if (!confirm(`Excluir "${d.name}" do banco? Essa ação não pode ser desfeita (mas você tem backup baixável).`)) return;
-  try {
-    await deleteDishFromFirestore(id);
-    toast('Ficha excluída');
-  } catch (err) { toast('Erro: ' + err.message); }
-}
-
-// ---------- Admin: edit/new ----------
-function renderAdminEdit(dishId) {
+function renderAdminEdit(cid, dishId) {
   const app = $('#app');
   app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
   let dish;
   if (dishId) {
-    const existing = DATA.dishes.find(d => d.id === dishId);
+    const existing = STATE.dishes.find(d => d.id === dishId);
     if (!existing) { app.appendChild(el('p', {}, 'Prato não encontrado')); return; }
     dish = JSON.parse(JSON.stringify(existing));
   } else {
-    dish = {
-      id: 'new-' + uid(),
-      name: '',
-      description: '',
-      photos: [],
-      louca: '',
-      equipamentos: [],
+    dish = { id: 'new-' + uid(), name: '', description: '', photos: [], louca: '', equipamentos: [],
       sub_fichas: [{ id: uid(), name: 'Preparação 1', rendimento: '', ingredientes: [], modo_preparo: '' }],
-      markup: 300,
-    };
+      markup: 300 };
   }
-
-  app.appendChild(el('a', { href: '#/admin', class: 'back-link' }, '← Voltar'));
+  app.appendChild(el('a', { href: `#/c/${cid}/admin`, class: 'back-link' }, '← Voltar'));
   app.appendChild(el('h1', {}, dishId ? 'Editar ficha' : 'Nova ficha'));
-
   const panel = el('div', { class: 'admin-panel' });
-
   panel.appendChild(el('h2', {}, 'Informações gerais'));
-  const basic = el('div', { class: 'form-grid' },
+  panel.appendChild(el('div', { class: 'form-grid' },
     fieldInput('Nome do prato', 'text', dish.name, v => dish.name = v),
     fieldInput('Louça / apresentação', 'text', dish.louca, v => dish.louca = v),
     fieldInput('Markup sugerido (%)', 'number', dish.markup, v => dish.markup = parseFloat(v) || 0)
-  );
-  panel.appendChild(basic);
-
+  ));
   panel.appendChild(el('h3', {}, 'Fotos (até 3)'));
   const photoWrap = el('div', { class: 'photo-upload' });
   function renderPhotos() {
@@ -913,8 +1300,7 @@ function renderAdminEdit(dishId) {
         slot.appendChild(document.createTextNode('+ foto'));
         const input = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
         input.addEventListener('change', () => {
-          const file = input.files[0];
-          if (!file) return;
+          const file = input.files[0]; if (!file) return;
           const reader = new FileReader();
           reader.onload = () => {
             const img = new Image();
@@ -922,8 +1308,7 @@ function renderAdminEdit(dishId) {
               const maxW = 1000;
               const scale = Math.min(1, maxW / img.width);
               const canvas = document.createElement('canvas');
-              canvas.width = img.width * scale;
-              canvas.height = img.height * scale;
+              canvas.width = img.width * scale; canvas.height = img.height * scale;
               canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
               dish.photos[i] = canvas.toDataURL('image/jpeg', 0.78);
               renderPhotos();
@@ -942,20 +1327,14 @@ function renderAdminEdit(dishId) {
 
   panel.appendChild(el('h3', {}, 'Equipamentos necessários'));
   const eqBox = el('div', { class: 'equipamentos-select' });
-  (DATA.equipamentos_disponiveis || []).forEach(eq => {
-    const lbl = el('label', {},
-      (() => {
-        const i = el('input', { type: 'checkbox' });
-        if (dish.equipamentos.includes(eq)) i.setAttribute('checked', '');
-        i.addEventListener('change', () => {
-          if (i.checked) { if (!dish.equipamentos.includes(eq)) dish.equipamentos.push(eq); }
-          else dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
-        });
-        return i;
-      })(),
-      document.createTextNode(eq)
-    );
-    eqBox.appendChild(lbl);
+  (STATE.equipamentos || []).forEach(eq => {
+    const i = el('input', { type: 'checkbox' });
+    if (dish.equipamentos.includes(eq)) i.setAttribute('checked', '');
+    i.addEventListener('change', () => {
+      if (i.checked) { if (!dish.equipamentos.includes(eq)) dish.equipamentos.push(eq); }
+      else dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
+    });
+    eqBox.appendChild(el('label', {}, i, document.createTextNode(' ' + eq)));
   });
   panel.appendChild(eqBox);
 
@@ -965,13 +1344,10 @@ function renderAdminEdit(dishId) {
     sfWrap.innerHTML = '';
     dish.sub_fichas.forEach((sf, idx) => {
       const box = el('div', { class: 'subficha-editor' },
-        el('h4', {},
-          el('span', {}, `${idx + 1}. Preparação`),
+        el('h4', {}, el('span', {}, `${idx + 1}. Preparação`),
           el('span', {},
-            el('button', { class: 'btn btn-small', onclick: () => { if (idx > 0) { [dish.sub_fichas[idx-1], dish.sub_fichas[idx]] = [dish.sub_fichas[idx], dish.sub_fichas[idx-1]]; renderSubfichas(); } } }, '↑'),
-            ' ',
-            el('button', { class: 'btn btn-small', onclick: () => { if (idx < dish.sub_fichas.length - 1) { [dish.sub_fichas[idx], dish.sub_fichas[idx+1]] = [dish.sub_fichas[idx+1], dish.sub_fichas[idx]]; renderSubfichas(); } } }, '↓'),
-            ' ',
+            el('button', { class: 'btn btn-small', onclick: () => { if (idx > 0) { [dish.sub_fichas[idx-1], dish.sub_fichas[idx]] = [dish.sub_fichas[idx], dish.sub_fichas[idx-1]]; renderSubfichas(); } } }, '↑'), ' ',
+            el('button', { class: 'btn btn-small', onclick: () => { if (idx < dish.sub_fichas.length - 1) { [dish.sub_fichas[idx], dish.sub_fichas[idx+1]] = [dish.sub_fichas[idx+1], dish.sub_fichas[idx]]; renderSubfichas(); } } }, '↓'), ' ',
             el('button', { class: 'btn btn-small btn-danger', onclick: () => { if (confirm('Excluir esta preparação?')) { dish.sub_fichas.splice(idx, 1); renderSubfichas(); } } }, 'Excluir')
           )
         ),
@@ -980,8 +1356,7 @@ function renderAdminEdit(dishId) {
           fieldInput('Rendimento', 'text', sf.rendimento, v => sf.rendimento = v)
         )
       );
-      const ingHeader = el('h4', {}, 'Insumos');
-      box.appendChild(ingHeader);
+      box.appendChild(el('h4', {}, 'Insumos'));
       const ingList = el('div', {});
       function renderIngs() {
         ingList.innerHTML = '';
@@ -990,7 +1365,7 @@ function renderAdminEdit(dishId) {
           const nameInput = el('input', { type: 'text', value: ing.insumo_name, placeholder: 'Insumo', list: 'all-insumos' });
           nameInput.addEventListener('input', () => {
             ing.insumo_name = nameInput.value;
-            const match = DATA.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
+            const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
             ing.insumo_id = match ? match.id : slugify(nameInput.value);
           });
           row.appendChild(nameInput);
@@ -1011,83 +1386,67 @@ function renderAdminEdit(dishId) {
           row.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: () => { sf.ingredientes.splice(ingIdx, 1); renderIngs(); } }, '×'));
           ingList.appendChild(row);
         });
-        const addBtn = el('button', { class: 'btn btn-small', onclick: () => {
+        ingList.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
           sf.ingredientes.push({ insumo_id: '', insumo_name: '', qty: null, qty_raw: '', unit: 'g', observacao: '', is_qb: false });
           renderIngs();
-        } }, '+ adicionar insumo');
-        ingList.appendChild(addBtn);
+        } }, '+ adicionar insumo'));
       }
       renderIngs();
       box.appendChild(ingList);
       box.appendChild(el('label', { class: 'field' },
         el('span', { class: 'label-text' }, 'Modo de Preparo'),
-        (() => {
-          const ta = el('textarea', {}, sf.modo_preparo || '');
-          ta.addEventListener('input', () => { sf.modo_preparo = ta.value; });
-          return ta;
-        })()
+        (() => { const ta = el('textarea', {}, sf.modo_preparo || ''); ta.addEventListener('input', () => sf.modo_preparo = ta.value); return ta; })()
       ));
       sfWrap.appendChild(box);
     });
-    const add = el('button', { class: 'btn', onclick: () => {
+    sfWrap.appendChild(el('button', { class: 'btn', onclick: () => {
       dish.sub_fichas.push({ id: uid(), name: `Preparação ${dish.sub_fichas.length + 1}`, rendimento: '', ingredientes: [], modo_preparo: '' });
       renderSubfichas();
-    } }, '+ Adicionar sub-ficha');
-    sfWrap.appendChild(add);
+    } }, '+ Adicionar sub-ficha'));
   }
   renderSubfichas();
   panel.appendChild(sfWrap);
 
   const dl = el('datalist', { id: 'all-insumos' });
-  DATA.insumos.forEach(i => dl.appendChild(el('option', { value: i.name })));
+  STATE.insumos.forEach(i => dl.appendChild(el('option', { value: i.name })));
   panel.appendChild(dl);
 
-  const saveBar = el('div', { class: 'ficha-actions' },
-    el('button', { class: 'btn btn-primary', onclick: () => saveDish(dish, dishId) }, 'Salvar'),
-    el('a', { class: 'btn', href: '#/admin' }, 'Cancelar')
-  );
-  panel.appendChild(saveBar);
-
+  panel.appendChild(el('div', { class: 'ficha-actions' },
+    el('button', { class: 'btn btn-primary', onclick: () => saveDishAction(cid, dish, dishId) }, 'Salvar'),
+    el('a', { class: 'btn', href: `#/c/${cid}/admin` }, 'Cancelar')
+  ));
   app.appendChild(panel);
 }
 
-async function saveDish(dish, originalId) {
-  if (!isAdmin) { toast('Faça login como admin'); return; }
+async function saveDishAction(cid, dish, originalId) {
   if (!dish.name.trim()) { alert('Nome do prato é obrigatório'); return; }
   const newId = slugify(dish.name);
   dish.id = newId;
   try {
-    // Register new insumos first
+    // Register new insumos
     const batch = writeBatch(db);
-    let batchCount = 0;
+    let bc = 0;
     for (const sf of dish.sub_fichas) {
       for (const ing of sf.ingredientes) {
         if (!ing.insumo_name.trim()) continue;
-        const existing = DATA.insumos.find(i => i.name.toLowerCase() === ing.insumo_name.toLowerCase());
+        const existing = STATE.insumos.find(i => i.name.toLowerCase() === ing.insumo_name.toLowerCase());
         if (!existing) {
           const newIns = { id: slugify(ing.insumo_name), name: ing.insumo_name.trim(), unit: ing.unit || 'g', price: 0 };
           ing.insumo_id = newIns.id;
-          const clean = { ...newIns };
-          delete clean.id;
-          batch.set(doc(db, 'insumos', newIns.id), clean);
-          batchCount++;
+          const clean = { ...newIns }; delete clean.id;
+          batch.set(insumoDoc(cid, newIns.id), clean);
+          bc++;
         } else {
           ing.insumo_id = existing.id;
         }
       }
     }
-    if (batchCount > 0) await batch.commit();
-    // If id changed (on edit), delete old doc
-    if (originalId && originalId !== newId) {
-      await deleteDoc(doc(db, 'dishes', originalId));
-    }
-    await saveDishToFirestore(dish);
-    toast('Ficha salva');
-    location.hash = `#/ficha/${dish.id}`;
-  } catch (err) {
-    console.error(err);
-    toast('Erro ao salvar: ' + err.message);
-  }
+    if (bc > 0) await batch.commit();
+    if (originalId && originalId !== newId) await deleteDish(cid, originalId);
+    await saveDish(cid, dish);
+    toast('Salvo');
+    location.hash = `#/c/${cid}/ficha/${dish.id}`;
+  } catch (err) { console.error(err); toast('Erro: ' + err.message); }
 }
 
 function fieldInput(label, type, value, onChange) {
@@ -1098,113 +1457,86 @@ function fieldInput(label, type, value, onChange) {
   return wrap;
 }
 
-// ---------- Exports (PDF + XLSX) ----------
+// ---------- Exports ----------
 function exportFichaPDF(dish, state) {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 15;
   let y = margin;
-  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageWidth = docPdf.internal.pageSize.getWidth();
   const contentWidth = pageWidth - margin * 2;
-
   const isTrabalho = state.view === 'trabalho';
   const all = dishCost(dish);
   const currentSf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
+  const sf = state.view === 'trabalho' ? currentSf : null;
 
-  doc.setFont('times', 'italic');
-  doc.setFontSize(10);
-  doc.setTextColor(130);
-  doc.text(isTrabalho ? 'Ficha Técnica Operacional' : 'Ficha de Custo por Rendimento', pageWidth / 2, y, { align: 'center' });
+  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
+  docPdf.text(isTrabalho ? 'Ficha Técnica Operacional' : 'Ficha de Custo por Rendimento', pageWidth / 2, y, { align: 'center' });
   y += 7;
-  doc.setFont('times', 'normal');
-  doc.setFontSize(22);
-  doc.setTextColor(20);
-  doc.text(dish.name, pageWidth / 2, y, { align: 'center' });
+  docPdf.setFont('times', 'normal').setFontSize(22).setTextColor(20);
+  docPdf.text(dish.name, pageWidth / 2, y, { align: 'center' });
   y += 10;
-  doc.setDrawColor(184, 149, 94);
-  doc.setLineWidth(0.3);
-  doc.line(pageWidth / 2 - 20, y, pageWidth / 2 + 20, y);
+  docPdf.setDrawColor(184, 149, 94).setLineWidth(0.3);
+  docPdf.line(pageWidth / 2 - 20, y, pageWidth / 2 + 20, y);
   y += 8;
 
+  const factor = state.scaleFactor || 1;
   if (isTrabalho) {
-    doc.setFont('times', 'normal');
-    doc.setFontSize(14);
-    doc.setTextColor(20);
-    doc.text(currentSf.name, margin, y);
-    y += 5;
-    if (currentSf.rendimento) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(120);
-      doc.text('Rendimento: ' + currentSf.rendimento, margin, y);
-      y += 6;
+    docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
+    docPdf.text(sf.name, margin, y); y += 5;
+    if (sf.rendimento) {
+      docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(120);
+      const rendStr = factor !== 1 ? scaleRendStr(sf.rendimento, factor) + ` (escalado ${fmtNum(factor, 2)}×)` : sf.rendimento;
+      docPdf.text('Rendimento: ' + rendStr, margin, y); y += 6;
     }
-    doc.autoTable({
-      startY: y,
-      margin: { left: margin, right: margin },
+    docPdf.autoTable({
+      startY: y, margin: { left: margin, right: margin },
       head: [['Insumo', 'Quantidade', 'Unidade', 'Observação']],
-      body: (currentSf.ingredientes || []).map(i => [
-        i.insumo_name,
-        i.is_qb ? 'Q.B' : (i.qty != null ? fmtNum(i.qty, i.qty % 1 === 0 ? 0 : 2) : (i.qty_raw || '—')),
-        i.unit || '—',
-        i.observacao || '—'
-      ]),
+      body: (sf.ingredientes || []).map(i => {
+        const scaled = i.qty != null ? scaleQty(i.qty, factor) : null;
+        return [
+          i.insumo_name,
+          i.is_qb ? 'Q.B' : (scaled != null ? fmtNum(scaled, scaled % 1 === 0 ? 0 : 2) : (i.qty_raw || '—')),
+          i.unit || '—', i.observacao || '—'
+        ];
+      }),
       theme: 'plain',
       headStyles: { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
       bodyStyles: { fontSize: 9, cellPadding: 2.5, textColor: [40, 40, 40] },
       alternateRowStyles: { fillColor: [252, 251, 247] }
     });
-    y = doc.lastAutoTable.finalY + 8;
-    if (currentSf.modo_preparo) {
-      if (y > 250) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text('MODO DE PREPARO', margin, y);
-      y += 5;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(40);
-      const lines = doc.splitTextToSize(currentSf.modo_preparo.replace(/\s+/g, ' '), contentWidth);
-      doc.text(lines, margin, y);
-      y += lines.length * 4 + 6;
+    y = docPdf.lastAutoTable.finalY + 8;
+    if (sf.modo_preparo) {
+      if (y > 250) { docPdf.addPage(); y = margin; }
+      docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
+      docPdf.text('MODO DE PREPARO', margin, y); y += 5;
+      docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(40);
+      const lines = docPdf.splitTextToSize(sf.modo_preparo.replace(/\s+/g, ' '), contentWidth);
+      docPdf.text(lines, margin, y); y += lines.length * 4 + 6;
     }
     if (dish.louca) {
-      if (y > 260) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text('APRESENTAÇÃO / LOUÇA', margin, y);
-      y += 5;
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(40);
-      const lines = doc.splitTextToSize(dish.louca, contentWidth);
-      doc.text(lines, margin, y);
-      y += lines.length * 4 + 5;
+      if (y > 260) { docPdf.addPage(); y = margin; }
+      docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
+      docPdf.text('APRESENTAÇÃO / LOUÇA', margin, y); y += 5;
+      docPdf.setFont('helvetica', 'normal').setTextColor(40);
+      const lines = docPdf.splitTextToSize(dish.louca, contentWidth);
+      docPdf.text(lines, margin, y); y += lines.length * 4 + 5;
     }
     if (dish.equipamentos && dish.equipamentos.length) {
-      if (y > 260) { doc.addPage(); y = margin; }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text('EQUIPAMENTOS', margin, y);
-      y += 5;
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(40);
-      const lines = doc.splitTextToSize(dish.equipamentos.join(' · '), contentWidth);
-      doc.text(lines, margin, y);
+      if (y > 260) { docPdf.addPage(); y = margin; }
+      docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
+      docPdf.text('EQUIPAMENTOS', margin, y); y += 5;
+      docPdf.setFont('helvetica', 'normal').setTextColor(40);
+      const lines = docPdf.splitTextToSize(dish.equipamentos.join(' · '), contentWidth);
+      docPdf.text(lines, margin, y);
     }
   } else {
-    all.sfCosts.forEach(({ sf, rows, total }) => {
-      if (y > 240) { doc.addPage(); y = margin; }
-      doc.setFont('times', 'normal');
-      doc.setFontSize(12);
-      doc.setTextColor(20);
-      doc.text(`${sf.name}${sf.rendimento ? ' — ' + sf.rendimento : ''}`, margin, y);
-      y += 4;
-      doc.autoTable({
-        startY: y,
-        margin: { left: margin, right: margin },
+    all.sfCosts.forEach(({ sf: x, rows, total }) => {
+      if (y > 240) { docPdf.addPage(); y = margin; }
+      docPdf.setFont('times', 'normal').setFontSize(12).setTextColor(20);
+      docPdf.text(`${x.name}${x.rendimento ? ' — ' + x.rendimento : ''}`, margin, y); y += 4;
+      docPdf.autoTable({
+        startY: y, margin: { left: margin, right: margin },
         head: [['Insumo', 'Qtd', 'Un.', 'Preço unit.', 'Custo']],
         body: rows.map(({ ing, insumo, cost, isSubref, subSf }) => [
           (isSubref ? '↪ ' : '') + ing.insumo_name,
@@ -1220,44 +1552,38 @@ function exportFichaPDF(dish, state) {
         footStyles: { fontStyle: 'bold', fillColor: [252, 251, 247], fontSize: 9 },
         columnStyles: { 1: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = docPdf.lastAutoTable.finalY + 6;
     });
-    if (y > 240) { doc.addPage(); y = margin; }
-    doc.setFillColor(26, 26, 26);
-    doc.rect(margin, y, contentWidth, 28, 'F');
-    doc.setTextColor(255);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
+    if (y > 240) { docPdf.addPage(); y = margin; }
+    docPdf.setFillColor(26, 26, 26).rect(margin, y, contentWidth, 28, 'F');
+    docPdf.setTextColor(255).setFont('helvetica', 'normal').setFontSize(8);
     const col = contentWidth / 3;
-    doc.text('CUSTO TOTAL', margin + 5, y + 6);
-    doc.text('CUSTO/PORÇÃO', margin + col + 5, y + 6);
-    doc.text('PREÇO SUGERIDO', margin + col * 2 + 5, y + 6);
-    doc.setFont('times', 'normal');
-    doc.setFontSize(16);
-    doc.text(fmtBRL(all.total), margin + 5, y + 18);
-    doc.setTextColor(216, 184, 120);
-    doc.text(fmtBRL(all.costPerPortion), margin + col + 5, y + 18);
-    doc.setTextColor(255);
-    doc.text(fmtBRL(all.suggestedPrice), margin + col * 2 + 5, y + 18);
+    docPdf.text('CUSTO TOTAL', margin + 5, y + 6);
+    docPdf.text('CUSTO/PORÇÃO', margin + col + 5, y + 6);
+    docPdf.text('PREÇO SUGERIDO', margin + col * 2 + 5, y + 6);
+    docPdf.setFont('times', 'normal').setFontSize(16);
+    docPdf.text(fmtBRL(all.total), margin + 5, y + 18);
+    docPdf.setTextColor(216, 184, 120);
+    docPdf.text(fmtBRL(all.costPerPortion), margin + col + 5, y + 18);
+    docPdf.setTextColor(255);
+    docPdf.text(fmtBRL(all.suggestedPrice), margin + col * 2 + 5, y + 18);
     y += 32;
-
-    doc.setTextColor(80);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(`Markup: ${dish.markup}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
+    docPdf.setTextColor(80).setFont('helvetica', 'normal').setFontSize(9);
+    docPdf.text(`Markup: ${dish.markup}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
   }
-
-  doc.save(`${slugify(dish.name)}-${isTrabalho ? 'trabalho' : 'custo'}-${currentSf?.id || 'geral'}.pdf`);
+  const suffix = state.scaleFactor !== 1 ? `-escalado${fmtNum(state.scaleFactor, 2)}x` : '';
+  docPdf.save(`${slugify(dish.name)}-${isTrabalho ? 'trabalho' : 'custo'}${suffix}.pdf`);
 }
 
-function exportFichaXLSX(dish) {
+function exportFichaXLSX(dish, state) {
   const wb = XLSX.utils.book_new();
   const all = dishCost(dish);
   const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
-  const summaryData = [
+  const factor = state?.scaleFactor || 1;
+  const summary = [
     ['FICHA TÉCNICA'],
     ['Prato', dish.name],
-    ['Rendimento final', lastSf?.rendimento || '—'],
+    ['Rendimento final', (lastSf?.rendimento || '—') + (factor !== 1 ? ` (escalado ${fmtNum(factor, 2)}x)` : '')],
     [],
     ['Custo total', all.total],
     ['Porções', all.portions],
@@ -1267,50 +1593,64 @@ function exportFichaXLSX(dish) {
     ['CMV (%)', all.cmv],
     [],
     ['Louça', dish.louca || '—'],
-    ['Equipamentos', (dish.equipamentos || []).join('; ')],
+    ['Equipamentos', (dish.equipamentos || []).join('; ')]
   ];
-  const wsSum = XLSX.utils.aoa_to_sheet(summaryData);
-  XLSX.utils.book_append_sheet(wb, wsSum, 'Resumo');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Resumo');
   all.sfCosts.forEach(({ sf, rows, total }, idx) => {
     const data = [
-      [sf.name],
-      ['Rendimento', sf.rendimento || '—'],
-      [],
+      [sf.name], ['Rendimento', sf.rendimento || '—'], [],
       ['Insumo', 'Quantidade', 'Unidade', 'Observação', 'Preço unit.', 'Custo'],
       ...rows.map(({ ing, insumo, cost }) => [
         ing.insumo_name,
         ing.is_qb ? 'Q.B' : (ing.qty != null ? ing.qty : (ing.qty_raw || '')),
-        ing.unit || '',
-        ing.observacao || '',
-        insumo ? (insumo.price || 0) : 0,
-        cost
+        ing.unit || '', ing.observacao || '',
+        insumo ? (insumo.price || 0) : 0, cost
       ]),
-      [],
-      ['Subtotal', '', '', '', '', total],
-      [],
-      ['Modo de preparo:'],
-      [sf.modo_preparo || '']
+      [], ['Subtotal', '', '', '', '', total], [],
+      ['Modo de preparo:'], [sf.modo_preparo || '']
     ];
-    const ws = XLSX.utils.aoa_to_sheet(data);
     const name = ('SF' + (idx + 1) + '-' + sf.name).replace(/[/\\?*\[\]:]/g, '').slice(0, 30);
-    XLSX.utils.book_append_sheet(wb, ws, name);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), name);
   });
-  XLSX.writeFile(wb, `${slugify(dish.name)}.xlsx`);
+  // Trabalho scaled view: if factor != 1 and we're in Trabalho view, add a "Ficha Escalada" sheet with the scaled sub-ficha
+  if (factor !== 1 && state?.view === 'trabalho') {
+    const sfActive = (dish.sub_fichas || []).find(s => s.id === state.activeSf);
+    if (sfActive) {
+      const scaledData = [
+        [`Ficha de trabalho ESCALADA — fator ${fmtNum(factor, 2)}×`],
+        [sfActive.name],
+        ['Rendimento', scaleRendStr(sfActive.rendimento, factor)],
+        [],
+        ['Insumo', 'Quantidade', 'Unidade', 'Observação'],
+        ...(sfActive.ingredientes || []).map(i => {
+          const sc = i.qty != null ? scaleQty(i.qty, factor) : null;
+          return [
+            i.insumo_name,
+            i.is_qb ? 'Q.B' : (sc != null ? sc : (i.qty_raw || '')),
+            i.unit || '', i.observacao || ''
+          ];
+        }),
+        [], ['Modo de preparo'], [sfActive.modo_preparo || '']
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scaledData), 'Escalada');
+    }
+  }
+  const suffix = factor !== 1 ? `-esc${fmtNum(factor, 2)}x` : '';
+  XLSX.writeFile(wb, `${slugify(dish.name)}${suffix}.xlsx`);
 }
 
 // ---------- Init ----------
-onAuthStateChanged(auth, (user) => {
-  currentUser = user;
-  isAdmin = !!(user && user.email === ADMIN_EMAIL);
+onAuthStateChanged(auth, async (user) => {
+  STATE.user = user;
+  if (user) await ensureUserDoc(user);
+  else STATE.userDoc = null;
   updateAuthUI();
-  if (hasRenderedOnce) route();
+  route();
 });
 
-setupListeners();
-
-// Wire up buttons
+// Wire up UI
 $('#btn-auth').addEventListener('click', () => {
-  if (isAdmin) doLogout();
+  if (STATE.user) doLogout();
   else openLoginModal();
 });
 $('#login-form').addEventListener('submit', e => {
@@ -1319,11 +1659,20 @@ $('#login-form').addEventListener('submit', e => {
 });
 $('#login-cancel').addEventListener('click', closeLoginModal);
 $('.modal-overlay').addEventListener('click', closeLoginModal);
-$('#btn-download-backup').addEventListener('click', downloadBackup);
-$('#btn-seed').addEventListener('click', seedFromJson);
-$('#file-restore').addEventListener('change', e => {
-  if (e.target.files[0]) restoreBackup(e.target.files[0]);
-});
 
-// Initial UI
-updateAuthUI();
+// Optional: download backup of current cliente (admin only)
+const btnBackup = $('#btn-download-backup');
+if (btnBackup) btnBackup.addEventListener('click', () => {
+  if (!STATE.currentClienteId) { toast('Abra um cliente antes'); return; }
+  const payload = {
+    cliente: STATE.currentCliente,
+    dishes: STATE.dishes, insumos: STATE.insumos,
+    equipamentos_disponiveis: STATE.equipamentos
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `backup-${STATE.currentClienteId}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  toast('Backup baixado');
+});
