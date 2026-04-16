@@ -61,6 +61,59 @@ const el = (tag, attrs = {}, ...children) => {
 };
 const fmtBRL = v => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
 const fmtNum = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—';
+
+// Normaliza quantidade para kg (peso) ou l (volume) com 3 decimais; outros permanecem.
+const WEIGHT_G = ['g','gr','gram','grama','gramas'];
+const WEIGHT_MG = ['mg'];
+const WEIGHT_KG = ['kg','quilo','quilos','quilograma','quilogramas'];
+const VOL_ML = ['ml','millilitro','mililitro'];
+const VOL_L = ['l','lt','litro','litros'];
+function normUnitForDisplay(qty, unit) {
+  if (qty == null) return { qty: null, unit: unit || '', text: '—' };
+  const u = (unit || '').toLowerCase().trim().replace(/\s+/g, '');
+  if (WEIGHT_G.includes(u)) return { qty: qty/1000, unit: 'kg', text: fmtNum(qty/1000, 3) };
+  if (WEIGHT_MG.includes(u)) return { qty: qty/1e6, unit: 'kg', text: fmtNum(qty/1e6, 3) };
+  if (WEIGHT_KG.includes(u)) return { qty, unit: 'kg', text: fmtNum(qty, 3) };
+  if (VOL_ML.includes(u)) return { qty: qty/1000, unit: 'l', text: fmtNum(qty/1000, 3) };
+  if (VOL_L.includes(u)) return { qty, unit: 'l', text: fmtNum(qty, 3) };
+  const dec = qty % 1 === 0 ? 0 : 2;
+  return { qty, unit: unit || '', text: fmtNum(qty, dec) };
+}
+// Returns formatted "qty unit" string or "Q.B" / raw fallback
+function formatIngQty(ing, scaleFactor = 1) {
+  if (ing.is_qb) return { text: 'Q.B', unit: '' };
+  if (ing.qty == null) return { text: ing.qty_raw || '—', unit: ing.unit || '' };
+  const scaled = ing.qty * (scaleFactor || 1);
+  const n = normUnitForDisplay(scaled, ing.unit);
+  return { text: n.text, unit: n.unit };
+}
+// Convert insumo price to normalized per-unit display (per kg, per l, or as-is)
+function normalizePriceForDisplay(insumo) {
+  if (!insumo) return null;
+  const u = (insumo.unit || '').toLowerCase().trim();
+  const p = insumo.price || 0;
+  if (WEIGHT_G.includes(u)) return { price: p * 1000, unit: 'kg' };
+  if (WEIGHT_MG.includes(u)) return { price: p * 1e6, unit: 'kg' };
+  if (WEIGHT_KG.includes(u)) return { price: p, unit: 'kg' };
+  if (VOL_ML.includes(u)) return { price: p * 1000, unit: 'l' };
+  if (VOL_L.includes(u)) return { price: p, unit: 'l' };
+  return { price: p, unit: insumo.unit || '—' };
+}
+
+// Normalize rendimento string (just leading number + unit)
+function formatRendimento(rendStr, scaleFactor = 1) {
+  if (!rendStr) return '';
+  const parsed = parseRendimentoQty(rendStr);
+  // Preserve any suffix text after number+unit
+  const s = String(rendStr).trim();
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ/]*)(.*)$/);
+  if (!m) return rendStr;
+  const qty = parsed.qty * (scaleFactor || 1);
+  const unit = parsed.unit;
+  const n = normUnitForDisplay(qty, unit);
+  const suffix = m[3].trim();
+  return `${n.text} ${n.unit}${suffix ? ' ' + suffix : ''}`.trim();
+}
 const slugify = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'item';
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -360,7 +413,7 @@ async function route() {
 
     const rest = parts.slice(2);
     if (rest.length === 0) { renderClienteHome(cid); return; }
-    if (rest[0] === 'ficha' && rest[1]) { renderFicha(cid, rest[1]); return; }
+    if (rest[0] === 'ficha' && rest[1]) { renderFicha(cid, rest[1], rest[2] || null); return; }
     if (rest[0] === 'insumos') { renderInsumos(cid); return; }
     if (rest[0] === 'admin') {
       if (!canEditCliente(cid)) { renderNoAccess(); return; }
@@ -850,15 +903,13 @@ function scaleRendStr(rendStr, factor) {
   });
 }
 
-// ---------- Views: Cliente home (cardápio) ----------
+// ---------- Views: Cliente home (cardápio) — list format ----------
 function renderClienteHome(cid) {
   const app = $('#app');
   app.innerHTML = '';
   const totalSubfichas = STATE.dishes.reduce((s, d) => s + (d.sub_fichas || []).length, 0);
 
-  // Breadcrumb / context bar
-  const ctx = renderClienteContext(cid);
-  app.appendChild(ctx);
+  app.appendChild(renderClienteContext(cid));
 
   const hero = el('section', { class: 'home-hero' },
     el('h1', {}, 'Cardápio'),
@@ -884,26 +935,40 @@ function renderClienteHome(cid) {
     return;
   }
 
-  const grid = el('div', { class: 'grid-dishes' });
-  STATE.dishes.forEach(dish => {
+  const listWrap = el('div', { class: 'cardapio-list' });
+  STATE.dishes.forEach((dish, idx) => {
     const { costPerPortion } = dishCost(dish);
-    const photo = dish.photos && dish.photos[0];
     const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
-    const card = el('a', { class: 'card-dish', href: `#/c/${cid}/ficha/${dish.id}` },
-      el('div', { class: 'card-photo' },
-        photo ? el('img', { src: photo, alt: dish.name }) : el('span', { class: 'placeholder' }, 'sem foto')
-      ),
-      el('div', { class: 'card-body' },
-        el('h3', {}, dish.name),
-        el('div', { class: 'card-meta' },
-          el('span', {}, 'Rendimento', el('br'), el('strong', {}, lastSf?.rendimento || '—')),
-          canEditInsumoPrice(cid) ? el('span', {}, 'Custo/porção', el('br'), el('strong', {}, fmtBRL(costPerPortion))) : null
+    const rendDisplay = lastSf?.rendimento ? formatRendimento(lastSf.rendimento) : '—';
+    const dishGroup = el('article', { class: 'dish-group' },
+      el('header', { class: 'dish-head' },
+        el('a', { class: 'dish-title', href: `#/c/${cid}/ficha/${dish.id}` },
+          el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
+          el('span', { class: 'dish-name' }, dish.name)
+        ),
+        el('div', { class: 'dish-meta' },
+          el('span', { class: 'meta-item' }, el('em', {}, 'rendimento: '), rendDisplay),
+          canEditInsumoPrice(cid) ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção: '), fmtBRL(costPerPortion)) : null
         )
-      )
+      ),
+      (() => {
+        const ul = el('ul', { class: 'subficha-sublist' });
+        (dish.sub_fichas || []).forEach((sf, sfIdx) => {
+          const isFinal = sfIdx === dish.sub_fichas.length - 1;
+          ul.appendChild(el('li', { class: 'subficha-item' + (isFinal ? ' is-final' : '') },
+            el('a', { href: `#/c/${cid}/ficha/${dish.id}/${sf.id}` },
+              el('span', { class: 'sf-marker' }, isFinal ? '●' : '○'),
+              el('span', { class: 'sf-name' }, sf.name),
+              sf.rendimento ? el('span', { class: 'sf-rend' }, formatRendimento(sf.rendimento)) : null
+            )
+          ));
+        });
+        return ul;
+      })()
     );
-    grid.appendChild(card);
+    listWrap.appendChild(dishGroup);
   });
-  app.appendChild(grid);
+  app.appendChild(listWrap);
 }
 
 function renderClienteContext(cid) {
@@ -920,7 +985,7 @@ function renderClienteContext(cid) {
 }
 
 // ---------- Views: Ficha (with scaling + kitchen mode on mobile) ----------
-function renderFicha(cid, dishId) {
+function renderFicha(cid, dishId, initialSfId = null) {
   const dish = STATE.dishes.find(d => d.id === dishId);
   const app = $('#app');
   app.innerHTML = '';
@@ -930,11 +995,15 @@ function renderFicha(cid, dishId) {
   }
   app.appendChild(renderClienteContext(cid));
 
+  // If initialSfId is provided and exists, start on it; otherwise default to first sub-ficha (for kitchen flow)
+  const defaultSf = initialSfId && dish.sub_fichas.some(s => s.id === initialSfId)
+    ? initialSfId
+    : (dish.sub_fichas[0]?.id || null);
   const state = {
     view: 'trabalho',
-    activeSf: (dish.sub_fichas || [])[dish.sub_fichas.length - 1]?.id || (dish.sub_fichas || [])[0]?.id,
+    activeSf: defaultSf,
     scaleFactor: 1,
-    targetYield: null, // user-entered target, as {qty, unit}
+    targetYield: null,
   };
 
   const header = el('div', { class: 'ficha-header' },
@@ -988,37 +1057,42 @@ function renderFichaTrabalho(dish, sf, state, rerender) {
   wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha Técnica Operacional'));
   wrap.appendChild(el('h2', {}, sf.name));
 
-  // Scaling controls
+  // Scaling controls (units displayed in kg/l when applicable)
   const originalRend = sf.rendimento || '';
   const parsedRend = parseRendimentoQty(originalRend);
-  const scaledRendStr = state.scaleFactor !== 1 ? scaleRendStr(originalRend, state.scaleFactor) : originalRend;
+  const normRend = normUnitForDisplay(parsedRend.qty, parsedRend.unit);
+  // Target/display quantity in normalized units
+  const displayQtyOriginal = normRend.qty; // in kg or l or original
+  const displayUnitOriginal = normRend.unit;
+  const displayQtyScaled = displayQtyOriginal * (state.scaleFactor || 1);
   const rendBar = el('div', { class: 'rend-bar' },
     el('div', { class: 'rend-info' },
       el('span', { class: 'rend-label' }, 'Rendimento'),
-      el('span', { class: 'rend-value' }, scaledRendStr || '—')
+      el('span', { class: 'rend-value' }, `${fmtNum(displayQtyScaled, (['kg','l'].includes(displayUnitOriginal) ? 3 : (displayQtyScaled % 1 === 0 ? 0 : 2)))} ${displayUnitOriginal}`.trim())
     ),
     el('div', { class: 'scale-ctrl' },
       el('span', { class: 'scale-label' }, 'Produzir:'),
       (() => {
-        const input = el('input', { type: 'number', step: '0.1', min: '0.1',
-          value: state.targetYield != null ? state.targetYield : parsedRend.qty,
-          placeholder: String(parsedRend.qty) });
+        const useDecimals = ['kg', 'l'].includes(displayUnitOriginal);
+        const input = el('input', { type: 'number', step: useDecimals ? '0.001' : '1', min: '0',
+          value: state.targetYield != null ? state.targetYield : (useDecimals ? displayQtyOriginal.toFixed(3) : displayQtyOriginal),
+          placeholder: String(displayQtyOriginal) });
         input.addEventListener('change', () => {
-          const v = parseFloat(input.value);
+          const v = parseFloat(input.value.replace(',', '.'));
           if (isNaN(v) || v <= 0) return;
           state.targetYield = v;
-          state.scaleFactor = parsedRend.qty > 0 ? (v / parsedRend.qty) : 1;
+          state.scaleFactor = displayQtyOriginal > 0 ? (v / displayQtyOriginal) : 1;
           rerender();
         });
         return input;
       })(),
-      el('span', { class: 'scale-unit' }, parsedRend.unit || 'unid.'),
+      el('span', { class: 'scale-unit' }, displayUnitOriginal || 'unid.'),
       state.scaleFactor !== 1
         ? el('button', { class: 'btn btn-small btn-ghost', onclick: () => { state.scaleFactor = 1; state.targetYield = null; rerender(); } }, 'Resetar')
         : null
     ),
     state.scaleFactor !== 1
-      ? el('div', { class: 'scale-note muted' }, `Original: ${originalRend}  ·  Fator ${fmtNum(state.scaleFactor, 2)}×`)
+      ? el('div', { class: 'scale-note muted' }, `Original: ${fmtNum(displayQtyOriginal, (['kg','l'].includes(displayUnitOriginal) ? 3 : 0))} ${displayUnitOriginal}  ·  Fator ${fmtNum(state.scaleFactor, 2)}×`)
       : null
   );
   wrap.appendChild(rendBar);
@@ -1031,15 +1105,11 @@ function renderFichaTrabalho(dish, sf, state, rerender) {
     if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
     if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
 
-    const scaledQty = ing.qty != null ? scaleQty(ing.qty, state.scaleFactor) : null;
-    const qtyStr = ing.is_qb ? 'Q.B' : (scaledQty != null
-      ? fmtNum(scaledQty, scaledQty % 1 === 0 ? 0 : 2)
-      : (ing.qty_raw || '—'));
-
+    const formatted = formatIngQty(ing, state.scaleFactor);
     const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
       el('div', { class: 'k-qty' },
-        el('span', { class: 'qty-num' }, qtyStr),
-        el('span', { class: 'qty-unit' }, ing.unit || '')
+        el('span', { class: 'qty-num' }, formatted.text),
+        el('span', { class: 'qty-unit' }, formatted.unit || '')
       ),
       el('div', { class: 'k-info' },
         el('span', { class: 'k-name' }, (subSf ? '↪ ' : '') + ing.insumo_name),
@@ -1084,8 +1154,9 @@ function renderFichaCusto(dish, currentSf, cid) {
 
   const all = dishCost(dish);
   all.sfCosts.forEach(({ sf, rows, total }) => {
+    const rendDisplay = sf.rendimento ? formatRendimento(sf.rendimento) : '';
     const section = el('div', { class: 'ficha-section' },
-      el('h3', {}, sf.name + (sf.rendimento ? ` — rendimento: ${sf.rendimento}` : ''))
+      el('h3', {}, sf.name + (rendDisplay ? ` — rendimento: ${rendDisplay}` : ''))
     );
     const tbl = el('table', { class: 'ficha-table' },
       el('thead', {}, el('tr', {},
@@ -1096,20 +1167,22 @@ function renderFichaCusto(dish, currentSf, cid) {
         el('th', { class: 'num' }, 'Custo')
       )),
       el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf }) => {
-        const qtyTxt = ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'));
+        const fmt = formatIngQty(ing);
         let priceTxt, nameCell;
         if (isSubref && subSf) {
-          priceTxt = el('span', { class: 'subref-note' }, `sub-ficha (${subSf.rendimento || '—'})`);
+          priceTxt = el('span', { class: 'subref-note' }, `sub-ficha (${formatRendimento(subSf.rendimento || '')})`);
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
             el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
         } else {
-          priceTxt = insumo ? `${fmtBRL(insumo.price || 0)} / ${insumo.unit || '—'}` : '—';
+          // Insumo price: display per normalized unit
+          const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
+          priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
           nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
         }
         return el('tr', { class: isSubref ? 'row-subref' : '' },
           nameCell,
-          el('td', { class: 'num', 'data-label': 'Quantidade' }, qtyTxt),
-          el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
+          el('td', { class: 'num', 'data-label': 'Quantidade' }, fmt.text),
+          el('td', { 'data-label': 'Unidade' }, fmt.unit || '—'),
           el('td', { class: 'num', 'data-label': 'Preço unit.' }, priceTxt),
           el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost))
         );
@@ -1486,18 +1559,18 @@ function exportFichaPDF(dish, state) {
     docPdf.text(sf.name, margin, y); y += 5;
     if (sf.rendimento) {
       docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(120);
-      const rendStr = factor !== 1 ? scaleRendStr(sf.rendimento, factor) + ` (escalado ${fmtNum(factor, 2)}×)` : sf.rendimento;
+      const rendStr = formatRendimento(sf.rendimento, factor) + (factor !== 1 ? ` (escalado ${fmtNum(factor, 2)}×)` : '');
       docPdf.text('Rendimento: ' + rendStr, margin, y); y += 6;
     }
     docPdf.autoTable({
       startY: y, margin: { left: margin, right: margin },
       head: [['Insumo', 'Quantidade', 'Unidade', 'Observação']],
       body: (sf.ingredientes || []).map(i => {
-        const scaled = i.qty != null ? scaleQty(i.qty, factor) : null;
+        const f = formatIngQty(i, factor);
         return [
           i.insumo_name,
-          i.is_qb ? 'Q.B' : (scaled != null ? fmtNum(scaled, scaled % 1 === 0 ? 0 : 2) : (i.qty_raw || '—')),
-          i.unit || '—', i.observacao || '—'
+          f.text,
+          f.unit || '—', i.observacao || '—'
         ];
       }),
       theme: 'plain',
@@ -1538,13 +1611,17 @@ function exportFichaPDF(dish, state) {
       docPdf.autoTable({
         startY: y, margin: { left: margin, right: margin },
         head: [['Insumo', 'Qtd', 'Un.', 'Preço unit.', 'Custo']],
-        body: rows.map(({ ing, insumo, cost, isSubref, subSf }) => [
-          (isSubref ? '↪ ' : '') + ing.insumo_name,
-          ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—')),
-          ing.unit || '—',
-          isSubref ? `sub-ficha (${subSf?.rendimento || '—'})` : (insumo ? `${fmtBRL(insumo.price || 0)}/${insumo.unit || '—'}` : '—'),
-          fmtBRL(cost)
-        ]),
+        body: rows.map(({ ing, insumo, cost, isSubref, subSf }) => {
+          const f = formatIngQty(ing);
+          const np = insumo ? normalizePriceForDisplay(insumo) : null;
+          return [
+            (isSubref ? '↪ ' : '') + ing.insumo_name,
+            f.text, f.unit || '—',
+            isSubref ? `sub-ficha (${formatRendimento(subSf?.rendimento || '')})`
+                     : (np ? `${fmtBRL(np.price)}/${np.unit}` : '—'),
+            fmtBRL(cost)
+          ];
+        }),
         foot: [['', '', '', 'Subtotal', fmtBRL(total)]],
         theme: 'plain',
         headStyles: { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8, cellPadding: 2.5 },
@@ -1598,37 +1675,37 @@ function exportFichaXLSX(dish, state) {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Resumo');
   all.sfCosts.forEach(({ sf, rows, total }, idx) => {
     const data = [
-      [sf.name], ['Rendimento', sf.rendimento || '—'], [],
+      [sf.name], ['Rendimento', formatRendimento(sf.rendimento || '')], [],
       ['Insumo', 'Quantidade', 'Unidade', 'Observação', 'Preço unit.', 'Custo'],
-      ...rows.map(({ ing, insumo, cost }) => [
-        ing.insumo_name,
-        ing.is_qb ? 'Q.B' : (ing.qty != null ? ing.qty : (ing.qty_raw || '')),
-        ing.unit || '', ing.observacao || '',
-        insumo ? (insumo.price || 0) : 0, cost
-      ]),
+      ...rows.map(({ ing, insumo, cost }) => {
+        const f = formatIngQty(ing);
+        const np = insumo ? normalizePriceForDisplay(insumo) : null;
+        return [
+          ing.insumo_name,
+          ing.is_qb ? 'Q.B' : (f.text || ''),
+          f.unit || '', ing.observacao || '',
+          np ? np.price : 0, cost
+        ];
+      }),
       [], ['Subtotal', '', '', '', '', total], [],
       ['Modo de preparo:'], [sf.modo_preparo || '']
     ];
     const name = ('SF' + (idx + 1) + '-' + sf.name).replace(/[/\\?*\[\]:]/g, '').slice(0, 30);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), name);
   });
-  // Trabalho scaled view: if factor != 1 and we're in Trabalho view, add a "Ficha Escalada" sheet with the scaled sub-ficha
+  // Trabalho scaled view: if factor != 1 and we're in Trabalho view, add a "Ficha Escalada" sheet
   if (factor !== 1 && state?.view === 'trabalho') {
     const sfActive = (dish.sub_fichas || []).find(s => s.id === state.activeSf);
     if (sfActive) {
       const scaledData = [
         [`Ficha de trabalho ESCALADA — fator ${fmtNum(factor, 2)}×`],
         [sfActive.name],
-        ['Rendimento', scaleRendStr(sfActive.rendimento, factor)],
+        ['Rendimento', formatRendimento(sfActive.rendimento, factor)],
         [],
         ['Insumo', 'Quantidade', 'Unidade', 'Observação'],
         ...(sfActive.ingredientes || []).map(i => {
-          const sc = i.qty != null ? scaleQty(i.qty, factor) : null;
-          return [
-            i.insumo_name,
-            i.is_qb ? 'Q.B' : (sc != null ? sc : (i.qty_raw || '')),
-            i.unit || '', i.observacao || ''
-          ];
+          const f = formatIngQty(i, factor);
+          return [i.insumo_name, f.text || '', f.unit || '', i.observacao || ''];
         }),
         [], ['Modo de preparo'], [sfActive.modo_preparo || '']
       ];

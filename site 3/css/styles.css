@@ -690,6 +690,112 @@ label.field textarea { min-height: 90px; resize: vertical; }
 }
 .cliente-card p { margin: 0; font-size: 0.8rem; }
 
+/* ============ Cardápio list (home) ============ */
+.cardapio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.dish-group {
+  background: #fff;
+  border: 1px solid #ebe9e1;
+  padding: 1.75rem 2rem;
+}
+.dish-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ebe9e1;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.dish-title {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.dish-number {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  color: #b8955e;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.dish-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.7rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  line-height: 1.15;
+}
+.dish-title:hover .dish-name { color: #b8955e; }
+.dish-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  color: #555;
+  flex-shrink: 0;
+}
+.dish-meta em {
+  font-style: normal;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+.dish-meta .meta-item { white-space: nowrap; }
+
+.subficha-sublist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.subficha-item a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  padding: 0.55rem 0;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px dotted #f0ede3;
+  transition: color 0.15s, padding 0.15s;
+}
+.subficha-item:last-child a { border-bottom: none; }
+.subficha-item a:hover {
+  color: #b8955e;
+  padding-left: 0.25rem;
+}
+.sf-marker {
+  color: #b8955e;
+  font-size: 0.7rem;
+  width: 1em;
+  flex-shrink: 0;
+}
+.subficha-item.is-final .sf-marker { color: #1a1a1a; }
+.sf-name {
+  flex: 1;
+  font-size: 0.98rem;
+  min-width: 0;
+  word-break: break-word;
+}
+.subficha-item.is-final .sf-name { font-weight: 500; }
+.sf-rend {
+  font-size: 0.8rem;
+  color: #888;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Context bar (breadcrumb + cliente quick links) */
 .context-bar {
   display: flex;
@@ -861,6 +967,25 @@ label.field textarea { min-height: 90px; resize: vertical; }
   white-space: pre-line;
   color: #1a1a1a;
   font-weight: 300;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Prevent long content overflow */
+.k-name, .dish-name, .sf-name, .insumos-table td, .ficha-table td,
+.card-body h3, .subficha-editor h4 {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  min-width: 0;
+}
+.ficha-header h1 { word-break: break-word; hyphens: auto; }
+.ficha-body h2 { word-break: break-word; }
+.ficha-body { overflow: hidden; }
+
+/* Cost summary fix on narrow screens */
+@media (max-width: 900px) {
+  .cost-summary { grid-template-columns: 1fr 1fr; }
+  .total-dish-cost { grid-template-columns: 1fr 1fr; }
 }
 
 /* ============ Modal ============ */
@@ -1252,20 +1377,62 @@ label.field textarea { min-height: 90px; resize: vertical; }
 
   .equipamentos-select { grid-template-columns: 1fr 1fr; }
 
+  /* ---- Cardápio list (mobile) ---- */
+  .dish-group { padding: 1.25rem 1.25rem; }
+  .dish-head {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 0.85rem;
+    margin-bottom: 0.85rem;
+  }
+  .dish-title { gap: 0.65rem; flex-wrap: wrap; }
+  .dish-number { font-size: 0.95rem; }
+  .dish-name { font-size: 1.35rem; }
+  .dish-meta {
+    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    width: 100%;
+    font-size: 0.78rem;
+  }
+  .sf-name { font-size: 0.92rem; }
+  .sf-rend { font-size: 0.72rem; }
+  .subficha-item a { gap: 0.65rem; padding: 0.5rem 0; flex-wrap: wrap; }
+
   /* ---- Kitchen mode mobile (modo cozinha) ---- */
-  .kitchen-mode h2 { font-size: 1.9rem; }
-  .rend-bar { flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: 0.9rem 1rem; }
-  .rend-value { font-size: 1.4rem; }
-  .scale-ctrl { margin-left: 0; width: 100%; }
-  .scale-ctrl input { flex: 1; max-width: 150px; }
-  .k-section-title { font-size: 0.72rem; margin: 1.75rem 0 0.75rem; }
+  .kitchen-mode h2 { font-size: 1.8rem; line-height: 1.15; word-break: break-word; }
+  .rend-bar { flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; }
+  .rend-info { width: 100%; }
+  .rend-value { font-size: 1.35rem; }
+  .scale-ctrl {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .scale-ctrl input { flex: 0 1 auto; width: 110px; font-size: 1.1rem; }
+  .scale-label { flex-shrink: 0; }
+  .scale-unit { flex-shrink: 0; }
+  .k-section-title { font-size: 0.72rem; margin: 1.75rem 0 0.75rem; letter-spacing: 0.14em; }
 
   .kitchen-ingredients { margin-bottom: 1.25rem; }
-  .kitchen-ing { flex-direction: row; gap: 1rem; padding: 0.85rem 0; }
-  .k-qty { min-width: 90px; }
-  .k-qty .qty-num { font-size: 1.4rem; }
-  .k-qty .qty-unit { font-size: 0.78rem; }
-  .k-name { font-size: 1rem; }
+  .kitchen-ing {
+    flex-direction: row;
+    gap: 0.9rem;
+    padding: 0.85rem 0;
+    align-items: baseline;
+  }
+  .k-qty {
+    min-width: 90px;
+    max-width: 110px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .k-qty .qty-num { font-size: 1.3rem; word-break: normal; }
+  .k-qty .qty-unit { font-size: 0.75rem; }
+  .k-info { min-width: 0; }
+  .k-name { font-size: 1rem; word-wrap: break-word; hyphens: auto; }
   .k-obs, .k-sub-note { font-size: 0.8rem; }
 
   .kitchen-preparo { font-size: 1rem; line-height: 1.75; }
