@@ -13,7 +13,7 @@
         {
           "id": "massa-de-empada",
           "name": "Massa de Empada",
-          "rendimento": "820g",
+          "rendimento": "820 g",
           "ingredientes": [
             {
               "insumo_id": "farinha-de-trigo",
@@ -66,7 +66,7 @@
         {
           "id": "recheio-de-frango-com-catupiry",
           "name": "Recheio de Frango com Catupiry",
-          "rendimento": "1,5kg",
+          "rendimento": "1,5 kg",
           "ingredientes": [
             {
               "insumo_id": "frango-cozido-e-desfiado",
@@ -241,7 +241,7 @@
         {
           "id": "curry-vermelho",
           "name": "Curry Vermelho",
-          "rendimento": "1kg",
+          "rendimento": "1 kg",
           "ingredientes": [
             {
               "insumo_id": "oleo",
@@ -364,7 +364,7 @@
         {
           "id": "espetinho-de-quiabo-com-curry-vermelho",
           "name": "Espetinho de Quiabo com Curry Vermelho",
-          "rendimento": "1Porção",
+          "rendimento": "1 Porção",
           "ingredientes": [
             {
               "insumo_id": "espetinho-de-quiabo",
@@ -413,7 +413,7 @@
         {
           "id": "rabada-cozida-e-desfiada",
           "name": "Rabada Cozida e Desfiada",
-          "rendimento": "1kg",
+          "rendimento": "1 kg",
           "ingredientes": [
             {
               "insumo_id": "rabada-crua",
@@ -511,7 +511,7 @@
         {
           "id": "polenta-com-rabada",
           "name": "Polenta com Rabada",
-          "rendimento": "5kg",
+          "rendimento": "5 kg",
           "ingredientes": [
             {
               "insumo_id": "fuba-mimoso",
@@ -624,7 +624,7 @@
         {
           "id": "pururuca",
           "name": "Pururuca",
-          "rendimento": "36g",
+          "rendimento": "36 g",
           "ingredientes": [
             {
               "insumo_id": "pele-de-porco-desidratada",
@@ -650,7 +650,7 @@
         {
           "id": "aioli-de-pimenta-fermentada",
           "name": "Aioli de Pimenta Fermentada",
-          "rendimento": "600g",
+          "rendimento": "600 g",
           "ingredientes": [
             {
               "insumo_id": "leite-gelado",
@@ -703,7 +703,7 @@
         {
           "id": "crudo-de-atum",
           "name": "Crudo de Atum",
-          "rendimento": "1porção",
+          "rendimento": "1 porção",
           "ingredientes": [
             {
               "insumo_id": "atum-fresco",
@@ -747,7 +747,7 @@
         {
           "id": "crudo-de-atum-na-pururca-com-aioli-de-pimenta-fermentda",
           "name": "Crudo de Atum na Pururuca com Aioli de Pimenta Fermentada",
-          "rendimento": "1porção",
+          "rendimento": "1 porção",
           "ingredientes": [
             {
               "insumo_id": "crudo-de-atum",
@@ -819,7 +819,7 @@
         {
           "id": "camada-bovina-base",
           "name": "Camada Bovina (base)",
-          "rendimento": "1,023kg",
+          "rendimento": "1,023 kg",
           "ingredientes": [
             {
               "insumo_id": "acem-moido",
@@ -863,7 +863,7 @@
         {
           "id": "camada-suina-topo",
           "name": "Camada Suína (topo)",
-          "rendimento": "1,023kg",
+          "rendimento": "1,023 kg",
           "ingredientes": [
             {
               "insumo_id": "copa-lombo-moida",
@@ -916,7 +916,7 @@
         {
           "id": "montagem-em-camdas-gn",
           "name": "Montagem em Camadas (gn)",
-          "rendimento": "1,7kg- 34UND- DE 50G",
+          "rendimento": "1,7 kg- 34 UND- DE 50 G",
           "ingredientes": [
             {
               "insumo_id": "acem-moido-e-temperado",
@@ -942,7 +942,7 @@
         {
           "id": "maionese-de-mostarda",
           "name": "Maionese de Mostarda",
-          "rendimento": "1,6kg",
+          "rendimento": "1,6 kg",
           "ingredientes": [
             {
               "insumo_id": "leite-gelado",
@@ -1058,7 +1058,7 @@
         {
           "id": "bolinho-de-carne",
           "name": "Bolinho de Carne",
-          "rendimento": "2und",
+          "rendimento": "2 und",
           "ingredientes": [
             {
               "insumo_id": "bolinho-de-carne-empanado",
@@ -1100,7 +1100,7 @@
         {
           "id": "frango-cozido-e-desfiado",
           "name": "Frango Cozido e Desfiado",
-          "rendimento": "1kg",
+          "rendimento": "1 kg",
           "ingredientes": [
             {
               "insumo_id": "peito-de-frango-cru",
@@ -1162,7 +1162,7 @@
         {
           "id": "base-de-maionese",
           "name": "Base de Maionese",
-          "rendimento": "1,1kg",
+          "rendimento": "1,1 kg",
           "ingredientes": [
             {
               "insumo_id": "leite-gelado",
@@ -1286,7 +1286,7 @@
         {
           "id": "salpicao-finalizado",
           "name": "Salpicão Finalizado",
-          "rendimento": "2,7kg",
+          "rendimento": "2,7 kg",
           "ingredientes": [
             {
               "insumo_id": "frango-desfiado",
@@ -1366,7 +1366,7 @@
         {
           "id": "salpicao-de-frango-roll",
           "name": "Salpicão de Frango Roll",
-          "rendimento": "50und",
+          "rendimento": "50 und",
           "ingredientes": [
             {
               "insumo_id": "mini-brioche",
@@ -1426,7 +1426,7 @@
         {
           "id": "moela-temperada",
           "name": "Moela Temperada",
-          "rendimento": "5kg",
+          "rendimento": "5 kg",
           "ingredientes": [
             {
               "insumo_id": "moela",
@@ -1497,7 +1497,7 @@
         {
           "id": "sofrito-base-do-molho",
           "name": "Sofrito (base do Molho)",
-          "rendimento": "2,5kg",
+          "rendimento": "2,5 kg",
           "ingredientes": [
             {
               "insumo_id": "tomate-italiano",
@@ -1630,7 +1630,7 @@
         {
           "id": "molho-de-moela-finalizado",
           "name": "Molho de Moela Finalizado",
-          "rendimento": "6,5kg",
+          "rendimento": "6,5 kg",
           "ingredientes": [
             {
               "insumo_id": "moela-temperada",
@@ -1685,7 +1685,7 @@
         {
           "id": "moela-no-molho",
           "name": "Moela no Molho",
-          "rendimento": "160g",
+          "rendimento": "160 g",
           "ingredientes": [
             {
               "insumo_id": "moela-com-molho",
@@ -1735,7 +1735,7 @@
         {
           "id": "massa-do-pastel",
           "name": "Massa do Pastel",
-          "rendimento": "1,4kg-40und",
+          "rendimento": "1,4 kg-40 und",
           "ingredientes": [
             {
               "insumo_id": "polvilho-azedo",
@@ -1797,7 +1797,7 @@
         {
           "id": "costelinha-suina-desfiada",
           "name": "Costelinha Suína Desfiada",
-          "rendimento": "800g",
+          "rendimento": "800 g",
           "ingredientes": [
             {
               "insumo_id": "costelinha-suina",
@@ -1868,7 +1868,7 @@
         {
           "id": "montagem-do-pastel",
           "name": "Montagem do Pastel",
-          "rendimento": "1und",
+          "rendimento": "1 und",
           "ingredientes": [
             {
               "insumo_id": "massa-de-pastel",
@@ -1926,7 +1926,7 @@
         {
           "id": "quirera-de-milho-cozida",
           "name": "Quirera de Milho Cozida",
-          "rendimento": "1,7kg",
+          "rendimento": "1,7 kg",
           "ingredientes": [
             {
               "insumo_id": "quirera-de-milho",
@@ -1961,7 +1961,7 @@
         {
           "id": "joelho-de-porco-defumado-cozido-e-desfiado",
           "name": "Joelho de Porco Defumado Cozido e Desfiado",
-          "rendimento": "1kg",
+          "rendimento": "1 kg",
           "ingredientes": [
             {
               "insumo_id": "joelho-de-porco-defumado",
@@ -1987,7 +1987,7 @@
         {
           "id": "joelhada-na-canjiquinha",
           "name": "Joelhada na Canjiquinha",
-          "rendimento": "24Porções de 200g",
+          "rendimento": "24 Porções de 200 g",
           "ingredientes": [
             {
               "insumo_id": "canjiquinha-cozida",
@@ -2082,7 +2082,7 @@
         {
           "id": "massa-de-tempura",
           "name": "Massa de Tempurá",
-          "rendimento": "2,7kg",
+          "rendimento": "2,7 kg",
           "ingredientes": [
             {
               "insumo_id": "farinha-de-trigo",
@@ -2144,7 +2144,7 @@
         {
           "id": "vinagrete-de-banana",
           "name": "Vinagrete de Banana",
-          "rendimento": "1,1kg",
+          "rendimento": "1,1 kg",
           "ingredientes": [
             {
               "insumo_id": "banana-da-terra",
@@ -2206,7 +2206,7 @@
         {
           "id": "base-de-maionese",
           "name": "Base de Maionese",
-          "rendimento": "1,1kg",
+          "rendimento": "1,1 kg",
           "ingredientes": [
             {
               "insumo_id": "leite-gelado",
@@ -2372,7 +2372,7 @@
         {
           "id": "lula-limpa",
           "name": "Lula Limpa",
-          "rendimento": "1kg",
+          "rendimento": "1 kg",
           "ingredientes": [
             {
               "insumo_id": "lula",
@@ -2389,7 +2389,7 @@
         {
           "id": "milho-verde-cozido",
           "name": "Milho Verde Cozido",
-          "rendimento": "600g",
+          "rendimento": "600 g",
           "ingredientes": [
             {
               "insumo_id": "milho-verde-em-espigas",
@@ -2424,7 +2424,7 @@
         {
           "id": "linguica",
           "name": "Linguiça",
-          "rendimento": "450g",
+          "rendimento": "450 g",
           "ingredientes": [
             {
               "insumo_id": "linguica-fresca",
@@ -2441,7 +2441,7 @@
         {
           "id": "mix-de-papricas",
           "name": "Mix de Pápricas",
-          "rendimento": "100g",
+          "rendimento": "100 g",
           "ingredientes": [
             {
               "insumo_id": "paprica-doce",
@@ -2476,7 +2476,7 @@
         {
           "id": "lula-salteada-com-linguica-e-milho",
           "name": "Lula Salteada com Linguiça e Milho",
-          "rendimento": "10Porções de 200g",
+          "rendimento": "10 Porções de 200 g",
           "ingredientes": [
             {
               "insumo_id": "lula-limpa",
@@ -2733,7 +2733,7 @@
         {
           "id": "espetinho-de-coracao-com-sweet-chili",
           "name": "Espetinho de Coração com Sweet Chili",
-          "rendimento": "1Porção",
+          "rendimento": "1 Porção",
           "ingredientes": [
             {
               "insumo_id": "espetinho-montado",

@@ -100,21 +100,19 @@ function normalizePriceForDisplay(insumo) {
   return { price: p, unit: insumo.unit || '—' };
 }
 
-// Normalize rendimento string (just leading number + unit)
+// Normalize rendimento string (just leading number + unit) — preserves original case
 function formatRendimento(rendStr, scaleFactor = 1) {
   if (!rendStr) return '';
-  const parsed = parseRendimentoQty(rendStr);
   const s = String(rendStr).trim();
   const m = s.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµ\/\u00c0-\u024f]*)(.*)$/);
   if (!m) return rendStr;
-  const qty = parsed.qty * (scaleFactor || 1);
-  const unit = parsed.unit;
-  const n = normUnitForDisplay(qty, unit);
-  // Capitalize first letter of unit if it's a word (e.g. "porção" → "Porção")
-  let unitDisplay = n.unit;
-  if (unitDisplay && /^[a-záéíóúâêôãõàèìòùç]/i.test(unitDisplay) && unitDisplay.length > 2) {
-    unitDisplay = unitDisplay[0].toUpperCase() + unitDisplay.slice(1);
-  }
+  const rawQty = parseFloat(m[1].replace(',', '.'));
+  const originalUnit = m[2] || '';
+  const qty = rawQty * (scaleFactor || 1);
+  const n = normUnitForDisplay(qty, originalUnit);
+  // Se o unit foi convertido (ex: 'g' → 'kg'), usa a versão curta; senão preserva o case original
+  const unitChanged = n.unit.toLowerCase() !== originalUnit.toLowerCase();
+  const unitDisplay = unitChanged ? n.unit : originalUnit;
   const suffix = m[3].trim();
   return `${n.text} ${unitDisplay}${suffix ? ' ' + suffix : ''}`.trim();
 }
