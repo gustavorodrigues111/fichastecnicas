@@ -1004,7 +1004,8 @@
               "qty_raw": "34.0",
               "unit": "dades",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "bolinho-de-carne"
             },
             {
               "insumo_id": "ovos",
@@ -2898,18 +2899,6 @@
       "price": 0.0
     },
     {
-      "id": "bolinho-de-carne",
-      "name": "Bolinho de Carne",
-      "unit": "dades",
-      "price": 0.0
-    },
-    {
-      "id": "bolinho-de-carne-empanado",
-      "name": "Bolinho de Carne Empanado",
-      "unit": "und",
-      "price": 0.0
-    },
-    {
       "id": "caldo",
       "name": "Caldo",
       "unit": "L",
@@ -2919,12 +2908,6 @@
       "id": "caldo-de-legumes",
       "name": "Caldo de Legumes",
       "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "caldo-misto",
-      "name": "Caldo Misto",
-      "unit": "g",
       "price": 0.0
     },
     {
@@ -3060,12 +3043,6 @@
       "price": 0.0
     },
     {
-      "id": "curry-vermelho",
-      "name": "Curry Vermelho",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
       "id": "dill",
       "name": "Dill",
       "unit": "g",
@@ -3075,12 +3052,6 @@
       "id": "dill-para-finalizacao",
       "name": "Dill para Finalização",
       "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "espetinho-de-quiabo",
-      "name": "Espetinho de Quiabo",
-      "unit": "und",
       "price": 0.0
     },
     {
@@ -3111,12 +3082,6 @@
       "id": "folhas-de-dill",
       "name": "Folhas de Dill",
       "unit": "Q.B",
-      "price": 0.0
-    },
-    {
-      "id": "frango-cozido-e-desfiado",
-      "name": "Frango Cozido e Desfiado",
-      "unit": "g",
       "price": 0.0
     },
     {
@@ -3327,12 +3292,6 @@
       "id": "panko",
       "name": "Panko",
       "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pastel-de-pao-de-queijo-finalizado",
-      "name": "Pastel de Pão de Queijo Finalizado",
-      "unit": "und",
       "price": 0.0
     },
     {

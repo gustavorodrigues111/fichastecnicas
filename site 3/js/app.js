@@ -94,6 +94,10 @@ async function saveInsumoToFirestore(insumo) {
   delete clean.id;
   await setDoc(doc(db, 'insumos', insumo.id), clean);
 }
+async function deleteInsumoFromFirestore(id) {
+  if (!isAdmin) return;
+  await deleteDoc(doc(db, 'insumos', id));
+}
 
 // ---------- Real-time listeners ----------
 function setupListeners() {
@@ -754,7 +758,8 @@ function renderInsumos() {
       el('th', {}, 'Insumo'),
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
-      el('th', {}, 'Usado em')
+      el('th', {}, 'Usado em'),
+      isAdmin ? el('th', {}, '') : null
     ))
   );
   const tbody = el('tbody', {});
@@ -785,12 +790,27 @@ function renderInsumos() {
           insumo.price = parseFloat(priceInput.value) || 0;
           scheduleSave('insumo-' + insumo.id, () => saveInsumoToFirestore(insumo));
         });
-        const tr = el('tr', {},
+        const cells = [
           el('td', { 'data-label': 'Insumo' }, insumo.name),
           el('td', { 'data-label': 'Unidade' }, unitInput),
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
-          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas')
-        );
+          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
+        ];
+        if (isAdmin) {
+          const delBtn = el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+            const uses = usageMap[insumo.id] || 0;
+            const msg = uses > 0
+              ? `Excluir "${insumo.name}"? Ele é usado em ${uses} receita(s) — essas referências ficarão sem preço até você corrigir.`
+              : `Excluir "${insumo.name}"?`;
+            if (!confirm(msg)) return;
+            try {
+              await deleteInsumoFromFirestore(insumo.id);
+              toast('Insumo excluído');
+            } catch (err) { toast('Erro: ' + err.message); }
+          } }, 'Excluir');
+          cells.push(el('td', { 'data-label': '' }, delBtn));
+        }
+        const tr = el('tr', {}, ...cells);
         tbody.appendChild(tr);
       });
   }
