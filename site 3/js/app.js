@@ -293,10 +293,10 @@ function renderFichaTrabalho(dish, sf) {
       el('th', {}, 'Observação / Processamento')
     )),
     el('tbody', {}, ...sf.ingredientes.map(ing => el('tr', {},
-      el('td', {}, ing.insumo_name),
-      el('td', { class: 'num' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
-      el('td', {}, ing.unit || '—'),
-      el('td', {}, ing.observacao || '—')
+      el('td', { 'data-label': 'Insumo' }, ing.insumo_name),
+      el('td', { class: 'num', 'data-label': 'Quantidade' }, ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'))),
+      el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
+      el('td', { 'data-label': 'Observação' }, ing.observacao || '—')
     )))
   );
   wrap.appendChild(tbl);
@@ -352,11 +352,11 @@ function renderFichaCusto(dish, currentSf) {
         const priceTxt = insumo ? `${fmtBRL(insumo.price || 0)} / ${insumo.unit || '—'}` : '—';
         const qtyTxt = ing.is_qb ? 'Q.B' : (ing.qty != null ? fmtNum(ing.qty, ing.qty % 1 === 0 ? 0 : 2) : (ing.qty_raw || '—'));
         return el('tr', {},
-          el('td', {}, ing.insumo_name),
-          el('td', { class: 'num' }, qtyTxt),
-          el('td', {}, ing.unit || '—'),
-          el('td', { class: 'num' }, priceTxt),
-          el('td', { class: 'num' }, fmtBRL(cost))
+          el('td', { 'data-label': 'Insumo' }, ing.insumo_name),
+          el('td', { class: 'num', 'data-label': 'Quantidade' }, qtyTxt),
+          el('td', { 'data-label': 'Unidade' }, ing.unit || '—'),
+          el('td', { class: 'num', 'data-label': 'Preço unit.' }, priceTxt),
+          el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost))
         );
       })),
       el('tfoot', {}, el('tr', {},
@@ -457,18 +457,18 @@ function renderInsumos() {
       .filter(i => !f || i.name.toLowerCase().includes(f))
       .forEach(insumo => {
         const tr = el('tr', {},
-          el('td', {}, insumo.name),
-          el('td', {}, (() => {
+          el('td', { 'data-label': 'Insumo' }, insumo.name),
+          el('td', { 'data-label': 'Unidade' }, (() => {
             const i = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
             i.addEventListener('change', () => { insumo.unit = i.value.trim(); persist(); });
             return i;
           })()),
-          el('td', {}, (() => {
+          el('td', { 'data-label': 'Preço (R$)' }, (() => {
             const i = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
             i.addEventListener('input', () => { insumo.price = parseFloat(i.value) || 0; persist(); });
             return i;
           })()),
-          el('td', {}, (usageMap[insumo.id] || 0) + ' receitas')
+          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas')
         );
         tbody.appendChild(tr);
       });
