@@ -13,23 +13,23 @@
         {
           "id": "massa-de-empada",
           "name": "Massa de Empada",
-          "rendimento": "820 g",
+          "rendimento": "0,820 kg",
           "ingredientes": [
             {
               "insumo_id": "farinha-de-trigo",
               "insumo_name": "Farinha de Trigo",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Peneirada",
               "is_qb": false
             },
             {
               "insumo_id": "manteiga",
               "insumo_name": "Manteiga",
-              "qty": 200.0,
+              "qty": 0.2,
               "qty_raw": "200g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Gelada em cubos pequenos",
               "is_qb": false
             },
@@ -43,8 +43,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "gemas",
-              "insumo_name": "Gemas",
+              "insumo_id": "gema",
+              "insumo_name": "Gema",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -52,11 +52,11 @@
               "is_qb": true
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 70.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.07,
               "qty_raw": "70.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Adicionar aos poucos",
               "is_qb": false
             }
@@ -66,83 +66,87 @@
         {
           "id": "recheio-de-frango-com-catupiry",
           "name": "Recheio de Frango com Catupiry",
-          "rendimento": "1,5 kg",
+          "rendimento": "1,500 kg",
           "ingredientes": [
             {
               "insumo_id": "frango-cozido-e-desfiado",
               "insumo_name": "Frango Cozido e Desfiado",
-              "qty": 650.0,
+              "qty": 0.65,
               "qty_raw": "650.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Desfiado Fino",
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-brunoise",
-              "insumo_name": "Cebola Brunoise",
-              "qty": 130.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.13,
               "qty_raw": "130.0",
-              "unit": "g",
-              "observacao": "Brunoise",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "em brunoise · Brunoise",
+              "is_qb": false,
+              "fc": 1.25
             },
             {
-              "insumo_id": "alho-picado",
-              "insumo_name": "Alho Picado",
-              "qty": 50.0,
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 0.05,
               "qty_raw": "50.0",
-              "unit": "g",
-              "observacao": "",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picado",
+              "is_qb": false,
+              "fc": 1.1
             },
             {
-              "insumo_id": "tomate-picado",
-              "insumo_name": "Tomate Picado",
-              "qty": 200.0,
+              "insumo_id": "tomate",
+              "insumo_name": "Tomate",
+              "qty": 0.2,
               "qty_raw": "200.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Sem sementes (concassé)",
-              "is_qb": false
+              "is_qb": false,
+              "fc": 1.15
             },
             {
               "insumo_id": "azeitona",
               "insumo_name": "Azeitona",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Rodelas sem caroço",
               "is_qb": false
             },
             {
               "insumo_id": "requeijao-tipo-catupiry",
               "insumo_name": "Requeijão Tipo Catupiry",
-              "qty": 130.0,
+              "qty": 0.13,
               "qty_raw": "130.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "salsinha-picada",
-              "insumo_name": "Salsinha Picada",
-              "qty": 20.0,
+              "insumo_id": "salsinha",
+              "insumo_name": "Salsinha",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
-              "observacao": "Fresca",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picada · Fresca",
+              "is_qb": false,
+              "fc": 1.1
             },
             {
-              "insumo_id": "ovo-de-codorna-cozido-e-picado",
-              "insumo_name": "Ovo de Codorna Cozido e Picado",
-              "qty": 200.0,
+              "insumo_id": "ovo-de-codorna",
+              "insumo_name": "Ovo de Codorna",
+              "qty": 0.2,
               "qty_raw": "200.0",
-              "unit": "g",
-              "observacao": "Picado grosseiramente",
+              "unit": "kg",
+              "observacao": "cozido e picado · Picado grosseiramente",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -150,8 +154,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "pimenta-do-reino",
-              "insumo_name": "Pimenta-do-Reino",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -159,11 +163,11 @@
               "is_qb": true
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
-              "qty": 100.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Para Refogar",
               "is_qb": false
             }
@@ -178,9 +182,9 @@
             {
               "insumo_id": "massa-de-empada-base",
               "insumo_name": "Massa de Empada (base)",
-              "qty": 32.5,
+              "qty": 0.0325,
               "qty_raw": "30-35",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Para forrar a forma",
               "is_qb": false,
               "subref_id": "massa-de-empada"
@@ -188,19 +192,19 @@
             {
               "insumo_id": "massa-de-empada-tampa",
               "insumo_name": "Massa de Empada (tampa)",
-              "qty": 60.0,
+              "qty": 0.06,
               "qty_raw": "60.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Para fechar",
               "is_qb": false,
               "subref_id": "massa-de-empada"
             },
             {
-              "insumo_id": "recheiro-de-frango",
-              "insumo_name": "Recheiro de Frango",
-              "qty": 60.0,
+              "insumo_id": "recheio-de-frango-com-catupiry",
+              "insumo_name": "Recheio de Frango com Catupiry",
+              "qty": 0.06,
               "qty_raw": "60.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Deve estar Refriderado",
               "is_qb": false
             },
@@ -241,114 +245,117 @@
         {
           "id": "curry-vermelho",
           "name": "Curry Vermelho",
-          "rendimento": "1 kg",
+          "rendimento": "1,000 kg",
           "ingredientes": [
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
-              "qty": 20.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-picada",
-              "insumo_name": "Cebola Picada",
-              "qty": 80.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.08,
               "qty_raw": "80.0",
-              "unit": "g",
-              "observacao": "",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picada",
+              "is_qb": false,
+              "fc": 1.25
             },
             {
-              "insumo_id": "gengibre-fresco-picado",
-              "insumo_name": "Gengibre Fresco Picado",
-              "qty": 20.0,
+              "insumo_id": "gengibre",
+              "insumo_name": "Gengibre",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
-              "observacao": "",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picado",
+              "is_qb": false,
+              "fc": 1.1
             },
             {
-              "insumo_id": "alho-picado",
-              "insumo_name": "Alho Picado",
-              "qty": 12.0,
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 0.012,
               "qty_raw": "12.0",
-              "unit": "g",
-              "observacao": "",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picado",
+              "is_qb": false,
+              "fc": 1.1
             },
             {
               "insumo_id": "curry-vermelho",
               "insumo_name": "Curry Vermelho",
-              "qty": 40.0,
+              "qty": 0.04,
               "qty_raw": "40.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 5.0,
+              "qty": 0.005,
               "qty_raw": "5.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "leite-de-coco",
               "insumo_name": "Leite de Coco",
-              "qty": 400.0,
+              "qty": 0.4,
               "qty_raw": "400.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "caldo-de-legumes",
               "insumo_name": "Caldo de Legumes",
-              "qty": 300.0,
+              "qty": 0.3,
               "qty_raw": "300.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "molho-de-peixe-nam-pla",
               "insumo_name": "Molho de Peixe (nam Pla)",
-              "qty": 15.0,
+              "qty": 0.015,
               "qty_raw": "15.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "acucar",
-              "insumo_name": "Açúcar",
-              "qty": 10.0,
+              "insumo_id": "acucar-cristal",
+              "insumo_name": "Açúcar Cristal",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "suco-de-limao",
               "insumo_name": "Suco de Limão",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "raspas-de-limao",
-              "insumo_name": "Raspas de Limão",
-              "qty": 5.0,
+              "insumo_id": "limao",
+              "insumo_name": "Limão",
+              "qty": 0.005,
               "qty_raw": "5.0",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "raspas",
               "is_qb": false
             }
           ],
@@ -357,14 +364,14 @@
         {
           "id": "quiabo",
           "name": "Quiabo",
-          "rendimento": "10 Porções",
+          "rendimento": "10 porções",
           "ingredientes": [],
           "modo_preparo": "Lavar e secar muito bem os quiabos, retirar o cabinho e a parte de baixo do quiabo. Misture o quiabo junto com o óleo, sal e pimenta do reino. Monte os espetos com 80g de quiabo e reserve."
         },
         {
           "id": "espetinho-de-quiabo-com-curry-vermelho",
           "name": "Espetinho de Quiabo com Curry Vermelho",
-          "rendimento": "1 Porção",
+          "rendimento": "1 porção",
           "ingredientes": [
             {
               "insumo_id": "espetinho-de-quiabo",
@@ -378,9 +385,9 @@
             {
               "insumo_id": "curry-vermelho",
               "insumo_name": "Curry Vermelho",
-              "qty": 80.0,
+              "qty": 0.08,
               "qty_raw": "80.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "curry-vermelho"
@@ -413,7 +420,7 @@
         {
           "id": "rabada-cozida-e-desfiada",
           "name": "Rabada Cozida e Desfiada",
-          "rendimento": "1 kg",
+          "rendimento": "1,000 kg",
           "ingredientes": [
             {
               "insumo_id": "rabada-crua",
@@ -425,8 +432,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -434,47 +441,47 @@
               "is_qb": true
             },
             {
-              "insumo_id": "pimenta-do-reino-mooida",
-              "insumo_name": "Pimenta do Reino Mooída",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
-              "observacao": "",
+              "observacao": "moída",
               "is_qb": true
             },
             {
-              "insumo_id": "cebola",
-              "insumo_name": "Cebola",
-              "qty": 340.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.34,
               "qty_raw": "340.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "cenoura",
               "insumo_name": "Cenoura",
-              "qty": 240.0,
+              "qty": 0.24,
               "qty_raw": "240.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "salsao",
               "insumo_name": "Salsão",
-              "qty": 160.0,
+              "qty": 0.16,
               "qty_raw": "160.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 50.0,
+              "qty": 0.05,
               "qty_raw": "50.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -497,8 +504,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -511,7 +518,7 @@
         {
           "id": "polenta-com-rabada",
           "name": "Polenta com Rabada",
-          "rendimento": "5 kg",
+          "rendimento": "5,000 kg",
           "ingredientes": [
             {
               "insumo_id": "fuba-mimoso",
@@ -534,9 +541,9 @@
             {
               "insumo_id": "sal-refinado",
               "insumo_name": "Sal Refinado",
-              "qty": 30.0,
+              "qty": 0.03,
               "qty_raw": "30.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -553,18 +560,18 @@
             {
               "insumo_id": "polvilho-azedo",
               "insumo_name": "Polvilho Azedo",
-              "qty": 150.0,
+              "qty": 0.15,
               "qty_raw": "150.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "manteiga",
               "insumo_name": "Manteiga",
-              "qty": 165.0,
+              "qty": 0.165,
               "qty_raw": "165.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -574,32 +581,32 @@
         {
           "id": "polenta-de-rabada-com-agriao-e-queijo-tulha",
           "name": "Polenta de Rabada com Agrião e Queijo Tulha",
-          "rendimento": "1 Porção",
+          "rendimento": "1 porção",
           "ingredientes": [
             {
-              "insumo_id": "polenta",
-              "insumo_name": "Polenta",
-              "qty": 240.0,
+              "insumo_id": "polenta-com-rabada",
+              "insumo_name": "Polenta com Rabada",
+              "qty": 0.24,
               "qty_raw": "240.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "queijo-tulha",
               "insumo_name": "Queijo Tulha",
-              "qty": 17.5,
+              "qty": 0.0175,
               "qty_raw": "15 a 20",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "agriao-fresco",
-              "insumo_name": "Agrião Fresco",
-              "qty": 15.0,
+              "insumo_id": "agriao",
+              "insumo_name": "Agrião",
+              "qty": 0.015,
               "qty_raw": "15.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -624,20 +631,20 @@
         {
           "id": "pururuca",
           "name": "Pururuca",
-          "rendimento": "36 g",
+          "rendimento": "0,036 kg",
           "ingredientes": [
             {
               "insumo_id": "pele-de-porco-desidratada",
               "insumo_name": "Pele de Porco Desidratada",
-              "qty": 32.0,
+              "qty": 0.032,
               "qty_raw": "32.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -650,47 +657,47 @@
         {
           "id": "aioli-de-pimenta-fermentada",
           "name": "Aioli de Pimenta Fermentada",
-          "rendimento": "600 g",
+          "rendimento": "0,600 kg",
           "ingredientes": [
             {
-              "insumo_id": "leite-gelado",
-              "insumo_name": "Leite Gelado",
-              "qty": 100.0,
+              "insumo_id": "leite",
+              "insumo_name": "Leite",
+              "qty": 0.1,
               "qty_raw": "100ml",
-              "unit": "ml",
-              "observacao": "",
+              "unit": "l",
+              "observacao": "gelado",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo-vegetal",
-              "insumo_name": "Óleo Vegetal",
-              "qty": 450.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.45,
               "qty_raw": "450ml",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "pimenta-fermentada",
               "insumo_name": "Pimenta Fermentada",
-              "qty": 60.0,
+              "qty": 0.06,
               "qty_raw": "60g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "suco-de-limao",
               "insumo_name": "Suco de Limão",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10ml",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -708,24 +715,24 @@
             {
               "insumo_id": "atum-fresco",
               "insumo_name": "Atum Fresco",
-              "qty": 120.0,
+              "qty": 0.12,
               "qty_raw": "120.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Limpo, sem nervos e partes escuras",
               "is_qb": false
             },
             {
               "insumo_id": "azeite-de-oliva",
               "insumo_name": "Azeite de Oliva",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -733,12 +740,12 @@
               "is_qb": true
             },
             {
-              "insumo_id": "pimenta-preta-moida-na-hora",
-              "insumo_name": "Pimenta Preta Moída na Hora",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
-              "observacao": "Moído na hora",
+              "observacao": "moída na hora · Moído na hora",
               "is_qb": true
             }
           ],
@@ -752,9 +759,9 @@
             {
               "insumo_id": "crudo-de-atum",
               "insumo_name": "Crudo de Atum",
-              "qty": 120.0,
+              "qty": 0.12,
               "qty_raw": "120.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "crudo-de-atum"
@@ -762,9 +769,9 @@
             {
               "insumo_id": "pururuca",
               "insumo_name": "Pururuca",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "pururuca"
@@ -772,9 +779,9 @@
             {
               "insumo_id": "aioli-de-pimenta",
               "insumo_name": "Aioli de Pimenta",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "aioli-de-pimenta-fermentada"
@@ -831,30 +838,30 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 18.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.018,
               "qty_raw": "18.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-preta-moida",
-              "insumo_name": "Pimenta Preta Moída",
-              "qty": 3.0,
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
+              "qty": 0.003,
               "qty_raw": "3.0",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "moída",
               "is_qb": false
             },
             {
-              "insumo_id": "pimeta-branca-moida",
-              "insumo_name": "Pimeta Branca Moída",
-              "qty": 2.0,
+              "insumo_id": "pimenta-do-reino-branca",
+              "insumo_name": "Pimenta do Reino Branca",
+              "qty": 0.002,
               "qty_raw": "2.0",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "moída",
               "is_qb": false
             }
           ],
@@ -868,46 +875,46 @@
             {
               "insumo_id": "copa-lombo-moida",
               "insumo_name": "Copa Lombo Moída",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "barriga-suina-moida",
               "insumo_name": "Barriga Suína Moída",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 18.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.018,
               "qty_raw": "18.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-preta-moida",
-              "insumo_name": "Pimenta Preta Moída",
-              "qty": 3.0,
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
+              "qty": 0.003,
               "qty_raw": "3.0",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "moída",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-branca-moida",
-              "insumo_name": "Pimenta Branca Moída",
-              "qty": 2.0,
+              "insumo_id": "pimenta-do-reino-branca",
+              "insumo_name": "Pimenta do Reino Branca",
+              "qty": 0.002,
               "qty_raw": "2.0",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "moída",
               "is_qb": false
             }
           ],
@@ -916,11 +923,11 @@
         {
           "id": "montagem-em-camdas-gn",
           "name": "Montagem em Camadas (gn)",
-          "rendimento": "1,7 kg- 34 UND- DE 50 G",
+          "rendimento": "1,700 kg- 34 UND- DE 50 G",
           "ingredientes": [
             {
-              "insumo_id": "acem-moido-e-temperado",
-              "insumo_name": "Acém Moido e Temperado",
+              "insumo_id": "camada-bovina-base",
+              "insumo_name": "Camada Bovina (base)",
               "qty": 1.023,
               "qty_raw": "1.023",
               "unit": "kg",
@@ -928,8 +935,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "blend-suino-e-temperado",
-              "insumo_name": "Blend Suíno e Temperado",
+              "insumo_id": "camada-suina-topo",
+              "insumo_name": "Camada Suína (topo)",
               "qty": 1.023,
               "qty_raw": "1.023",
               "unit": "kg",
@@ -942,50 +949,50 @@
         {
           "id": "maionese-de-mostarda",
           "name": "Maionese de Mostarda",
-          "rendimento": "1,6 kg",
+          "rendimento": "1,600 kg",
           "ingredientes": [
             {
-              "insumo_id": "leite-gelado",
-              "insumo_name": "Leite Gelado",
-              "qty": 250.0,
+              "insumo_id": "leite",
+              "insumo_name": "Leite",
+              "qty": 0.25,
               "qty_raw": "250.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Bem Gelado",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo-vegetal",
-              "insumo_name": "Óleo Vegetal",
-              "qty": 900.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.9,
               "qty_raw": "900.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 10.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "mostarda-djon",
               "insumo_name": "Mostarda Djon",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -1008,8 +1015,8 @@
               "subref_id": "bolinho-de-carne"
             },
             {
-              "insumo_id": "ovos",
-              "insumo_name": "Ovos",
+              "insumo_id": "ovo",
+              "insumo_name": "Ovo",
               "qty": 4.0,
               "qty_raw": "4.0",
               "unit": "und",
@@ -1019,24 +1026,24 @@
             {
               "insumo_id": "panko",
               "insumo_name": "Panko",
-              "qty": 400.0,
+              "qty": 0.4,
               "qty_raw": "400.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Temperar com sal e pimenta",
               "is_qb": false
             },
             {
               "insumo_id": "farinha-de-trigo",
               "insumo_name": "Farinha de Trigo",
-              "qty": 150.0,
+              "qty": 0.15,
               "qty_raw": "150.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Temperar com sal e pimenta",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1044,12 +1051,12 @@
               "is_qb": true
             },
             {
-              "insumo_id": "pimenta-moida",
-              "insumo_name": "Pimenta Moída",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
-              "observacao": "",
+              "observacao": "moída",
               "is_qb": true
             }
           ],
@@ -1072,9 +1079,9 @@
             {
               "insumo_id": "maionese-de-mostarda",
               "insumo_name": "Maionese de Mostarda",
-              "qty": 30.0,
+              "qty": 0.03,
               "qty_raw": "30.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "maionese-de-mostarda"
@@ -1100,7 +1107,7 @@
         {
           "id": "frango-cozido-e-desfiado",
           "name": "Frango Cozido e Desfiado",
-          "rendimento": "1 kg",
+          "rendimento": "1,000 kg",
           "ingredientes": [
             {
               "insumo_id": "peito-de-frango-cru",
@@ -1121,20 +1128,20 @@
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-sem-casca",
-              "insumo_name": "Cebola sem Casca",
-              "qty": 100.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.1,
               "qty_raw": "100g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Cortada em quatro partes sem casca",
               "is_qb": false
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Amassado sem casca",
               "is_qb": false
             },
@@ -1148,8 +1155,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1162,41 +1169,41 @@
         {
           "id": "base-de-maionese",
           "name": "Base de Maionese",
-          "rendimento": "1,1 kg",
+          "rendimento": "1,100 kg",
           "ingredientes": [
             {
-              "insumo_id": "leite-gelado",
-              "insumo_name": "Leite Gelado",
-              "qty": 250.0,
+              "insumo_id": "leite",
+              "insumo_name": "Leite",
+              "qty": 0.25,
               "qty_raw": "250.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Bem Gelado",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo-vegetal",
-              "insumo_name": "Óleo Vegetal",
-              "qty": 900.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.9,
               "qty_raw": "900.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 10.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -1206,60 +1213,60 @@
         {
           "id": "picles-de-cebola-roxa",
           "name": "Picles de Cebola Roxa",
-          "rendimento": "1 litro",
+          "rendimento": "1,000 l",
           "ingredientes": [
             {
               "insumo_id": "cebola-roxa",
               "insumo_name": "Cebola Roxa",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Fatiada em julienne bem fino",
               "is_qb": false
             },
             {
               "insumo_id": "vinagre-de-maca",
               "insumo_name": "Vinagre de Maçã",
-              "qty": 300.0,
+              "qty": 0.3,
               "qty_raw": "300.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "agua",
               "insumo_name": "Água",
-              "qty": 200.0,
+              "qty": 0.2,
               "qty_raw": "200.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "acucar-refinado",
               "insumo_name": "Açúcar Refinado",
-              "qty": 60.0,
+              "qty": 0.06,
               "qty_raw": "60.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 15.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.015,
               "qty_raw": "15.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-do-reino-em-graos",
-              "insumo_name": "Pimenta do Reino em Grãos",
-              "qty": 5.0,
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
+              "qty": 0.005,
               "qty_raw": "5.0",
-              "unit": "g",
-              "observacao": "Grãos",
+              "unit": "kg",
+              "observacao": "em grãos · Grãos",
               "is_qb": false
             },
             {
@@ -1286,11 +1293,11 @@
         {
           "id": "salpicao-finalizado",
           "name": "Salpicão Finalizado",
-          "rendimento": "2,7 kg",
+          "rendimento": "2,700 kg",
           "ingredientes": [
             {
-              "insumo_id": "frango-desfiado",
-              "insumo_name": "Frango Desfiado",
+              "insumo_id": "frango-cozido-e-desfiado",
+              "insumo_name": "Frango Cozido e Desfiado",
               "qty": 1.0,
               "qty_raw": "1.0",
               "unit": "kg",
@@ -1298,39 +1305,40 @@
               "is_qb": false
             },
             {
-              "insumo_id": "maionese-base",
-              "insumo_name": "Maionese Base",
-              "qty": 900.0,
+              "insumo_id": "base-de-maionese",
+              "insumo_name": "Base de Maionese",
+              "qty": 0.9,
               "qty_raw": "900.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "maca-verde-em-brunoise",
-              "insumo_name": "Maçã Verde em Brunoise",
-              "qty": 310.0,
+              "insumo_id": "maca-verde",
+              "insumo_name": "Maçã Verde",
+              "qty": 0.31,
               "qty_raw": "310.0",
-              "unit": "g",
-              "observacao": "Brunoise 3mm",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "em brunoise · Brunoise 3mm",
+              "is_qb": false,
+              "fc": 1.15
             },
             {
               "insumo_id": "dill",
               "insumo_name": "Dill",
-              "qty": 120.0,
+              "qty": 0.12,
               "qty_raw": "120.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado Finamente",
               "is_qb": false
             },
             {
-              "insumo_id": "ovo-cozido",
-              "insumo_name": "Ovo Cozido",
-              "qty": 311.0,
+              "insumo_id": "ovo",
+              "insumo_name": "Ovo",
+              "qty": 0.311,
               "qty_raw": "311.0",
-              "unit": "g",
-              "observacao": "Cubos médios aprox 6und",
+              "unit": "kg",
+              "observacao": "cozido · Cubos médios aprox 6und",
               "is_qb": false
             },
             {
@@ -1343,8 +1351,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "Q.B",
@@ -1352,12 +1360,12 @@
               "is_qb": true
             },
             {
-              "insumo_id": "folhas-de-dill",
-              "insumo_name": "Folhas de Dill",
+              "insumo_id": "dill",
+              "insumo_name": "Dill",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "Q.B",
-              "observacao": "Picado finamente",
+              "observacao": "folhas · Picado finamente",
               "is_qb": true
             }
           ],
@@ -1390,19 +1398,19 @@
             {
               "insumo_id": "manteiga",
               "insumo_name": "Manteiga",
-              "qty": 80.0,
+              "qty": 0.08,
               "qty_raw": "80g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "dill-para-finalizacao",
-              "insumo_name": "Dill para Finalização",
+              "insumo_id": "dill",
+              "insumo_name": "Dill",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
-              "observacao": "",
+              "observacao": "para finalização",
               "is_qb": true
             }
           ],
@@ -1426,7 +1434,7 @@
         {
           "id": "moela-temperada",
           "name": "Moela Temperada",
-          "rendimento": "5 kg",
+          "rendimento": "5,000 kg",
           "ingredientes": [
             {
               "insumo_id": "moela",
@@ -1438,56 +1446,56 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 50.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.05,
               "qty_raw": "50g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-picante",
               "insumo_name": "Páprica Picante",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-do-reino-moida",
-              "insumo_name": "Pimenta do Reino Moída",
-              "qty": 10.0,
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
+              "qty": 0.01,
               "qty_raw": "10g",
-              "unit": "g",
-              "observacao": "",
+              "unit": "kg",
+              "observacao": "moída",
               "is_qb": false
             },
             {
               "insumo_id": "alho-em-po",
               "insumo_name": "Alho em Pó",
-              "qty": 15.0,
+              "qty": 0.015,
               "qty_raw": "15g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "cominho-em-po",
               "insumo_name": "Cominho em Pó",
-              "qty": 5.0,
+              "qty": 0.005,
               "qty_raw": "5g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -1497,7 +1505,7 @@
         {
           "id": "sofrito-base-do-molho",
           "name": "Sofrito (base do Molho)",
-          "rendimento": "2,5 kg",
+          "rendimento": "2,500 kg",
           "ingredientes": [
             {
               "insumo_id": "tomate-italiano",
@@ -1511,42 +1519,43 @@
             {
               "insumo_id": "extrato-de-tomate",
               "insumo_name": "Extrato de Tomate",
-              "qty": 200.0,
+              "qty": 0.2,
               "qty_raw": "200g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-branca-brunoise",
-              "insumo_name": "Cebola Branca Brunoise",
-              "qty": 300.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.3,
               "qty_raw": "300g",
-              "unit": "g",
-              "observacao": "Brunoise",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "em brunoise · Brunoise",
+              "is_qb": false,
+              "fc": 1.25
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 80.0,
+              "qty": 0.08,
               "qty_raw": "80g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Oleo",
-              "qty": 150.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.15,
               "qty_raw": "150ml",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "Q.B",
@@ -1559,7 +1568,7 @@
         {
           "id": "caldo-misto-de-porco-e-frango",
           "name": "Caldo Misto de Porco e Frango",
-          "rendimento": "5 litros",
+          "rendimento": "5,000 l",
           "ingredientes": [
             {
               "insumo_id": "pe-de-frango",
@@ -1591,27 +1600,27 @@
             {
               "insumo_id": "cebola-branca",
               "insumo_name": "Cebola Branca",
-              "qty": 200.0,
+              "qty": 0.2,
               "qty_raw": "200g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "cenoura",
               "insumo_name": "Cenoura",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "salsao",
               "insumo_name": "Salsão",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -1630,7 +1639,7 @@
         {
           "id": "molho-de-moela-finalizado",
           "name": "Molho de Moela Finalizado",
-          "rendimento": "6,5 kg",
+          "rendimento": "6,500 kg",
           "ingredientes": [
             {
               "insumo_id": "moela-temperada",
@@ -1671,8 +1680,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1685,14 +1694,14 @@
         {
           "id": "moela-no-molho",
           "name": "Moela no Molho",
-          "rendimento": "160 g",
+          "rendimento": "0,160 kg",
           "ingredientes": [
             {
-              "insumo_id": "moela-com-molho",
-              "insumo_name": "Moela com Molho",
-              "qty": 160.0,
+              "insumo_id": "molho-de-moela-finalizado",
+              "insumo_name": "Molho de Moela Finalizado",
+              "qty": 0.16,
               "qty_raw": "160.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -1735,59 +1744,59 @@
         {
           "id": "massa-do-pastel",
           "name": "Massa do Pastel",
-          "rendimento": "1,4 kg-40 und",
+          "rendimento": "1,400 kg-40 und",
           "ingredientes": [
             {
               "insumo_id": "polvilho-azedo",
               "insumo_name": "Polvilho Azedo",
-              "qty": 454.0,
+              "qty": 0.454,
               "qty_raw": "454.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Peneirado",
               "is_qb": false
             },
             {
               "insumo_id": "mussarela",
               "insumo_name": "Mussarela",
-              "qty": 454.0,
+              "qty": 0.454,
               "qty_raw": "454.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Ralado fino",
               "is_qb": false
             },
             {
               "insumo_id": "leite",
               "insumo_name": "Leite",
-              "qty": 180.0,
+              "qty": 0.18,
               "qty_raw": "180.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
-              "qty": 180.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.18,
               "qty_raw": "180.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "ovo",
               "insumo_name": "Ovo",
-              "qty": 115.0,
+              "qty": 0.115,
               "qty_raw": "115.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "aprox.2und",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 17.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.017,
               "qty_raw": "17.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -1797,7 +1806,7 @@
         {
           "id": "costelinha-suina-desfiada",
           "name": "Costelinha Suína Desfiada",
-          "rendimento": "800 g",
+          "rendimento": "0,800 kg",
           "ingredientes": [
             {
               "insumo_id": "costelinha-suina",
@@ -1809,35 +1818,37 @@
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-branca-picada",
-              "insumo_name": "Cebola Branca Picada",
-              "qty": 200.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.2,
               "qty_raw": "200.0",
-              "unit": "g",
-              "observacao": "Brunoise",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picada · Brunoise",
+              "is_qb": false,
+              "fc": 1.25
             },
             {
-              "insumo_id": "alho-picado",
-              "insumo_name": "Alho Picado",
-              "qty": 33.0,
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 0.033,
               "qty_raw": "33.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado",
-              "is_qb": false
+              "is_qb": false,
+              "fc": 1.1
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 17.0,
+              "qty": 0.017,
               "qty_raw": "17.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1845,8 +1856,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "pimenta-do-reino",
-              "insumo_name": "Pimenta do Reino",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1854,8 +1865,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "oleo",
-              "insumo_name": "Óleo",
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1873,18 +1884,18 @@
             {
               "insumo_id": "massa-de-pastel",
               "insumo_name": "Massa de Pastel",
-              "qty": 35.0,
+              "qty": 0.035,
               "qty_raw": "35.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Pré-pesada",
               "is_qb": false
             },
             {
-              "insumo_id": "recheio-de-costelinha",
-              "insumo_name": "Recheio de Costelinha",
-              "qty": 20.0,
+              "insumo_id": "costelinha-suina-desfiada",
+              "insumo_name": "Costelinha Suína Desfiada",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Refrigerado",
               "is_qb": false
             }
@@ -1926,14 +1937,14 @@
         {
           "id": "quirera-de-milho-cozida",
           "name": "Quirera de Milho Cozida",
-          "rendimento": "1,7 kg",
+          "rendimento": "1,700 kg",
           "ingredientes": [
             {
               "insumo_id": "quirera-de-milho",
               "insumo_name": "Quirera de Milho",
-              "qty": 566.0,
+              "qty": 0.566,
               "qty_raw": "566.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Lavada",
               "is_qb": false
             },
@@ -1947,8 +1958,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -1961,7 +1972,7 @@
         {
           "id": "joelho-de-porco-defumado-cozido-e-desfiado",
           "name": "Joelho de Porco Defumado Cozido e Desfiado",
-          "rendimento": "1 kg",
+          "rendimento": "1,000 kg",
           "ingredientes": [
             {
               "insumo_id": "joelho-de-porco-defumado",
@@ -1987,11 +1998,11 @@
         {
           "id": "joelhada-na-canjiquinha",
           "name": "Joelhada na Canjiquinha",
-          "rendimento": "24 Porções de 200 g",
+          "rendimento": "24 porções de 200 g",
           "ingredientes": [
             {
-              "insumo_id": "canjiquinha-cozida",
-              "insumo_name": "Canjiquinha Cozida",
+              "insumo_id": "quirera-de-milho-cozida",
+              "insumo_name": "Quirera de Milho Cozida",
               "qty": 1.7,
               "qty_raw": "1.7",
               "unit": "kg",
@@ -1999,8 +2010,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "joelho-desfiado",
-              "insumo_name": "Joelho Desfiado",
+              "insumo_id": "joelho-de-porco-defumado-cozido-e-desfiado",
+              "insumo_name": "Joelho de Porco Defumado Cozido e Desfiado",
               "qty": 1.0,
               "qty_raw": "1.0",
               "unit": "kg",
@@ -2008,8 +2019,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "caldo-reservado-do-joelho",
-              "insumo_name": "Caldo Reservado do Joelho",
+              "insumo_id": "joelho-de-porco-defumado-cozido-e-desfiado",
+              "insumo_name": "Joelho de Porco Defumado Cozido e Desfiado",
               "qty": 1.7,
               "qty_raw": "1.7",
               "unit": "kg",
@@ -2017,26 +2028,27 @@
               "is_qb": false
             },
             {
-              "insumo_id": "cebola-branca-em-brunoise",
-              "insumo_name": "Cebola Branca em Brunoise",
-              "qty": 220.0,
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.22,
               "qty_raw": "220.0",
-              "unit": "g",
-              "observacao": "Brunoise",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "em brunoise · Brunoise",
+              "is_qb": false,
+              "fc": 1.25
             },
             {
               "insumo_id": "verduras",
               "insumo_name": "Verduras",
-              "qty": 330.0,
+              "qty": 0.33,
               "qty_raw": "330.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picadas grosseiramente (rasgadas)",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-do-reino",
-              "insumo_name": "Pimenta do Reino",
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2044,8 +2056,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2053,8 +2065,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "azeite",
-              "insumo_name": "Azeite",
+              "insumo_id": "azeite-de-oliva",
+              "insumo_name": "Azeite de Oliva",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2082,7 +2094,7 @@
         {
           "id": "massa-de-tempura",
           "name": "Massa de Tempurá",
-          "rendimento": "2,7 kg",
+          "rendimento": "2,700 kg",
           "ingredientes": [
             {
               "insumo_id": "farinha-de-trigo",
@@ -2096,18 +2108,18 @@
             {
               "insumo_id": "amido-de-milho",
               "insumo_name": "Amido de Milho",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Peneirada",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 15.0,
+              "qty": 0.015,
               "qty_raw": "15.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -2121,8 +2133,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "ovos",
-              "insumo_name": "Ovos",
+              "insumo_id": "ovo",
+              "insumo_name": "Ovo",
               "qty": 2.0,
               "qty_raw": "2.0",
               "unit": "und",
@@ -2130,11 +2142,11 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 20.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -2144,59 +2156,59 @@
         {
           "id": "vinagrete-de-banana",
           "name": "Vinagrete de Banana",
-          "rendimento": "1,1 kg",
+          "rendimento": "1,100 kg",
           "ingredientes": [
             {
               "insumo_id": "banana-da-terra",
               "insumo_name": "Banana da Terra",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Brunoise",
               "is_qb": false
             },
             {
-              "insumo_id": "tomate-maduro",
-              "insumo_name": "Tomate Maduro",
-              "qty": 300.0,
+              "insumo_id": "tomate",
+              "insumo_name": "Tomate",
+              "qty": 0.3,
               "qty_raw": "300.0",
-              "unit": "g",
-              "observacao": "Brunoise (sem sementes)",
+              "unit": "kg",
+              "observacao": "maduro · Brunoise (sem sementes)",
               "is_qb": false
             },
             {
               "insumo_id": "cebola-roxa",
               "insumo_name": "Cebola Roxa",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Julienne fina",
               "is_qb": false
             },
             {
               "insumo_id": "azeite-de-oliva",
               "insumo_name": "Azeite de Oliva",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "suco-de-limao",
               "insumo_name": "Suco de Limão",
-              "qty": 80.0,
+              "qty": 0.08,
               "qty_raw": "80.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "aprox. 3limões",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 10.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -2206,41 +2218,41 @@
         {
           "id": "base-de-maionese",
           "name": "Base de Maionese",
-          "rendimento": "1,1 kg",
+          "rendimento": "1,100 kg",
           "ingredientes": [
             {
-              "insumo_id": "leite-gelado",
-              "insumo_name": "Leite Gelado",
-              "qty": 250.0,
+              "insumo_id": "leite",
+              "insumo_name": "Leite",
+              "qty": 0.25,
               "qty_raw": "250.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Bem Gelado",
               "is_qb": false
             },
             {
-              "insumo_id": "oleo-vegetal",
-              "insumo_name": "Óleo Vegetal",
-              "qty": 900.0,
+              "insumo_id": "oleo-de-soja",
+              "insumo_name": "Óleo de Soja",
+              "qty": 0.9,
               "qty_raw": "900.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "alho",
               "insumo_name": "Alho",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Picado",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 10.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -2264,18 +2276,18 @@
             {
               "insumo_id": "agua",
               "insumo_name": "Água",
-              "qty": 3000.0,
+              "qty": 3.0,
               "qty_raw": "3000.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 90.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.09,
               "qty_raw": "90.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Proporção de 3% (salmoura leve)",
               "is_qb": false
             }
@@ -2285,7 +2297,7 @@
         {
           "id": "taco-de-peixe",
           "name": "Taco de Peixe",
-          "rendimento": "2 Porções",
+          "rendimento": "2 porções",
           "ingredientes": [
             {
               "insumo_id": "tortilha",
@@ -2297,29 +2309,29 @@
               "is_qb": false
             },
             {
-              "insumo_id": "peixe-empanado-no-tempura",
-              "insumo_name": "Peixe Empanado no Tempurá",
-              "qty": 60.0,
+              "insumo_id": "salmoura-e-porcionamento-do-peixe",
+              "insumo_name": "Salmoura e Porcionamento do Peixe",
+              "qty": 0.06,
               "qty_raw": "60.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "2und de 30g",
               "is_qb": false
             },
             {
-              "insumo_id": "maionese-base",
-              "insumo_name": "Maionese Base",
-              "qty": 15.0,
+              "insumo_id": "base-de-maionese",
+              "insumo_name": "Base de Maionese",
+              "qty": 0.015,
               "qty_raw": "15.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Aplicar na base da tortilha",
               "is_qb": false
             },
             {
               "insumo_id": "vinagrete-de-banana-finalizado",
               "insumo_name": "Vinagrete de Banana Finalizado",
-              "qty": 40.0,
+              "qty": 0.04,
               "qty_raw": "40.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "vinagrete-de-banana"
@@ -2327,15 +2339,15 @@
             {
               "insumo_id": "molho-sweet-chili",
               "insumo_name": "Molho Sweet Chili",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Finalização",
               "is_qb": false
             },
             {
-              "insumo_id": "coentro-fresco",
-              "insumo_name": "Coentro Fresco",
+              "insumo_id": "coentro",
+              "insumo_name": "Coentro",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2343,8 +2355,8 @@
               "is_qb": true
             },
             {
-              "insumo_id": "limao-cortado",
-              "insumo_name": "Limão Cortado",
+              "insumo_id": "limao",
+              "insumo_name": "Limão",
               "qty": 1.0,
               "qty_raw": "1.0",
               "unit": "und",
@@ -2372,7 +2384,7 @@
         {
           "id": "lula-limpa",
           "name": "Lula Limpa",
-          "rendimento": "1 kg",
+          "rendimento": "1,000 kg",
           "ingredientes": [
             {
               "insumo_id": "lula",
@@ -2389,7 +2401,7 @@
         {
           "id": "milho-verde-cozido",
           "name": "Milho Verde Cozido",
-          "rendimento": "600 g",
+          "rendimento": "0,600 kg",
           "ingredientes": [
             {
               "insumo_id": "milho-verde-em-espigas",
@@ -2401,8 +2413,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2424,14 +2436,14 @@
         {
           "id": "linguica",
           "name": "Linguiça",
-          "rendimento": "450 g",
+          "rendimento": "0,450 kg",
           "ingredientes": [
             {
               "insumo_id": "linguica-fresca",
               "insumo_name": "Linguiça Fresca",
-              "qty": 500.0,
+              "qty": 0.5,
               "qty_raw": "500.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Inteira",
               "is_qb": false
             }
@@ -2441,32 +2453,32 @@
         {
           "id": "mix-de-papricas",
           "name": "Mix de Pápricas",
-          "rendimento": "100 g",
+          "rendimento": "0,100 kg",
           "ingredientes": [
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 70.0,
+              "qty": 0.07,
               "qty_raw": "70.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Em pó",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-picante",
               "insumo_name": "Páprica Picante",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Em pó",
               "is_qb": false
             },
             {
               "insumo_id": "sal-refinado",
               "insumo_name": "Sal Refinado",
-              "qty": 10.0,
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -2476,7 +2488,7 @@
         {
           "id": "lula-salteada-com-linguica-e-milho",
           "name": "Lula Salteada com Linguiça e Milho",
-          "rendimento": "10 Porções de 200 g",
+          "rendimento": "10 porções de 200 g",
           "ingredientes": [
             {
               "insumo_id": "lula-limpa",
@@ -2491,34 +2503,34 @@
             {
               "insumo_id": "linguica-cozida",
               "insumo_name": "Linguiça Cozida",
-              "qty": 450.0,
+              "qty": 0.45,
               "qty_raw": "450g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Pré-preparada",
               "is_qb": false
             },
             {
-              "insumo_id": "milho-cozido-em-graos",
-              "insumo_name": "Milho Cozido em Grãos",
-              "qty": 550.0,
+              "insumo_id": "milho-verde",
+              "insumo_name": "Milho Verde",
+              "qty": 0.55,
               "qty_raw": "550g",
-              "unit": "g",
-              "observacao": "Pré-preparada",
+              "unit": "kg",
+              "observacao": "cozido · Pré-preparada",
               "is_qb": false
             },
             {
               "insumo_id": "mix-de-papricas",
               "insumo_name": "Mix de Pápricas",
-              "qty": 30.0,
+              "qty": 0.03,
               "qty_raw": "30g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false,
               "subref_id": "mix-de-papricas"
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2528,9 +2540,9 @@
             {
               "insumo_id": "cebolinha",
               "insumo_name": "Cebolinha",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100G",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "corte fino na diagonal",
               "is_qb": false
             },
@@ -2544,8 +2556,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "azeite",
-              "insumo_name": "Azeite",
+              "insumo_id": "azeite-de-oliva",
+              "insumo_name": "Azeite de Oliva",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
@@ -2594,74 +2606,75 @@
               "is_qb": false
             },
             {
-              "insumo_id": "alho-picado",
-              "insumo_name": "Alho Picado",
-              "qty": 80.0,
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 0.08,
               "qty_raw": "80.0",
-              "unit": "g",
-              "observacao": "Bem miúdo (brunoise)",
-              "is_qb": false
+              "unit": "kg",
+              "observacao": "picado · Bem miúdo (brunoise)",
+              "is_qb": false,
+              "fc": 1.1
             },
             {
               "insumo_id": "sal-refinado",
               "insumo_name": "Sal Refinado",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "acucar-cristal",
               "insumo_name": "Açúcar Cristal",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 20.0,
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
-              "insumo_id": "pimenta-do-reino",
-              "insumo_name": "Pimenta-do-Reino",
-              "qty": 10.0,
+              "insumo_id": "pimenta-do-reino-preta",
+              "insumo_name": "Pimenta do Reino Preta",
+              "qty": 0.01,
               "qty_raw": "10.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Moída na hora",
               "is_qb": false
             },
             {
               "insumo_id": "shoyu",
               "insumo_name": "Shoyu",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Tradicional",
               "is_qb": false
             },
             {
-              "insumo_id": "limao-suco",
-              "insumo_name": "Limão (suco)",
-              "qty": 100.0,
+              "insumo_id": "suco-de-limao",
+              "insumo_name": "Suco de Limão",
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "Coado (sem sementes)",
               "is_qb": false
             },
             {
               "insumo_id": "oleo-de-soja",
               "insumo_name": "Óleo de Soja",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100.0",
-              "unit": "ml",
+              "unit": "l",
               "observacao": "",
               "is_qb": false
             }
@@ -2671,7 +2684,7 @@
         {
           "id": "massa-de-tempura",
           "name": "Massa de Tempurá",
-          "rendimento": "50 Porções",
+          "rendimento": "50 porções",
           "ingredientes": [
             {
               "insumo_id": "farinha-de-trigo",
@@ -2685,18 +2698,18 @@
             {
               "insumo_id": "amido-de-milho",
               "insumo_name": "Amido de Milho",
-              "qty": 100.0,
+              "qty": 0.1,
               "qty_raw": "100g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
             {
               "insumo_id": "paprica-doce",
               "insumo_name": "Páprica Doce",
-              "qty": 15.0,
+              "qty": 0.015,
               "qty_raw": "15g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             },
@@ -2710,8 +2723,8 @@
               "is_qb": false
             },
             {
-              "insumo_id": "ovos",
-              "insumo_name": "Ovos",
+              "insumo_id": "ovo",
+              "insumo_name": "Ovo",
               "qty": 2.0,
               "qty_raw": "2und",
               "unit": "und",
@@ -2719,11 +2732,11 @@
               "is_qb": false
             },
             {
-              "insumo_id": "sal",
-              "insumo_name": "Sal",
-              "qty": 20.0,
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": 0.02,
               "qty_raw": "20g",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "",
               "is_qb": false
             }
@@ -2733,11 +2746,11 @@
         {
           "id": "espetinho-de-coracao-com-sweet-chili",
           "name": "Espetinho de Coração com Sweet Chili",
-          "rendimento": "1 Porção",
+          "rendimento": "1 porção",
           "ingredientes": [
             {
-              "insumo_id": "espetinho-montado",
-              "insumo_name": "Espetinho Montado",
+              "insumo_id": "marinada-do-coracao-de-frango",
+              "insumo_name": "Marinada do Coração de Frango",
               "qty": 1.0,
               "qty_raw": "1.0",
               "unit": "und",
@@ -2747,19 +2760,19 @@
             {
               "insumo_id": "massa-de-tempura",
               "insumo_name": "Massa de Tempurá",
-              "qty": 40.0,
+              "qty": 0.04,
               "qty_raw": "40.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "Deve estar bem gelado",
               "is_qb": false,
               "subref_id": "massa-de-tempura"
             },
             {
-              "insumo_id": "sweet-chili",
-              "insumo_name": "Sweet Chili",
-              "qty": 20.0,
+              "insumo_id": "molho-sweet-chili",
+              "insumo_name": "Molho Sweet Chili",
+              "qty": 0.02,
               "qty_raw": "20.0",
-              "unit": "g",
+              "unit": "kg",
               "observacao": "finalização",
               "is_qb": false
             },
@@ -2791,784 +2804,496 @@
   ],
   "insumos": [
     {
-      "id": "acem-moido-e-temperado",
-      "name": "Acém Moido e Temperado",
-      "unit": "kg",
-      "price": 0.0
-    },
-    {
       "id": "acem-moido",
       "name": "Acém Moído",
       "unit": "kg",
-      "price": 0.0
+      "price": 32.0
     },
     {
-      "id": "agriao-fresco",
-      "name": "Agrião Fresco",
-      "unit": "g",
-      "price": 0.0
+      "id": "agriao",
+      "name": "Agrião",
+      "unit": "kg",
+      "price": 25.0
     },
     {
       "id": "alho",
       "name": "Alho",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 30.0
     },
     {
       "id": "alho-em-po",
       "name": "Alho em Pó",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "alho-picado",
-      "name": "Alho Picado",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 60.0
     },
     {
       "id": "amido-de-milho",
       "name": "Amido de Milho",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 12.0
     },
     {
       "id": "atum-fresco",
       "name": "Atum Fresco",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "azeite",
-      "name": "Azeite",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 140.0
     },
     {
       "id": "azeite-de-oliva",
       "name": "Azeite de Oliva",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 50.0
     },
     {
       "id": "azeitona",
       "name": "Azeitona",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "acucar",
-      "name": "Açúcar",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 35.0
     },
     {
       "id": "acucar-cristal",
       "name": "Açúcar Cristal",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 4.5
     },
     {
       "id": "acucar-refinado",
       "name": "Açúcar Refinado",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 5.0
     },
     {
       "id": "banana-da-terra",
       "name": "Banana da Terra",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 6.0
     },
     {
       "id": "banha",
       "name": "Banha",
-      "unit": "und",
-      "price": 0.0
+      "unit": "kg",
+      "price": 20.0
     },
     {
       "id": "barriga-suina-moida",
       "name": "Barriga Suína Moída",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "blend-suino-e-temperado",
-      "name": "Blend Suíno e Temperado",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "caldo",
-      "name": "Caldo",
-      "unit": "l",
-      "price": 0.0
-    },
-    {
-      "id": "caldo-de-legumes",
-      "name": "Caldo de Legumes",
-      "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "caldo-reservado-do-joelho",
-      "name": "Caldo Reservado do Joelho",
-      "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "canjiquinha-cozida",
-      "name": "Canjiquinha Cozida",
-      "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "cebola",
-      "name": "Cebola",
-      "unit": "g",
-      "price": 0.0
+      "price": 35.0
     },
     {
       "id": "cebola-branca",
       "name": "Cebola Branca",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-branca-brunoise",
-      "name": "Cebola Branca Brunoise",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-branca-em-brunoise",
-      "name": "Cebola Branca em Brunoise",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-branca-picada",
-      "name": "Cebola Branca Picada",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-brunoise",
-      "name": "Cebola Brunoise",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-picada",
-      "name": "Cebola Picada",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 5.0
     },
     {
       "id": "cebola-roxa",
       "name": "Cebola Roxa",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "cebola-sem-casca",
-      "name": "Cebola sem Casca",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 8.0
     },
     {
       "id": "cebolinha",
       "name": "Cebolinha",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 20.0
     },
     {
       "id": "cenoura",
       "name": "Cenoura",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 5.0
     },
     {
       "id": "cerveja-ipa",
       "name": "Cerveja Ipa",
       "unit": "l",
-      "price": 0.0
+      "price": 30.0
     },
     {
       "id": "ciboulette",
       "name": "Ciboulette",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 80.0
     },
     {
       "id": "coentro",
       "name": "Coentro",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "coentro-fresco",
-      "name": "Coentro Fresco",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 20.0
     },
     {
       "id": "cominho-em-po",
       "name": "Cominho em Pó",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 120.0
     },
     {
       "id": "copa-lombo-moida",
       "name": "Copa Lombo Moída",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 40.0
     },
     {
       "id": "coracao-de-frango-limpo",
       "name": "Coração de Frango Limpo",
       "unit": "kg",
-      "price": 0.0
+      "price": 22.0
     },
     {
       "id": "costelinha-suina",
       "name": "Costelinha Suína",
       "unit": "kg",
-      "price": 0.0
+      "price": 30.0
     },
     {
       "id": "cravo",
       "name": "Cravo",
       "unit": "und",
-      "price": 0.0
+      "price": 1.0
     },
     {
       "id": "dill",
       "name": "Dill",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "dill-para-finalizacao",
-      "name": "Dill para Finalização",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "espetinho-montado",
-      "name": "Espetinho Montado",
-      "unit": "und",
-      "price": 0.0
+      "unit": "kg",
+      "price": 60.0
     },
     {
       "id": "extrato-de-tomate",
       "name": "Extrato de Tomate",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 22.0
     },
     {
       "id": "farinha-de-trigo",
       "name": "Farinha de Trigo",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 5.5
     },
     {
       "id": "flor-de-sal",
       "name": "Flor de Sal",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "folhas-de-dill",
-      "name": "Folhas de Dill",
-      "unit": "Q.B",
-      "price": 0.0
-    },
-    {
-      "id": "frango-desfiado",
-      "name": "Frango Desfiado",
       "unit": "kg",
-      "price": 0.0
+      "price": 80.0
     },
     {
       "id": "fuba-mimoso",
       "name": "Fubá Mimoso",
       "unit": "kg",
-      "price": 0.0
+      "price": 7.0
     },
     {
       "id": "gema",
       "name": "Gema",
       "unit": "und",
-      "price": 0.0
+      "price": 1.5
     },
     {
-      "id": "gemas",
-      "name": "Gemas",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "gengibre-fresco-picado",
-      "name": "Gengibre Fresco Picado",
-      "unit": "g",
-      "price": 0.0
+      "id": "gengibre",
+      "name": "Gengibre",
+      "unit": "kg",
+      "price": 15.0
     },
     {
       "id": "joelho-de-porco-defumado",
       "name": "Joelho de Porco Defumado",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "joelho-desfiado",
-      "name": "Joelho Desfiado",
-      "unit": "kg",
-      "price": 0.0
+      "price": 35.0
     },
     {
       "id": "leite",
       "name": "Leite",
-      "unit": "g",
-      "price": 0.0
+      "unit": "l",
+      "price": 6.0
     },
     {
       "id": "leite-de-coco",
       "name": "Leite de Coco",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 15.0
     },
     {
-      "id": "leite-gelado",
-      "name": "Leite Gelado",
-      "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "limao-suco",
-      "name": "Limão (suco)",
-      "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "limao-cortado",
-      "name": "Limão Cortado",
-      "unit": "und",
-      "price": 0.0
+      "id": "limao",
+      "name": "Limão",
+      "unit": "kg",
+      "price": 7.0
     },
     {
       "id": "linguica-cozida",
       "name": "Linguiça Cozida",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 32.0
     },
     {
       "id": "linguica-fresca",
       "name": "Linguiça Fresca",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 28.0
     },
     {
       "id": "louro",
       "name": "Louro",
       "unit": "folhas",
-      "price": 0.0
+      "price": 1.0
     },
     {
       "id": "lula",
       "name": "Lula",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "maionese-base",
-      "name": "Maionese Base",
-      "unit": "g",
-      "price": 0.0
+      "price": 60.0
     },
     {
       "id": "manteiga",
       "name": "Manteiga",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 60.0
     },
     {
       "id": "massa-de-pastel",
       "name": "Massa de Pastel",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 20.0
     },
     {
-      "id": "maca-verde-em-brunoise",
-      "name": "Maçã Verde em Brunoise",
-      "unit": "g",
-      "price": 0.0
+      "id": "maca-verde",
+      "name": "Maçã Verde",
+      "unit": "kg",
+      "price": 12.0
     },
     {
-      "id": "milho-cozido-em-graos",
-      "name": "Milho Cozido em Grãos",
-      "unit": "g",
-      "price": 0.0
+      "id": "milho-verde",
+      "name": "Milho Verde",
+      "unit": "kg",
+      "price": 15.0
     },
     {
       "id": "milho-verde-em-espigas",
       "name": "Milho Verde em Espigas",
-      "unit": "kg",
-      "price": 0.0
+      "unit": "und",
+      "price": 3.0
     },
     {
       "id": "mini-brioche",
       "name": "Mini Brioche",
       "unit": "und",
-      "price": 0.0
+      "price": 3.0
     },
     {
       "id": "moela",
       "name": "Moela",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "moela-com-molho",
-      "name": "Moela com Molho",
-      "unit": "g",
-      "price": 0.0
+      "price": 18.0
     },
     {
       "id": "molho-de-peixe-nam-pla",
       "name": "Molho de Peixe (nam Pla)",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 70.0
     },
     {
       "id": "molho-sweet-chili",
       "name": "Molho Sweet Chili",
-      "unit": "g",
-      "price": 0.0
+      "unit": "l",
+      "price": 40.0
     },
     {
       "id": "mostarda-djon",
       "name": "Mostarda Djon",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 60.0
     },
     {
       "id": "mussarela",
       "name": "Mussarela",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 40.0
     },
     {
       "id": "ossos-de-porco",
       "name": "Ossos de Porco",
       "unit": "kg",
-      "price": 0.0
+      "price": 10.0
     },
     {
       "id": "ovo",
       "name": "Ovo",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "ovo-cozido",
-      "name": "Ovo Cozido",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "ovo-de-codorna-cozido-e-picado",
-      "name": "Ovo de Codorna Cozido e Picado",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "ovos",
-      "name": "Ovos",
       "unit": "und",
-      "price": 0.0
+      "price": 0.9
+    },
+    {
+      "id": "ovo-de-codorna",
+      "name": "Ovo de Codorna",
+      "unit": "und",
+      "price": 0.5
     },
     {
       "id": "panko",
       "name": "Panko",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 50.0
     },
     {
       "id": "peito-de-frango-cru",
       "name": "Peito de Frango Cru",
       "unit": "kg",
-      "price": 0.0
+      "price": 22.0
     },
     {
       "id": "peixe-limpo",
       "name": "Peixe Limpo",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "peixe-empanado-no-tempura",
-      "name": "Peixe Empanado no Tempurá",
-      "unit": "g",
-      "price": 0.0
+      "price": 45.0
     },
     {
       "id": "pele-de-porco-desidratada",
       "name": "Pele de Porco Desidratada",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 40.0
     },
     {
-      "id": "pimenta-branca-moida",
-      "name": "Pimenta Branca Moída",
-      "unit": "g",
-      "price": 0.0
+      "id": "pimenta-do-reino-branca",
+      "name": "Pimenta do Reino Branca",
+      "unit": "kg",
+      "price": 200.0
     },
     {
-      "id": "pimenta-do-reino",
-      "name": "Pimenta do Reino",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-do-reino-em-graos",
-      "name": "Pimenta do Reino em Grãos",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-do-reino-moida",
-      "name": "Pimenta do Reino Moída",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-do-reino-mooida",
-      "name": "Pimenta do Reino Mooída",
-      "unit": "g",
-      "price": 0.0
+      "id": "pimenta-do-reino-preta",
+      "name": "Pimenta do Reino Preta",
+      "unit": "kg",
+      "price": 120.0
     },
     {
       "id": "pimenta-fermentada",
       "name": "Pimenta Fermentada",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-moida",
-      "name": "Pimenta Moída",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-preta-moida",
-      "name": "Pimenta Preta Moída",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-preta-moida-na-hora",
-      "name": "Pimenta Preta Moída na Hora",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimenta-do-reino",
-      "name": "Pimenta-do-Reino",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "pimeta-branca-moida",
-      "name": "Pimeta Branca Moída",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "polenta",
-      "name": "Polenta",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 50.0
     },
     {
       "id": "polvilho-azedo",
       "name": "Polvilho Azedo",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 15.0
     },
     {
       "id": "paprica-doce",
       "name": "Páprica Doce",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 80.0
     },
     {
       "id": "paprica-picante",
       "name": "Páprica Picante",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 90.0
     },
     {
       "id": "pao-de-fermentacao-natural",
       "name": "Pão de Fermentação Natural",
       "unit": "fatias",
-      "price": 0.0
+      "price": 0.8
     },
     {
       "id": "pe-de-frango",
       "name": "Pé de Frango",
       "unit": "kg",
-      "price": 0.0
+      "price": 10.0
     },
     {
       "id": "queijo-tulha",
       "name": "Queijo Tulha",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 150.0
     },
     {
       "id": "quirera-de-milho",
       "name": "Quirera de Milho",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 8.0
     },
     {
       "id": "rabada-crua",
       "name": "Rabada Crua",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "raspas-de-limao",
-      "name": "Raspas de Limão",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "recheio-de-costelinha",
-      "name": "Recheio de Costelinha",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "recheiro-de-frango",
-      "name": "Recheiro de Frango",
-      "unit": "g",
-      "price": 0.0
+      "price": 32.0
     },
     {
       "id": "requeijao-tipo-catupiry",
       "name": "Requeijão Tipo Catupiry",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "sal",
-      "name": "Sal",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "kg",
+      "price": 40.0
     },
     {
       "id": "sal-refinado",
       "name": "Sal Refinado",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 4.0
     },
     {
-      "id": "salsinha-picada",
-      "name": "Salsinha Picada",
-      "unit": "g",
-      "price": 0.0
+      "id": "salsinha",
+      "name": "Salsinha",
+      "unit": "kg",
+      "price": 20.0
     },
     {
       "id": "salsao",
       "name": "Salsão",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 10.0
     },
     {
       "id": "shoyu",
       "name": "Shoyu",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 20.0
     },
     {
       "id": "suco-de-limao",
       "name": "Suco de Limão",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 25.0
     },
     {
-      "id": "sweet-chili",
-      "name": "Sweet Chili",
-      "unit": "g",
-      "price": 0.0
+      "id": "tomate",
+      "name": "Tomate",
+      "unit": "kg",
+      "price": 7.0
     },
     {
       "id": "tomate-italiano",
       "name": "Tomate Italiano",
       "unit": "kg",
-      "price": 0.0
-    },
-    {
-      "id": "tomate-maduro",
-      "name": "Tomate Maduro",
-      "unit": "g",
-      "price": 0.0
-    },
-    {
-      "id": "tomate-picado",
-      "name": "Tomate Picado",
-      "unit": "g",
-      "price": 0.0
+      "price": 9.0
     },
     {
       "id": "tortilha",
       "name": "Tortilha",
       "unit": "und",
-      "price": 0.0
-    },
-    {
-      "id": "verduras",
-      "name": "Verduras",
-      "unit": "g",
-      "price": 0.0
+      "price": 1.5
     },
     {
       "id": "vinagre-de-maca",
       "name": "Vinagre de Maçã",
-      "unit": "g",
-      "price": 0.0
+      "unit": "kg",
+      "price": 15.0
     },
     {
       "id": "agua",
       "name": "Água",
-      "unit": "colher de sopa",
+      "unit": "l",
       "price": 0.0
     },
     {
       "id": "agua-com-gas",
       "name": "Água com Gás",
       "unit": "l",
-      "price": 0.0
-    },
-    {
-      "id": "oleo",
-      "name": "Óleo",
-      "unit": "ml",
-      "price": 0.0
+      "price": 5.0
     },
     {
       "id": "oleo-de-soja",
       "name": "Óleo de Soja",
-      "unit": "ml",
-      "price": 0.0
-    },
-    {
-      "id": "oleo-vegetal",
-      "name": "Óleo Vegetal",
-      "unit": "ml",
-      "price": 0.0
+      "unit": "l",
+      "price": 8.0
     }
   ],
   "equipamentos_disponiveis": [

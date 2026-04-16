@@ -320,6 +320,9 @@ table.ficha-table {
 .subref-arrow { color: #b8955e; font-style: normal; font-weight: 600; margin-right: 0.2rem; }
 .subref-note { color: #999; font-size: 0.82rem; font-style: italic; }
 
+/* Fator de correção badge */
+.fc-badge { color: #b8955e; font-size: 0.75rem; font-weight: 500; }
+
 .ficha-section { margin-top: 2.5rem; }
 .ficha-section h3 {
   font-size: 1rem;
@@ -593,7 +596,7 @@ label.field textarea { min-height: 90px; resize: vertical; }
 }
 .ingredient-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 2fr auto;
+  grid-template-columns: 2fr 0.8fr 0.8fr 1.6fr 0.6fr auto;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
   align-items: center;

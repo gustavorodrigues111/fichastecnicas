@@ -840,9 +840,10 @@ function subfichaCost(sf, dish, cache = null, visited = null) {
     }
     const insumo = findInsumo(ing.insumo_id);
     const [qNorm, priceNorm] = normalizeQtyPrice(ing, insumo);
-    const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm : 0;
+    const fc = (typeof ing.fc === 'number' && ing.fc > 0) ? ing.fc : 1;
+    const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm * fc : 0;
     total += cost;
-    return { ing, insumo, cost, isSubref: false };
+    return { ing, insumo, cost, isSubref: false, fc };
   });
   const result = { rows, total };
   cache.set(sf.id, result);
@@ -1176,7 +1177,7 @@ function renderFichaCusto(dish, currentSf, cid) {
         el('th', { class: 'num' }, 'Preço unit.'),
         el('th', { class: 'num' }, 'Custo')
       )),
-      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf }) => {
+      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf, fc }) => {
         const fmt = formatIngQty(ing);
         let priceTxt, nameCell;
         if (isSubref && subSf) {
@@ -1184,10 +1185,11 @@ function renderFichaCusto(dish, currentSf, cid) {
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
             el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
         } else {
-          // Insumo price: display per normalized unit
           const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
           priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
-          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name);
+          // Show FC badge next to name if applicable
+          const fcBadge = (fc && fc > 1) ? el('span', { class: 'fc-badge', title: `Fator de correção ${fc}x` }, ` · FC ${fmtNum(fc, 2)}`) : null;
+          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, fcBadge);
         }
         return el('tr', { class: isSubref ? 'row-subref' : '' },
           nameCell,
@@ -1466,6 +1468,13 @@ function renderAdminEdit(cid, dishId) {
           const obsInput = el('input', { type: 'text', value: ing.observacao || '', placeholder: 'Observação' });
           obsInput.addEventListener('input', () => { ing.observacao = obsInput.value; });
           row.appendChild(obsInput);
+          const fcInput = el('input', { type: 'number', step: '0.01', min: '1', placeholder: 'FC', value: ing.fc || '', title: 'Fator de correção' });
+          fcInput.addEventListener('input', () => {
+            const v = parseFloat(fcInput.value);
+            if (!v || v <= 1) delete ing.fc;
+            else ing.fc = v;
+          });
+          row.appendChild(fcInput);
           row.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: () => { sf.ingredientes.splice(ingIdx, 1); renderIngs(); } }, '×'));
           ingList.appendChild(row);
         });
