@@ -285,6 +285,61 @@ async function loadClientesList() {
   }
 }
 
+// ---------- Modal de editar cliente (nome, consultor, toggle) ----------
+function openEditClienteModal(cliente) {
+  const existing = $('#edit-cliente-modal');
+  if (existing) existing.remove();
+
+  const nameInput = el('input', { type: 'text', value: cliente.name || '' });
+  const consultorNameInput = el('input', { type: 'text', value: cliente.consultor_name || '', placeholder: 'Ex: Gustavo Rodrigues' });
+  const consultorInfoInput = el('input', { type: 'text', value: cliente.consultor_info || '', placeholder: 'Ex: Consultoria Gastronômica · contato@quibebe.com.br' });
+  const showToggle = el('input', { type: 'checkbox' });
+  if (cliente.show_consultor !== false) showToggle.setAttribute('checked', ''); // default true
+
+  const modal = el('div', { class: 'modal', id: 'edit-cliente-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content modal-content-wide' },
+      el('h2', {}, 'Editar restaurante'),
+      el('p', { class: 'modal-subtitle' }, cliente.id),
+      el('div', { class: 'form-grid' },
+        el('label', { class: 'field field-wide' },
+          el('span', { class: 'label-text' }, 'Nome do restaurante'), nameInput)
+      ),
+      el('h3', { style: 'margin-top:1.5rem;margin-bottom:0.5rem;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:#888;font-family:Inter,sans-serif;font-weight:500;' }, 'Consultoria'),
+      el('p', { class: 'muted', style: 'font-size:0.85rem;margin-bottom:1rem;' }, 'Aparece discretamente no cardápio, nas fichas e no rodapé dos PDFs exportados.'),
+      el('div', { class: 'form-grid' },
+        el('label', { class: 'field' },
+          el('span', { class: 'label-text' }, 'Nome do consultor'), consultorNameInput),
+        el('label', { class: 'field' },
+          el('span', { class: 'label-text' }, 'Info adicional'), consultorInfoInput)
+      ),
+      el('label', { class: 'field', style: 'display:flex;flex-direction:row;align-items:center;gap:0.6rem;margin-top:0.75rem;' },
+        showToggle,
+        el('span', { style: 'font-size:0.9rem;color:#4a4a4a;' }, 'Exibir info da consultoria no site e exports')
+      ),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: async () => {
+          const updated = {
+            ...cliente,
+            name: nameInput.value.trim() || cliente.name,
+            consultor_name: consultorNameInput.value.trim(),
+            consultor_info: consultorInfoInput.value.trim(),
+            show_consultor: showToggle.checked
+          };
+          try {
+            await saveCliente(updated);
+            toast('Restaurante atualizado');
+            modal.remove();
+            renderClientesAdmin();
+          } catch (err) { toast('Erro: ' + err.message); }
+        } }, 'Salvar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
+}
+
 // ---------- Modal unificado para escolher tipo de atualização ----------
 function openUpdateFromFileModal(cliente) {
   const existing = $('#update-from-file-modal');
@@ -801,12 +856,7 @@ async function renderClientesAdmin() {
       el('div', { class: 'cc-actions' },
         el('a', { class: 'btn btn-primary btn-block', href: `#/c/${c.id}` }, 'Abrir restaurante →'),
         el('div', { class: 'cc-menu' },
-          el('button', { class: 'btn btn-small', onclick: async () => {
-            const newName = prompt('Novo nome:', c.name);
-            if (!newName || newName === c.name) return;
-            try { await saveCliente({ ...c, name: newName }); toast('Renomeado'); renderClientesAdmin(); }
-            catch (err) { toast('Erro: ' + err.message); }
-          } }, '✎ Renomear'),
+          el('button', { class: 'btn btn-small', onclick: () => openEditClienteModal(c), title: 'Editar nome, consultor e configurações' }, '✎ Editar'),
           el('button', { class: 'btn btn-small btn-accent', onclick: () => openUpdateFromFileModal(c), title: 'Sincronizar do arquivo data.json' }, '↻ Atualizar do arquivo'),
           el('button', { class: 'btn btn-small', onclick: async () => {
             // Backup do cliente (precisa garantir que estamos subscritos a ele)
@@ -1254,13 +1304,23 @@ function renderClienteHome(cid) {
 
   app.appendChild(renderClienteContext(cid));
 
+  const cliente = STATE.currentCliente;
   const hero = el('section', { class: 'home-hero' },
     el('h1', {}, 'Cardápio'),
-    el('p', { class: 'subtitle' }, STATE.currentCliente?.name || ''),
+    el('p', { class: 'subtitle' }, cliente?.name || ''),
     el('p', { class: 'home-stats-mini' },
       `${STATE.dishes.length} pratos · ${totalSubfichas} sub-fichas · ${STATE.insumos.length} insumos`)
   );
   app.appendChild(hero);
+
+  // Consultoria (se ativa)
+  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
+    app.appendChild(el('div', { class: 'consultor-credit' },
+      el('span', { class: 'consultor-by' }, 'Consultoria por'),
+      el('span', { class: 'consultor-name' }, cliente.consultor_name),
+      cliente.consultor_info ? el('span', { class: 'consultor-info' }, cliente.consultor_info) : null
+    ));
+  }
 
   if (STATE.dishes.length === 0) {
     const empty = el('div', { class: 'empty-state' },
@@ -1356,6 +1416,16 @@ function renderFicha(cid, dishId, initialSfId = null) {
     el('h1', {}, dish.name)
   );
   app.appendChild(header);
+
+  // Consultoria (se ativa)
+  const cliente = STATE.currentCliente;
+  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
+    app.appendChild(el('div', { class: 'consultor-credit consultor-credit-ficha' },
+      el('span', { class: 'consultor-by' }, 'Consultoria por'),
+      el('span', { class: 'consultor-name' }, cliente.consultor_name),
+      cliente.consultor_info ? el('span', { class: 'consultor-info' }, cliente.consultor_info) : null
+    ));
+  }
 
   // Top action bar — view toggle + exports (sticky)
   const toggle = el('div', { class: 'view-toggle' },
@@ -2259,6 +2329,27 @@ function exportFichaPDF(dish, state) {
     docPdf.setTextColor(80).setFont('helvetica', 'normal').setFontSize(9);
     docPdf.text(`Markup: ${fmtNum(all.markup, 0)}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
   }
+  // Rodapé em TODAS as páginas: nome do cliente + consultoria (se ativa)
+  const totalPages = docPdf.internal.getNumberOfPages();
+  const cliente = STATE.currentCliente;
+  const footerParts = [];
+  if (cliente?.name) footerParts.push(cliente.name);
+  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
+    let c = 'Consultoria por ' + cliente.consultor_name;
+    if (cliente.consultor_info) c += ' · ' + cliente.consultor_info;
+    footerParts.push(c);
+  }
+  const footerText = footerParts.join('  ·  ');
+  if (footerText) {
+    for (let p = 1; p <= totalPages; p++) {
+      docPdf.setPage(p);
+      docPdf.setFont('helvetica', 'italic').setFontSize(7).setTextColor(140);
+      docPdf.text(footerText, pageWidth / 2, docPdf.internal.pageSize.getHeight() - 8, { align: 'center' });
+      docPdf.setFont('helvetica', 'normal').setFontSize(7).setTextColor(170);
+      docPdf.text(`${p} / ${totalPages}`, pageWidth - margin, docPdf.internal.pageSize.getHeight() - 8, { align: 'right' });
+    }
+  }
+
   const suffix = scaleChanged ? `-escalado${fmtNum(sfScale, 2)}x` : '';
   docPdf.save(`${slugify(dish.name)}-${isTrabalho ? 'trabalho' : 'custo'}${suffix}.pdf`);
 }
@@ -2284,7 +2375,12 @@ function exportFichaXLSX(dish, state) {
     ['CMV (%)', all.cmv],
     [],
     ['Louça', dish.louca || '—'],
-    ['Equipamentos', (dish.equipamentos || []).join('; ')]
+    ['Equipamentos', (dish.equipamentos || []).join('; ')],
+    [],
+    ['Restaurante', STATE.currentCliente?.name || '—'],
+    ...((STATE.currentCliente?.show_consultor !== false && STATE.currentCliente?.consultor_name) ? [
+      ['Consultoria', STATE.currentCliente.consultor_name + (STATE.currentCliente.consultor_info ? ' · ' + STATE.currentCliente.consultor_info : '')]
+    ] : [])
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Resumo');
   all.sfCosts.forEach(({ sf, rows, total }, idx) => {
