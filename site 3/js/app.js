@@ -1421,6 +1421,51 @@ function nrm(s) {
   return String(s).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim().replace(/[,.;:\s]+$/, '');
 }
+// Busca um subproduto por nome em TODOS os pratos do cliente.
+// Retorna { dish, sf, subproduto } ou null.
+function findSubproduto(name) {
+  if (!name) return null;
+  const target = nrm(name);
+  if (target.length < 3) return null;
+  for (const dish of STATE.dishes || []) {
+    for (const sf of dish.sub_fichas || []) {
+      if (!sf.subproduto || !sf.subproduto.name) continue;
+      if (nrm(sf.subproduto.name) === target) {
+        return { dish, sf, subproduto: sf.subproduto };
+      }
+    }
+  }
+  return null;
+}
+// Soma consumo de um subproduto (por nome) dentro do mesmo prato — converte unidade quando possível
+function computeSubprodConsumption(dish, subprodName, subprodUnit) {
+  if (!subprodName) return 0;
+  const target = nrm(subprodName);
+  let total = 0;
+  for (const sf of dish.sub_fichas || []) {
+    for (const ing of sf.ingredientes || []) {
+      if (ing.subref_id) continue;
+      if (nrm(ing.insumo_name) !== target) continue;
+      if (ing.qty == null) continue;
+      const [q] = normalizeSubrefQty(ing.qty, ing.unit, subprodUnit);
+      total += q;
+    }
+  }
+  return total;
+}
+// Lista de todos subprodutos (global no cliente)
+function listAllSubprodutos() {
+  const list = [];
+  for (const dish of STATE.dishes || []) {
+    for (const sf of dish.sub_fichas || []) {
+      if (sf.subproduto && sf.subproduto.name) {
+        list.push({ dish, sf, subproduto: sf.subproduto });
+      }
+    }
+  }
+  return list;
+}
+
 function detectSubref(dish, currentSfIdx, ingredientName) {
   const ingClean = nrm(ingredientName);
   if (ingClean.length < 4) return null;
@@ -1481,6 +1526,12 @@ function subfichaCost(sf, dish, cache = null, visited = null) {
       }
       total += cost;
       return { ing, insumo: null, cost, subSf, isSubref: true };
+    }
+    // Detecta subproduto (do mesmo prato ou outro prato) — sempre custo zero
+    const subprodHit = findSubproduto(ing.insumo_name);
+    if (subprodHit && !(subprodHit.dish.id === dish.id && subprodHit.sf.id === sf.id)) {
+      // Evita self-reference: não trata como subproduto se for a própria sub-ficha
+      return { ing, insumo: null, cost: 0, isSubref: false, isSubproduto: true, subprodHit };
     }
     const insumo = findInsumo(ing.insumo_id);
     const isReutilizavel = !!(insumo && insumo.reutilizavel);
@@ -1872,6 +1923,18 @@ function renderFichaTrabalho(dish, sf, state, idx) {
     )
   ));
 
+  // Info de subproduto (se existe)
+  if (sf.subproduto && sf.subproduto.name && sf.subproduto.rendimento_qty > 0) {
+    const sq = sf.subproduto.rendimento_qty * sfScale;
+    const sn = normUnitForDisplay(sq, sf.subproduto.rendimento_unit || '');
+    wrap.appendChild(el('div', { class: 'subproduto-info' },
+      el('span', { class: 'muted' }, '↳ também gera: '),
+      el('strong', {}, sf.subproduto.name),
+      el('span', { class: 'muted' }, ` — ${sn.text} ${sn.unit} `.trimEnd()),
+      el('em', { class: 'subproduto-note' }, '(custo alocado no produto principal)')
+    ));
+  }
+
   // Ingredientes
   const sfIdx = idx;
   const ingList = el('ul', { class: 'kitchen-ingredients' });
@@ -1883,11 +1946,15 @@ function renderFichaTrabalho(dish, sf, state, idx) {
     const formatted = formatIngQty(ing, sfScale);
     const insumoLookup = findInsumo(ing.insumo_id);
     const isReutilizavel = !!(insumoLookup && insumoLookup.reutilizavel);
-    const displayName = (subSf ? '↪ ' : '') + ing.insumo_name + (ing.variation_name ? ` — ${ing.variation_name}` : '');
-    const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') + (isReutilizavel ? ' is-reut' : '') },
+    // Detecta se o ingrediente é um subproduto de outra sub-ficha (do mesmo prato ou cross-dish)
+    const subprodHit = !subSf && !isReutilizavel ? findSubproduto(ing.insumo_name) : null;
+    const isSubproduto = !!(subprodHit && !(subprodHit.dish.id === dish.id && subprodHit.sf.id === sf.id));
+    const displayName = (subSf ? '↪ ' : '') + (isSubproduto ? '↳ ' : '') + ing.insumo_name + (ing.variation_name ? ` — ${ing.variation_name}` : '');
+    const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') + (isReutilizavel ? ' is-reut' : '') + (isSubproduto ? ' is-subproduto' : '') },
       el('div', { class: 'k-row-main' },
         el('span', { class: 'k-name' }, displayName,
-          isReutilizavel ? el('span', { class: 'reut-badge', title: 'Reutilizável — não entra no custo do prato' }, 'rateio') : null
+          isReutilizavel ? el('span', { class: 'reut-badge', title: 'Reutilizável — não entra no custo do prato' }, 'rateio') : null,
+          isSubproduto ? el('span', { class: 'subproduto-badge', title: `Subproduto de "${subprodHit.sf.name}" (${subprodHit.dish.name}) — custo alocado lá` }, 'subproduto') : null
         ),
         el('span', { class: 'k-qty' },
           el('span', { class: 'qty-num' }, formatted.text),
@@ -1895,10 +1962,24 @@ function renderFichaTrabalho(dish, sf, state, idx) {
         )
       ),
       ing.observacao ? el('div', { class: 'k-obs' }, ing.observacao) : null,
-      subSf ? el('div', { class: 'k-sub-note' }, el('a', { href: `#sf-${subSf.id}` }, 'ver preparação: ' + subSf.name)) : null
+      subSf ? el('div', { class: 'k-sub-note' }, el('a', { href: `#sf-${subSf.id}` }, 'ver preparação: ' + subSf.name)) : null,
+      isSubproduto && subprodHit.dish.id !== dish.id ? el('div', { class: 'k-sub-note' },
+        el('a', { href: `#/c/${STATE.currentClienteId}/ficha/${subprodHit.dish.id}` }, `produzido em: ${subprodHit.dish.name} / ${subprodHit.sf.name}`)
+      ) : (isSubproduto ? el('div', { class: 'k-sub-note' }, el('a', { href: `#sf-${subprodHit.sf.id}` }, `produzido em: ${subprodHit.sf.name}`)) : null)
     );
     ingList.appendChild(li);
   });
+
+  // Alerta de superconsumo de subproduto dentro do mesmo prato
+  if (sf.subproduto && sf.subproduto.name && sf.subproduto.rendimento_qty > 0) {
+    const consumption = computeSubprodConsumption(dish, sf.subproduto.name, sf.subproduto.rendimento_unit);
+    const produced = sf.subproduto.rendimento_qty;
+    if (consumption > produced * 1.001) {
+      wrap.appendChild(el('div', { class: 'subprod-alert' },
+        `⚠ Consumo interno de "${sf.subproduto.name}" (${fmtNum(consumption, 2)} ${sf.subproduto.rendimento_unit || ''}) excede o rendimento (${fmtNum(produced, 2)} ${sf.subproduto.rendimento_unit || ''}). Ajuste a receita mestre pra produzir o mínimo necessário.`
+      ));
+    }
+  }
   wrap.appendChild(el('h3', { class: 'k-section-title' }, 'Ingredientes'));
   wrap.appendChild(ingList);
 
@@ -1932,6 +2013,15 @@ function renderFichaCusto(dish, cid) {
         el('span', { class: 'muted' }, rendDisplay ? 'rend. ' + rendDisplay : '')
       )
     );
+    if (sf.subproduto && sf.subproduto.name && sf.subproduto.rendimento_qty > 0) {
+      const sn = normUnitForDisplay(sf.subproduto.rendimento_qty, sf.subproduto.rendimento_unit || '');
+      section.appendChild(el('div', { class: 'subproduto-info' },
+        el('span', { class: 'muted' }, '↳ também gera: '),
+        el('strong', {}, sf.subproduto.name),
+        el('span', { class: 'muted' }, ` — ${sn.text} ${sn.unit} `.trimEnd()),
+        el('em', { class: 'subproduto-note' }, '(custo R$ 0,00 — alocado aqui)')
+      ));
+    }
     const tbl = el('table', { class: 'ficha-table' },
       el('thead', {}, el('tr', {},
         el('th', {}, 'Insumo'),
@@ -1940,7 +2030,7 @@ function renderFichaCusto(dish, cid) {
         el('th', { class: 'num' }, 'Preço unit.'),
         el('th', { class: 'num' }, 'Custo')
       )),
-      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf, fc, isReutilizavel }) => {
+      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf, fc, isReutilizavel, isSubproduto, subprodHit }) => {
         const fmt = formatIngQty(ing);
         let priceTxt, nameCell, costCell;
         if (isSubref && subSf) {
@@ -1948,6 +2038,13 @@ function renderFichaCusto(dish, cid) {
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
             el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
           costCell = el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost));
+        } else if (isSubproduto) {
+          const title = `Subproduto de "${subprodHit.sf.name}" (${subprodHit.dish.name}) — custo alocado lá`;
+          priceTxt = el('span', { class: 'subref-note', title }, 'subproduto');
+          nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
+            el('span', { class: 'subref-arrow' }, '↳ '), ing.insumo_name,
+            el('span', { class: 'subproduto-badge', title }, 'subproduto'));
+          costCell = el('td', { class: 'num reut-cost', 'data-label': 'Custo', title: 'Subproduto — custo alocado no produto principal' }, 'R$ 0,00');
         } else if (isReutilizavel) {
           const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
           priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
@@ -1962,7 +2059,7 @@ function renderFichaCusto(dish, cid) {
           nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, varBadge, fcBadge);
           costCell = el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost));
         }
-        return el('tr', { class: (isSubref ? 'row-subref' : '') + (isReutilizavel ? ' row-reut' : '') },
+        return el('tr', { class: (isSubref ? 'row-subref' : '') + (isReutilizavel ? ' row-reut' : '') + (isSubproduto ? ' row-subproduto' : '') },
           nameCell,
           el('td', { class: 'num', 'data-label': 'Qtd' }, fmt.text),
           el('td', { 'data-label': 'Un.' }, fmt.unit || '—'),
@@ -2581,6 +2678,48 @@ function renderAdminEdit(cid, dishId) {
           })
         )
       );
+
+      // Subproduto opcional — ex: "Joelho Cozido" rende joelho + caldo
+      const hasSubproduto = !!(sf.subproduto && sf.subproduto.name);
+      const subprodToggle = el('input', { type: 'checkbox' });
+      if (hasSubproduto) subprodToggle.setAttribute('checked', '');
+      const subprodFields = el('div', { class: 'subproduto-fields', style: hasSubproduto ? '' : 'display:none' });
+      function renderSubprodFields() {
+        subprodFields.innerHTML = '';
+        if (!subprodToggle.checked) { subprodFields.style.display = 'none'; return; }
+        subprodFields.style.display = '';
+        if (!sf.subproduto) sf.subproduto = { id: 'bp-' + uid(), name: '', rendimento_qty: null, rendimento_unit: '' };
+        if (!sf.subproduto.id) sf.subproduto.id = 'bp-' + uid();
+        subprodFields.appendChild(el('p', { class: 'muted', style: 'font-size:0.82rem;margin-bottom:0.5rem;' },
+          'O subproduto tem rendimento próprio e custo R$ 0,00 — o custo total fica no produto principal. Pode ser usado em outras sub-fichas e pratos.'));
+        subprodFields.appendChild(el('div', { class: 'form-grid' },
+          fieldInput('Nome do subproduto', 'text', sf.subproduto.name || '', v => sf.subproduto.name = v.trim()),
+          fieldInput('Rendimento subproduto (qty)', 'number', sf.subproduto.rendimento_qty ?? '', v => {
+            const n = parseFloat(v);
+            sf.subproduto.rendimento_qty = isNaN(n) ? null : n;
+          }),
+          fieldInput('Unidade subproduto', 'text', sf.subproduto.rendimento_unit || '', v => {
+            sf.subproduto.rendimento_unit = v.trim().toLowerCase();
+          })
+        ));
+      }
+      subprodToggle.addEventListener('change', () => {
+        if (!subprodToggle.checked) {
+          if (confirm('Remover o subproduto desta sub-ficha?')) {
+            delete sf.subproduto;
+            renderSubprodFields();
+          } else {
+            subprodToggle.checked = true;
+          }
+        } else {
+          renderSubprodFields();
+        }
+      });
+      renderSubprodFields();
+      box.appendChild(el('label', { class: 'subprod-toggle-label' }, subprodToggle,
+        el('span', {}, ' Esta sub-ficha também gera um subproduto (ex: caldo do joelho cozido)')));
+      box.appendChild(subprodFields);
+
       box.appendChild(el('h4', {}, 'Insumos'));
       const ingList = el('div', {});
       function renderIngs() {
@@ -2695,6 +2834,10 @@ function renderAdminEdit(cid, dishId) {
 
   const dl = el('datalist', { id: 'all-insumos' });
   STATE.insumos.forEach(i => dl.appendChild(el('option', { value: i.name })));
+  // Adiciona subprodutos de todos os pratos como opções (identificadas como "subproduto")
+  listAllSubprodutos().forEach(({ dish: d, subproduto }) => {
+    dl.appendChild(el('option', { value: subproduto.name }, `subproduto de ${d.name}`));
+  });
   panel.appendChild(dl);
 
   panel.appendChild(el('div', { class: 'ficha-actions' },
@@ -2763,6 +2906,9 @@ function buildShoppingList(dish, scales) {
     for (const ing of (sf.ingredientes || [])) {
       if (ing.subref_id) continue;
       if (ing.qty == null) continue;
+      // Subproduto (produzido em outra sub-ficha) — não entra na lista de compras
+      const subprodHit = findSubproduto(ing.insumo_name);
+      if (subprodHit && !(subprodHit.dish.id === dish.id && subprodHit.sf.id === sf.id)) continue;
       const insumo = findInsumo(ing.insumo_id);
       if (!insumo) continue;
       const [qn, pn] = normalizeQtyPrice(ing, insumo);
