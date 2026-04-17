@@ -592,10 +592,11 @@ function downloadExcelTemplate() {
   const wb = XLSX.utils.book_new();
 
   const insumosData = [
-    ['nome', 'unidade', 'preco'],
-    ['Cebola Branca', 'kg', 4.50],
-    ['Sal Refinado', 'kg', 3.20],
-    ['Azeite', 'l', 28.00],
+    ['nome', 'unidade', 'preco', 'reutilizavel'],
+    ['Cebola Branca', 'kg', 4.50, ''],
+    ['Sal Refinado', 'kg', 3.20, ''],
+    ['Azeite', 'l', 28.00, ''],
+    ['Óleo de Fritura', 'l', 9.00, 'sim'],
   ];
   const variacoesData = [
     ['insumo_base', 'variacao', 'fc'],
@@ -641,7 +642,11 @@ async function parseExcelFile(file) {
     const unit = String(r.unidade || 'kg').trim().toLowerCase();
     const price = parseFloat(r.preco) || 0;
     const id = slugify(name);
-    insumosByName[name.toLowerCase()] = { id, name, unit, price };
+    const reut = String(r.reutilizavel || '').trim().toLowerCase();
+    const isReut = reut === 'sim' || reut === 's' || reut === '1' || reut === 'true' || reut === 'x';
+    const payload = { id, name, unit, price };
+    if (isReut) payload.reutilizavel = true;
+    insumosByName[name.toLowerCase()] = payload;
   }
   // Variações
   for (const r of rawVariacoes) {
@@ -1478,11 +1483,13 @@ function subfichaCost(sf, dish, cache = null, visited = null) {
       return { ing, insumo: null, cost, subSf, isSubref: true };
     }
     const insumo = findInsumo(ing.insumo_id);
+    const isReutilizavel = !!(insumo && insumo.reutilizavel);
     const [qNorm, priceNorm] = normalizeQtyPrice(ing, insumo);
     const fc = (typeof ing.fc === 'number' && ing.fc > 0) ? ing.fc : 1;
-    const cost = (qNorm != null && priceNorm != null) ? qNorm * priceNorm * fc : 0;
+    // Insumos reutilizáveis (óleo de fritura, etc) não entram no custo da ficha — vão em despesas operacionais
+    const cost = isReutilizavel ? 0 : ((qNorm != null && priceNorm != null) ? qNorm * priceNorm * fc : 0);
     total += cost;
-    return { ing, insumo, cost, isSubref: false, fc };
+    return { ing, insumo, cost, isSubref: false, fc: isReutilizavel ? 1 : fc, isReutilizavel };
   });
   const result = { rows, total };
   cache.set(sf.id, result);
@@ -1874,10 +1881,14 @@ function renderFichaTrabalho(dish, sf, state, idx) {
     if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
 
     const formatted = formatIngQty(ing, sfScale);
+    const insumoLookup = findInsumo(ing.insumo_id);
+    const isReutilizavel = !!(insumoLookup && insumoLookup.reutilizavel);
     const displayName = (subSf ? '↪ ' : '') + ing.insumo_name + (ing.variation_name ? ` — ${ing.variation_name}` : '');
-    const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
+    const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') + (isReutilizavel ? ' is-reut' : '') },
       el('div', { class: 'k-row-main' },
-        el('span', { class: 'k-name' }, displayName),
+        el('span', { class: 'k-name' }, displayName,
+          isReutilizavel ? el('span', { class: 'reut-badge', title: 'Reutilizável — não entra no custo do prato' }, 'rateio') : null
+        ),
         el('span', { class: 'k-qty' },
           el('span', { class: 'qty-num' }, formatted.text),
           formatted.unit ? el('span', { class: 'qty-unit' }, formatted.unit) : null
@@ -1929,26 +1940,34 @@ function renderFichaCusto(dish, cid) {
         el('th', { class: 'num' }, 'Preço unit.'),
         el('th', { class: 'num' }, 'Custo')
       )),
-      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf, fc }) => {
+      el('tbody', {}, ...rows.map(({ ing, insumo, cost, isSubref, subSf, fc, isReutilizavel }) => {
         const fmt = formatIngQty(ing);
-        let priceTxt, nameCell;
+        let priceTxt, nameCell, costCell;
         if (isSubref && subSf) {
           priceTxt = el('span', { class: 'subref-note' }, `sub-ficha`);
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
             el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
+          costCell = el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost));
+        } else if (isReutilizavel) {
+          const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
+          priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
+          const reutBadge = el('span', { class: 'reut-badge', title: 'Insumo reutilizável — lançar em despesas operacionais, não em CMV' }, 'rateio');
+          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, ' ', reutBadge);
+          costCell = el('td', { class: 'num reut-cost', 'data-label': 'Custo', title: 'Não entra no custo do prato. Lançar em despesas operacionais.' }, 'R$ 0,00');
         } else {
           const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
           priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
           const fcBadge = (fc && fc > 1) ? el('span', { class: 'fc-badge', title: `Fator de correção ${fc}x — considera perda no processamento` }, ` · FC ${fmtNum(fc, 2)}`) : null;
           const varBadge = ing.variation_name ? el('span', { class: 'var-badge', title: 'Variação do insumo' }, ` — ${ing.variation_name}`) : null;
           nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, varBadge, fcBadge);
+          costCell = el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost));
         }
-        return el('tr', { class: isSubref ? 'row-subref' : '' },
+        return el('tr', { class: (isSubref ? 'row-subref' : '') + (isReutilizavel ? ' row-reut' : '') },
           nameCell,
           el('td', { class: 'num', 'data-label': 'Qtd' }, fmt.text),
           el('td', { 'data-label': 'Un.' }, fmt.unit || '—'),
           el('td', { class: 'num', 'data-label': 'Preço unit.' }, priceTxt),
-          el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost))
+          costCell
         );
       })),
       el('tfoot', {}, el('tr', {},
@@ -2100,6 +2119,7 @@ function renderInsumos(cid) {
       el('th', {}, 'Insumo'),
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
+      el('th', { title: 'Insumos reutilizáveis (óleo de fritura, etc) não entram no custo do prato — devem ir em despesas operacionais' }, 'Rateio'),
       el('th', {}, 'Variações'),
       el('th', {}, 'Usado em')
     ))
@@ -2143,14 +2163,26 @@ function renderInsumos(cid) {
           onclick: () => openVariationsModal(cid, insumo)
         }, varCount > 0 ? `${varCount} variação${varCount > 1 ? 'ões' : ''}` : '+ adicionar');
         if (!canFullEdit) varBtn.disabled = true;
+        const reutInput = el('input', { type: 'checkbox', class: 'reut-check', title: 'Insumo reutilizável — não entra no custo do prato' });
+        if (insumo.reutilizavel) reutInput.setAttribute('checked', '');
+        if (!canFullEdit) reutInput.disabled = true;
+        reutInput.addEventListener('change', () => {
+          if (reutInput.checked) {
+            insumo.reutilizavel = true;
+          } else {
+            delete insumo.reutilizavel;
+          }
+          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+        });
         const cells = [
-          el('td', { 'data-label': 'Insumo' }, insumo.name),
+          el('td', { 'data-label': 'Insumo' }, insumo.name, insumo.reutilizavel ? el('span', { class: 'reut-badge-inline' }, 'rateio') : null),
           el('td', { 'data-label': 'Unidade' }, unitInput),
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
+          el('td', { 'data-label': 'Rateio', class: 'reut-cell' }, reutInput),
           el('td', { 'data-label': 'Variações' }, varBtn),
           el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
         ];
-        tbody.appendChild(el('tr', {}, ...cells));
+        tbody.appendChild(el('tr', { class: insumo.reutilizavel ? 'is-reut-row' : '' }, ...cells));
       });
   }
   buildRows();
@@ -2325,10 +2357,14 @@ function openNovoInsumoModal(cid) {
         const nameInput = el('input', { type: 'text', placeholder: 'Ex: Farinha de Arroz' });
         const unitInput = buildUnitSelect('kg');
         const priceInput = el('input', { type: 'number', min: '0', step: '0.01', placeholder: '0,00' });
+        const reutInput = el('input', { type: 'checkbox' });
         const formEl = el('div', { class: 'form-grid' },
           el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
           el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Unidade'), unitInput),
-          el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Preço (R$)'), priceInput)
+          el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Preço (R$)'), priceInput),
+          el('label', { class: 'field field-inline' }, reutInput,
+            el('span', { class: 'label-text', style: 'margin-left:0.5rem;' },
+              'Reutilizável (óleo de fritura, gás etc.) — não entra no custo do prato'))
         );
         modal.__submit = async () => {
           const name = nameInput.value.trim();
@@ -2338,7 +2374,9 @@ function openNovoInsumoModal(cid) {
           const id = slugify(name);
           if (STATE.insumos.find(i => i.id === id)) { alert('Já existe um insumo com esse nome'); return; }
           try {
-            await saveInsumo(cid, { id, name, unit, price });
+            const payload = { id, name, unit, price };
+            if (reutInput.checked) payload.reutilizavel = true;
+            await saveInsumo(cid, payload);
             toast('Insumo criado');
             modal.remove();
           } catch (err) { toast('Erro: ' + err.message); }
@@ -2555,9 +2593,18 @@ function renderAdminEdit(cid, dishId) {
           const varSelect = el('select', { class: 'var-select', title: 'Variação (ex: brunoise, julienne)' });
           function rebuildVarSelect() {
             const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
+            const isReut = !!(match && match.reutilizavel);
+            // Oculta FC e limpa se insumo é reutilizável
+            if (isReut) {
+              fcInput.style.display = 'none';
+              fcInput.value = '';
+              delete ing.fc;
+            } else {
+              fcInput.style.display = '';
+            }
             varSelect.innerHTML = '';
             const vars = (match && Array.isArray(match.variations)) ? match.variations : [];
-            if (vars.length === 0) {
+            if (vars.length === 0 || isReut) {
               varSelect.style.display = 'none';
               return;
             }
@@ -2720,11 +2767,13 @@ function buildShoppingList(dish, scales) {
       if (!insumo) continue;
       const [qn, pn] = normalizeQtyPrice(ing, insumo);
       if (qn == null || pn == null) continue;
-      const fc = ing.fc || 1;
+      // Insumos reutilizáveis: aparecem na lista mas com custo zero (lançar em despesas operacionais)
+      const isReutilizavel = !!insumo.reutilizavel;
+      const fc = isReutilizavel ? 1 : (ing.fc || 1);
       const key = ing.insumo_id;
-      if (!agg[key]) agg[key] = { name: insumo.name, unit: insumo.unit, qty: 0, cost: 0 };
+      if (!agg[key]) agg[key] = { name: insumo.name, unit: insumo.unit, qty: 0, cost: 0, isReutilizavel };
       agg[key].qty += qn * scale * fc;
-      agg[key].cost += qn * pn * scale * fc;
+      agg[key].cost += isReutilizavel ? 0 : (qn * pn * scale * fc);
     }
   }
   return Object.values(agg).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
@@ -2784,7 +2833,8 @@ function exportFichaPDF(dish, state) {
         head: [['Insumo', 'Quantidade total']],
         body: shopping.map(s => {
           const norm = normUnitForDisplay(s.qty, s.unit);
-          return [s.name, `${norm.text} ${norm.unit}`.trim()];
+          const label = s.isReutilizavel ? `${s.name} (rateio)` : s.name;
+          return [label, `${norm.text} ${norm.unit}`.trim()];
         }),
         theme: 'plain',
         headStyles: headStyle, bodyStyles: bodyStyle, alternateRowStyles: altRowStyle,
@@ -2981,7 +3031,8 @@ function exportFichaXLSX(dish, state) {
       ['Insumo', 'Quantidade', 'Unidade', 'Custo'],
       ...shopping.map(s => {
         const norm = normUnitForDisplay(s.qty, s.unit);
-        return [s.name, norm.text, norm.unit, s.cost];
+        const label = s.isReutilizavel ? `${s.name} (rateio — despesas)` : s.name;
+        return [label, norm.text, norm.unit, s.cost];
       }),
       [],
       ['TOTAL', '', '', shopping.reduce((t, s) => t + s.cost, 0)]

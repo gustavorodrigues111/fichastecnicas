@@ -481,6 +481,53 @@ table.ficha-table {
 .fc-badge[title]:hover { text-decoration: underline dotted; }
 .var-badge { color: #8a6b40; font-size: 0.82rem; font-style: italic; }
 
+/* ============ Insumo reutilizável (rateio) ============ */
+.reut-badge {
+  display: inline-block;
+  padding: 0.08rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #6a5530;
+  background: #f3e9d2;
+  border: 1px solid #e0d4a8;
+  border-radius: 2px;
+  margin-left: 0.4rem;
+  letter-spacing: 0.02em;
+  cursor: help;
+  vertical-align: middle;
+}
+.reut-badge-inline {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #6a5530;
+  background: #f3e9d2;
+  border: 1px solid #e0d4a8;
+  margin-left: 0.4rem;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.reut-cost {
+  color: #a0a0a0 !important;
+  font-style: italic;
+  cursor: help;
+}
+tr.row-reut td { background: #fafaf2; }
+tr.row-reut .num { color: #a0a0a0; }
+tr.is-reut-row td:first-child { border-left: 2px solid #d4b97b; padding-left: calc(0.75rem - 2px); }
+.kitchen-ing.is-reut .k-name { color: #6a5530; }
+.reut-cell { text-align: center; }
+.reut-check { cursor: pointer; }
+.field-inline {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  padding: 0.3rem 0;
+  cursor: pointer;
+}
+.field-inline .label-text { font-size: 0.85rem; color: #555; margin-top: 0; }
+
 /* ============ Variations modal ============ */
 .modal-wide .modal-content,
 .modal .modal-wide { max-width: 620px; }
