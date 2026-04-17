@@ -247,6 +247,38 @@ async function loadClientesList() {
   }
 }
 
+// ---------- Sync de preços apenas (sem mexer em fichas ou outros campos) ----------
+async function syncPricesOnly(cid) {
+  if (!isAdmin && !isStaff()) { toast('Sem permissão'); return; }
+  const msg = 'Atualizar preços dos insumos deste restaurante usando os valores do arquivo data.json?\n\n• SEGURO: só altera preços. Não mexe em fichas, não adiciona nem remove insumos.\n• Preços existentes > 0 são sobrescritos pelos do arquivo.';
+  if (!confirm(msg)) return;
+  try {
+    toast('Sincronizando preços...');
+    const resp = await fetch('data/data.json');
+    const seed = await resp.json();
+    const seedPrices = {};
+    for (const ins of (seed.insumos || [])) {
+      if (typeof ins.price === 'number' && ins.price > 0) seedPrices[ins.id] = ins.price;
+    }
+    const snap = await getDocs(insumosCol(cid));
+    let batch = writeBatch(db);
+    let count = 0, updated = 0;
+    for (const d of snap.docs) {
+      if (seedPrices[d.id] != null) {
+        batch.update(insumoDoc(cid, d.id), { price: seedPrices[d.id] });
+        updated++;
+        count++;
+        if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+      }
+    }
+    if (count > 0) await batch.commit();
+    toast(`✓ ${updated} preços atualizados`);
+  } catch (err) {
+    console.error(err);
+    toast('Erro ao sincronizar: ' + err.message);
+  }
+}
+
 // ---------- Seed / migration ----------
 async function seedClienteFromJson(cid, clienteName) {
   toast('Importando dados do arquivo inicial...');
@@ -522,67 +554,69 @@ async function renderClientesAdmin() {
   await loadClientesList();
   app.innerHTML = '';
 
-  app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar'));
-  const header = el('div', { class: 'page-header' },
+  app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar para Restaurantes'));
+  app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar restaurantes'),
-      el('p', {}, 'Crie, renomeie ou exclua restaurantes (clientes).')
+      el('p', {}, 'Crie novos restaurantes, importe dados, sincronize preços ou exclua.')
     )
-  );
-  app.appendChild(header);
+  ));
 
-  // Create new form
-  const createPanel = el('div', { class: 'admin-panel' },
-    el('h3', {}, 'Novo restaurante')
+  // Create new panel — cleaner form
+  const createPanel = el('section', { class: 'admin-panel-card' },
+    el('h3', {}, 'Novo restaurante'),
+    el('p', { class: 'muted' }, 'Digite o nome do restaurante. O ID é gerado automaticamente.')
   );
-  const nameInput = el('input', { type: 'text', placeholder: 'Nome do restaurante', style: 'padding:0.6rem;border:1px solid #d8d5cb;flex:1;' });
+  const nameInput = el('input', { type: 'text', placeholder: 'Ex: Diz que me Disse', class: 'inline-input' });
   const createBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
     const name = nameInput.value.trim();
     if (!name) { alert('Informe o nome'); return; }
     const id = slugify(name);
     try {
       await saveCliente({ id, name, slug: id, createdAt: serverTimestamp() });
-      // If I'm master or staff, ensure my clienteIds includes this? Master doesn't need it.
-      // Seed with initial data? No — user picks.
       toast('Restaurante criado');
       nameInput.value = '';
       renderClientesAdmin();
     } catch (err) { toast('Erro: ' + err.message); }
-  } }, 'Criar');
-  const form = el('div', { style: 'display:flex;gap:0.5rem;margin-top:0.5rem;' }, nameInput, createBtn);
-  createPanel.appendChild(form);
+  } }, '+ Criar');
+  createPanel.appendChild(el('div', { class: 'inline-form' }, nameInput, createBtn));
   app.appendChild(createPanel);
 
   // List existing
-  const listPanel = el('div', { class: 'admin-panel' },
-    el('h3', {}, 'Restaurantes existentes')
-  );
   if (STATE.clientes.length === 0) {
-    listPanel.appendChild(el('p', { class: 'muted' }, 'Nenhum restaurante cadastrado.'));
-  } else {
-    const list = el('div', { class: 'dish-admin-list' });
-    STATE.clientes.forEach(c => {
-      const item = el('div', { class: 'dish-admin-item' },
-        el('div', { class: 'info' },
-          el('h4', {}, c.name),
-          el('p', {}, c.id)
-        ),
-        el('div', { class: 'dish-admin-actions' },
-          el('a', { class: 'btn btn-small', href: `#/c/${c.id}` }, 'Abrir'),
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', { class: 'muted' }, 'Nenhum restaurante cadastrado ainda.')
+    ));
+    return;
+  }
+
+  const gridTitle = el('h3', { class: 'section-title' }, `Restaurantes cadastrados (${STATE.clientes.length})`);
+  app.appendChild(gridTitle);
+
+  const grid = el('div', { class: 'cliente-admin-grid' });
+  STATE.clientes.forEach(c => {
+    const card = el('article', { class: 'cliente-admin-card' },
+      el('div', { class: 'cc-head' },
+        el('h4', { class: 'cc-name' }, c.name),
+        el('span', { class: 'cc-id' }, c.id)
+      ),
+      el('div', { class: 'cc-actions' },
+        el('a', { class: 'btn btn-primary btn-block', href: `#/c/${c.id}` }, 'Abrir restaurante →'),
+        el('div', { class: 'cc-menu' },
           el('button', { class: 'btn btn-small', onclick: async () => {
             const newName = prompt('Novo nome:', c.name);
             if (!newName || newName === c.name) return;
             try { await saveCliente({ ...c, name: newName }); toast('Renomeado'); renderClientesAdmin(); }
             catch (err) { toast('Erro: ' + err.message); }
-          } }, 'Renomear'),
+          } }, '✎ Renomear'),
+          el('button', { class: 'btn btn-small btn-accent', onclick: () => syncPricesOnly(c.id), title: 'Atualiza só os preços dos insumos com valores do data.json' }, '₴ Atualizar preços'),
           el('button', { class: 'btn btn-small', onclick: () => {
-            if (!confirm(`Seed de dados iniciais (da planilha) em "${c.name}"? Sobrescreve fichas e insumos — preços existentes são preservados.`)) return;
+            if (!confirm(`Reimportar dados iniciais em "${c.name}"?\n\n• Sobrescreve fichas com versão do data.json\n• Preços existentes > 0 são preservados\n• Insumos e fichas órfãos são excluídos`)) return;
             seedClienteFromJson(c.id, c.name).catch(e => toast('Erro: ' + e.message));
-          } }, 'Seed inicial'),
+          }, title: 'Reimporta TUDO do data.json (sobrescreve fichas)' }, '⟳ Reimportar tudo'),
           el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-            if (!confirm(`EXCLUIR "${c.name}"?\n\nAtenção: vai tentar deletar também todas as fichas e insumos desse cliente. Baixe um backup antes se não quiser perder.`)) return;
+            if (!confirm(`EXCLUIR "${c.name}"?\n\nIsso apaga fichas, insumos e configs. Baixe um backup antes se houver dados importantes.`)) return;
             try {
-              // Delete all subcollections
               const [dSnap, iSnap] = await Promise.all([getDocs(dishesCol(c.id)), getDocs(insumosCol(c.id))]);
               let batch = writeBatch(db), cnt = 0;
               for (const d of dSnap.docs) { batch.delete(dishDoc(c.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
@@ -592,165 +626,192 @@ async function renderClientesAdmin() {
               await batch.commit();
               toast('Restaurante excluído'); renderClientesAdmin();
             } catch (err) { toast('Erro: ' + err.message); }
-          } }, 'Excluir')
+          } }, '× Excluir')
         )
-      );
-      list.appendChild(item);
-    });
-    listPanel.appendChild(list);
-  }
-  app.appendChild(listPanel);
+      )
+    );
+    grid.appendChild(card);
+  });
+  app.appendChild(grid);
 }
 
 // ---------- Views: Usuários Admin (master only) ----------
 async function renderUsuariosAdmin() {
   const app = $('#app');
   renderLoadingScreen();
-  // Load users + clientes
   const [usersSnap] = await Promise.all([getDocs(collection(db, 'users'))]);
   await loadClientesList();
   const users = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
   app.innerHTML = '';
 
-  app.appendChild(el('a', { href: '#/', class: 'back-link' }, '← Voltar'));
+  app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar'));
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Usuários'),
-      el('p', {}, 'Adicione equipe e clientes. Papel define o que podem fazer.')
+      el('p', {}, 'Equipe e clientes. Papel define o que cada um pode fazer.')
     )
   ));
 
-  // Invite form
-  const invitePanel = el('div', { class: 'admin-panel' },
-    el('h3', {}, 'Convidar novo usuário')
+  // Invite form — cleaner layout
+  const invitePanel = el('section', { class: 'admin-panel-card' },
+    el('h3', {}, 'Convidar novo usuário'),
+    el('p', { class: 'muted' }, 'Ao salvar, um email será enviado com link para a pessoa definir sua própria senha.')
   );
+
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
-  const nameInput = el('input', { type: 'text', placeholder: 'Nome' });
+  const nameInput = el('input', { type: 'text', placeholder: 'Nome completo' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Equipe (admin nos clientes atribuídos)'),
-    el('option', { value: 'cliente' }, 'Cliente (só visualiza + edita preços do seu cliente)'),
-    el('option', { value: 'master' }, 'Master (acesso total)')
+    el('option', { value: 'staff' }, 'Equipe — admin completo nos restaurantes atribuídos'),
+    el('option', { value: 'cliente' }, 'Cliente — visualiza e edita só preços'),
+    el('option', { value: 'master' }, 'Master — acesso total')
   );
-  const clienteChecks = el('div', { class: 'equipamentos-select', style: 'max-height:180px;' });
+  const clienteChecks = el('div', { class: 'cliente-chip-picker' });
   STATE.clientes.forEach(c => {
-    const lbl = el('label', {},
-      (() => { const i = el('input', { type: 'checkbox', value: c.id }); return i; })(),
-      document.createTextNode(' ' + c.name)
-    );
-    clienteChecks.appendChild(lbl);
+    const input = el('input', { type: 'checkbox', value: c.id, id: 'inv-c-' + c.id });
+    clienteChecks.appendChild(el('label', { class: 'cliente-chip-option', for: 'inv-c-' + c.id }, input, document.createTextNode(c.name)));
   });
-  const inviteForm = el('div', { class: 'form-grid' },
+  invitePanel.appendChild(el('div', { class: 'form-grid' },
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Email'), emailInput),
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
-    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect),
-  );
-  const clienteField = el('label', { class: 'field' },
-    el('span', { class: 'label-text' }, 'Restaurantes autorizados'),
+    el('label', { class: 'field field-wide' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
+  ));
+  invitePanel.appendChild(el('label', { class: 'field' },
+    el('span', { class: 'label-text' }, 'Restaurantes autorizados (obrigatório para staff e cliente)'),
     clienteChecks
-  );
-  const inviteBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
-    const email = emailInput.value.trim();
-    const name = nameInput.value.trim() || email;
-    const role = roleSelect.value;
-    const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
-    if (!email) { alert('Informe email'); return; }
-    if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
-    try {
-      await inviteUser(email, name, role, selected);
-    } catch (err) { alert('Erro: ' + err.message); }
-  } }, 'Criar + Enviar email de senha');
-  invitePanel.appendChild(inviteForm);
-  invitePanel.appendChild(clienteField);
-  invitePanel.appendChild(el('div', { style: 'margin-top:1rem;' }, inviteBtn));
-  invitePanel.appendChild(el('p', { class: 'muted', style: 'font-size:0.85rem;margin-top:0.5rem;' },
-    'Ao criar, será enviado um email automático do Firebase com link para o usuário definir sua própria senha.'));
+  ));
+  invitePanel.appendChild(el('div', { class: 'panel-actions' },
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      const email = emailInput.value.trim();
+      const name = nameInput.value.trim() || email.split('@')[0];
+      const role = roleSelect.value;
+      const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
+      if (!email) { alert('Informe email'); return; }
+      if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+      try {
+        await inviteUser(email, name, role, selected);
+      } catch (err) { alert('Erro: ' + err.message); }
+    } }, 'Enviar convite')
+  ));
   app.appendChild(invitePanel);
 
-  // Existing users list
-  const listPanel = el('div', { class: 'admin-panel' },
-    el('h3', {}, 'Usuários cadastrados')
-  );
+  // Existing users — list of cards
+  app.appendChild(el('h3', { class: 'section-title' }, `Usuários cadastrados (${users.length})`));
   if (users.length === 0) {
-    listPanel.appendChild(el('p', { class: 'muted' }, 'Nenhum usuário ainda.'));
-  } else {
-    const tbl = el('table', { class: 'users-table' },
-      el('thead', {}, el('tr', {},
-        el('th', {}, 'Nome / Email'),
-        el('th', {}, 'Papel'),
-        el('th', {}, 'Restaurantes'),
-        el('th', {}, '')
-      )),
-      el('tbody', {}, ...users.map(u => el('tr', {},
-        el('td', {}, (u.name || '—') + ' · ' + el('span', { class: 'muted' }, u.email).outerHTML || u.email),
-        el('td', {}, u.role || '—'),
-        el('td', {}, (u.clienteIds || []).map(cid => STATE.clientes.find(c => c.id === cid)?.name || cid).join(', ') || '—'),
-        el('td', {},
-          el('button', { class: 'btn btn-small', onclick: () => editUserDialog(u) }, 'Editar'),
-          ' ',
-          u.uid !== STATE.user.uid
-            ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-                if (!confirm(`Remover acesso de ${u.email}? (não deleta a conta no Firebase Auth, apenas remove permissões no site)`)) return;
-                try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
-                catch (err) { toast('Erro: ' + err.message); }
-              } }, 'Remover')
-            : null
-        )
-      )))
-    );
-    // Fix innerHTML workaround: rebuild rows cleanly
-    listPanel.appendChild(buildUsersTable(users));
-  }
-  app.appendChild(listPanel);
-}
-
-function buildUsersTable(users) {
-  const tbl = el('table', { class: 'users-table' },
-    el('thead', {}, el('tr', {},
-      el('th', {}, 'Email'),
-      el('th', {}, 'Nome'),
-      el('th', {}, 'Papel'),
-      el('th', {}, 'Restaurantes'),
-      el('th', {}, '')
-    ))
-  );
-  const tbody = el('tbody', {});
-  users.forEach(u => {
-    const clienteNames = (u.clienteIds || []).map(cid =>
-      STATE.clientes.find(c => c.id === cid)?.name || cid).join(', ') || '—';
-    tbody.appendChild(el('tr', {},
-      el('td', { 'data-label': 'Email' }, u.email),
-      el('td', { 'data-label': 'Nome' }, u.name || '—'),
-      el('td', { 'data-label': 'Papel' }, u.role || '—'),
-      el('td', { 'data-label': 'Restaurantes' }, clienteNames),
-      el('td', { 'data-label': '' },
-        el('button', { class: 'btn btn-small', onclick: () => editUserDialog(u) }, 'Editar'),
-        ' ',
-        u.uid !== STATE.user.uid
-          ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-              if (!confirm(`Remover acesso de ${u.email}?`)) return;
-              try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
-              catch (err) { toast('Erro: ' + err.message); }
-            } }, 'Remover')
-          : el('span', { class: 'muted' }, '(você)')
-      )
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', { class: 'muted' }, 'Nenhum usuário ainda.')
     ));
-  });
-  tbl.appendChild(tbody);
-  return tbl;
+    return;
+  }
+  const grid = el('div', { class: 'user-admin-list' });
+  users.forEach(u => grid.appendChild(renderUserCard(u)));
+  app.appendChild(grid);
 }
 
-async function editUserDialog(u) {
-  const newRole = prompt('Papel (master / staff / cliente):', u.role || 'staff');
-  if (!newRole) return;
-  if (!['master', 'staff', 'cliente'].includes(newRole)) { alert('Papel inválido'); return; }
-  const idsStr = prompt('IDs dos restaurantes autorizados (separados por vírgula):', (u.clienteIds || []).join(','));
-  if (idsStr == null) return;
-  const clienteIds = idsStr.split(',').map(s => s.trim()).filter(Boolean);
-  try {
-    await setDoc(doc(db, 'users', u.uid), { ...u, role: newRole, clienteIds }, { merge: true });
-    toast('Atualizado');
-    renderUsuariosAdmin();
-  } catch (err) { toast('Erro: ' + err.message); }
+function roleLabel(role) {
+  return { master: 'Master', staff: 'Equipe', cliente: 'Cliente' }[role] || role || '—';
+}
+
+function renderUserCard(u) {
+  const isMe = u.uid === STATE.user?.uid;
+  const card = el('article', { class: 'user-card' });
+  const head = el('div', { class: 'user-card-head' },
+    el('div', { class: 'user-id' },
+      el('h4', { class: 'user-name' }, u.name || '—'),
+      el('span', { class: 'user-email' }, u.email)
+    ),
+    el('span', { class: 'role-badge role-' + (u.role || 'none') }, roleLabel(u.role))
+  );
+  card.appendChild(head);
+
+  // Clientes as chips
+  if (u.role !== 'master') {
+    const chipRow = el('div', { class: 'user-chips' });
+    const ids = u.clienteIds || [];
+    if (ids.length === 0) {
+      chipRow.appendChild(el('span', { class: 'muted' }, 'Nenhum restaurante atribuído'));
+    } else {
+      ids.forEach(cid => {
+        const cname = STATE.clientes.find(c => c.id === cid)?.name || cid;
+        chipRow.appendChild(el('span', { class: 'user-chip' }, cname));
+      });
+    }
+    card.appendChild(chipRow);
+  } else {
+    card.appendChild(el('div', { class: 'user-chips' },
+      el('span', { class: 'muted' }, 'Acesso total a todos os restaurantes')));
+  }
+
+  // Actions
+  const actions = el('div', { class: 'user-actions' });
+  if (isMe) {
+    actions.appendChild(el('span', { class: 'muted' }, '(você)'));
+  } else {
+    actions.appendChild(el('button', { class: 'btn btn-small btn-primary', onclick: () => openEditUserModal(u) }, 'Editar'));
+    actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+      if (!confirm(`Remover acesso de ${u.email}?\n\nIsso só remove permissões no site. A conta no Firebase Auth permanece — delete lá também se quiser banir de vez.`)) return;
+      try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
+      catch (err) { toast('Erro: ' + err.message); }
+    } }, 'Remover'));
+  }
+  card.appendChild(actions);
+  return card;
+}
+
+function openEditUserModal(u) {
+  // Create modal dynamically
+  const existing = $('#edit-user-modal');
+  if (existing) existing.remove();
+
+  const emailEl = el('div', { class: 'modal-read' }, el('span', { class: 'label-text' }, 'Email'), el('div', {}, u.email));
+  const nameInput = el('input', { type: 'text', value: u.name || '' });
+  const roleSelect = el('select', {},
+    el('option', { value: 'staff' }, 'Equipe'),
+    el('option', { value: 'cliente' }, 'Cliente'),
+    el('option', { value: 'master' }, 'Master')
+  );
+  roleSelect.value = u.role || 'staff';
+
+  const clienteChecks = el('div', { class: 'cliente-chip-picker' });
+  const currentIds = new Set(u.clienteIds || []);
+  STATE.clientes.forEach(c => {
+    const input = el('input', { type: 'checkbox', value: c.id, id: 'edit-c-' + c.id });
+    if (currentIds.has(c.id)) input.setAttribute('checked', '');
+    clienteChecks.appendChild(el('label', { class: 'cliente-chip-option', for: 'edit-c-' + c.id }, input, document.createTextNode(c.name)));
+  });
+
+  const modal = el('div', { class: 'modal', id: 'edit-user-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content modal-content-wide' },
+      el('h2', {}, 'Editar usuário'),
+      el('p', { class: 'modal-subtitle' }, u.email),
+      el('div', { class: 'form-grid' },
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
+      ),
+      el('label', { class: 'field' },
+        el('span', { class: 'label-text' }, 'Restaurantes autorizados'),
+        clienteChecks
+      ),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: async () => {
+          const role = roleSelect.value;
+          const ids = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
+          if (role !== 'master' && ids.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+          try {
+            await setDoc(doc(db, 'users', u.uid), {
+              ...u, name: nameInput.value.trim() || u.email,
+              role, clienteIds: ids
+            }, { merge: true });
+            toast('Atualizado');
+            modal.remove();
+            renderUsuariosAdmin();
+          } catch (err) { toast('Erro: ' + err.message); }
+        } }, 'Salvar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 async function inviteUser(email, name, role, clienteIds) {
