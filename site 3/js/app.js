@@ -1289,32 +1289,71 @@ function renderFichaCusto(dish, currentSf, cid) {
   );
   wrap.appendChild(total);
 
-  // CMV alvo → preço sugerido, markup calculado
-  const cost = el('div', { class: 'cost-summary' });
-  const currentCmv = dish.target_cmv || 30;  // padrão 30%
-  const cmvInput = el('input', { type: 'number', min: '1', max: '100', step: '1', value: String(currentCmv) });
-  if (!canEditCliente(cid)) cmvInput.disabled = true;
-  cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'CMV alvo (%)'), cmvInput));
-  // Preço calculado: price = cost / (cmv/100)
-  const computedPrice = currentCmv > 0 ? all.costPerPortion / (currentCmv / 100) : 0;
-  const computedMarkup = all.costPerPortion > 0 ? ((computedPrice / all.costPerPortion) - 1) * 100 : 0;
-  const priceSpan = el('span', { class: 'stat-value accent' }, fmtBRL(computedPrice));
-  cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'Preço de venda sugerido'), priceSpan));
-  const markupSpan = el('span', { class: 'stat-value' }, fmtNum(computedMarkup, 0) + '%');
-  cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'Markup calculado'), markupSpan));
+  // 3 campos bidirecionais: CMV / Markup / Preço de Venda
+  // Edite qualquer um → os outros 2 se ajustam. Armazena target_cmv como fonte de verdade.
+  const costBox = el('div', { class: 'cost-summary' });
+  const costPP = all.costPerPortion;
+  const initialCmv = dish.target_cmv || 30;
+  const initialPrice = costPP > 0 ? costPP / (initialCmv / 100) : 0;
+  const initialMarkup = costPP > 0 ? ((initialPrice / costPP) - 1) * 100 : 0;
+
+  const editable = canEditCliente(cid);
+  const cmvInput = el('input', { type: 'number', min: '1', max: '100', step: '0.5', value: initialCmv.toFixed(1) });
+  const markupInput = el('input', { type: 'number', min: '0', step: '1', value: initialMarkup.toFixed(0) });
+  const priceInput = el('input', { type: 'number', min: '0', step: '0.50', value: initialPrice.toFixed(2) });
+  if (!editable) { cmvInput.disabled = true; markupInput.disabled = true; priceInput.disabled = true; }
+
+  costBox.appendChild(el('div', { class: 'stat' },
+    el('span', { class: 'stat-label' }, 'CMV (%)'), cmvInput));
+  costBox.appendChild(el('div', { class: 'stat' },
+    el('span', { class: 'stat-label' }, 'Markup (%)'), markupInput));
+  costBox.appendChild(el('div', { class: 'stat' },
+    el('span', { class: 'stat-label' }, 'Preço de venda'), priceInput));
+  wrap.appendChild(costBox);
+
+  // Handlers — evita loop infinito usando flag
+  let internalUpdate = false;
+  function save() { scheduleSave('dish-' + dish.id, () => saveDish(STATE.currentClienteId, dish)); }
+
   cmvInput.addEventListener('input', () => {
-    const newCmv = parseFloat(cmvInput.value) || 0;
-    dish.target_cmv = newCmv;
-    const newPrice = newCmv > 0 ? all.costPerPortion / (newCmv / 100) : 0;
-    const newMarkup = all.costPerPortion > 0 ? ((newPrice / all.costPerPortion) - 1) * 100 : 0;
-    priceSpan.textContent = fmtBRL(newPrice);
-    markupSpan.textContent = fmtNum(newMarkup, 0) + '%';
-    scheduleSave('dish-' + dish.id, () => saveDish(STATE.currentClienteId, dish));
+    if (internalUpdate) return;
+    const cmv = parseFloat(cmvInput.value);
+    if (isNaN(cmv) || cmv <= 0) return;
+    dish.target_cmv = cmv;
+    const price = costPP / (cmv / 100);
+    const markup = ((price / costPP) - 1) * 100;
+    internalUpdate = true;
+    priceInput.value = price.toFixed(2);
+    markupInput.value = markup.toFixed(0);
+    internalUpdate = false;
+    save();
   });
-  wrap.appendChild(cost);
+  markupInput.addEventListener('input', () => {
+    if (internalUpdate) return;
+    const markup = parseFloat(markupInput.value);
+    if (isNaN(markup) || markup < 0) return;
+    const price = costPP * (1 + markup / 100);
+    const cmv = price > 0 ? (costPP / price) * 100 : 0;
+    dish.target_cmv = cmv;
+    internalUpdate = true;
+    cmvInput.value = cmv.toFixed(1);
+    priceInput.value = price.toFixed(2);
+    internalUpdate = false;
+    save();
+  });
+  priceInput.addEventListener('input', () => {
+    if (internalUpdate) return;
+    const price = parseFloat(priceInput.value);
+    if (isNaN(price) || price <= 0) return;
+    const cmv = (costPP / price) * 100;
+    const markup = ((price / costPP) - 1) * 100;
+    dish.target_cmv = cmv;
+    internalUpdate = true;
+    cmvInput.value = cmv.toFixed(1);
+    markupInput.value = markup.toFixed(0);
+    internalUpdate = false;
+    save();
+  });
 
   return wrap;
 }
@@ -1447,7 +1486,7 @@ function renderAdminEdit(cid, dishId) {
   panel.appendChild(el('div', { class: 'form-grid' },
     fieldInput('Nome do prato', 'text', dish.name, v => dish.name = v),
     fieldInput('Louça / apresentação', 'text', dish.louca, v => dish.louca = v),
-    fieldInput('Markup sugerido (%)', 'number', dish.markup, v => dish.markup = parseFloat(v) || 0)
+    fieldInput('CMV alvo (%)', 'number', dish.target_cmv || 30, v => dish.target_cmv = parseFloat(v) || 30)
   ));
   panel.appendChild(el('h3', {}, 'Fotos (até 3)'));
   const photoWrap = el('div', { class: 'photo-upload' });
@@ -1743,7 +1782,7 @@ function exportFichaPDF(dish, state) {
     docPdf.text(fmtBRL(all.suggestedPrice), margin + col * 2 + 5, y + 18);
     y += 32;
     docPdf.setTextColor(80).setFont('helvetica', 'normal').setFontSize(9);
-    docPdf.text(`Markup: ${dish.markup}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
+    docPdf.text(`Markup: ${fmtNum(all.markup, 0)}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
   }
   const suffix = state.scaleFactor !== 1 ? `-escalado${fmtNum(state.scaleFactor, 2)}x` : '';
   docPdf.save(`${slugify(dish.name)}-${isTrabalho ? 'trabalho' : 'custo'}${suffix}.pdf`);
@@ -1762,7 +1801,7 @@ function exportFichaXLSX(dish, state) {
     ['Custo total', all.total],
     ['Porções', all.portions],
     ['Custo por porção', all.costPerPortion],
-    ['Markup (%)', dish.markup],
+    ['Markup (%)', all.markup],
     ['Preço de venda sugerido', all.suggestedPrice],
     ['CMV (%)', all.cmv],
     [],
