@@ -1285,7 +1285,7 @@ function renderClienteHome(cid) {
     const showCost = canEditInsumoPrice(cid);
     const dishGroup = el('article', { class: 'dish-group' },
       el('header', { class: 'dish-head' },
-        el('a', { class: 'dish-title', href: finalSfId ? `#/c/${cid}/ficha/${dish.id}/${finalSfId}` : `#/c/${cid}/ficha/${dish.id}` },
+        el('a', { class: 'dish-title', href: `#/c/${cid}/ficha/${dish.id}` },
           el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
           el('span', { class: 'dish-name' }, dish.name)
         ),
@@ -1447,8 +1447,10 @@ function renderFicha(cid, dishId, initialSfId = null) {
   toggle.addEventListener('click', e => { if (e.target.dataset.view) { state.view = e.target.dataset.view; updateBody(); } });
   updateBody();
 
-  // Scroll pra sub-ficha se vier do cardápio com /ficha/X/Y
-  if (initialSfId) {
+  // Scroll pra sub-ficha específica SE vier do cardápio de uma sub-ficha que NÃO é a final
+  // (a final já é renderizada primeiro na ordem invertida; scroll não é necessário)
+  const finalId = dish.sub_fichas[dish.sub_fichas.length - 1]?.id;
+  if (initialSfId && initialSfId !== finalId) {
     setTimeout(() => {
       const target = document.getElementById(`sf-${initialSfId}`);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });

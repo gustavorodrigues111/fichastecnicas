@@ -181,7 +181,7 @@ main { padding: 3rem 0 4rem; flex: 1; }
   border: 1px solid #ebe9e1;
   padding: 1.75rem 2rem;
   margin-bottom: 1.25rem;
-  scroll-margin-top: 1rem;
+  scroll-margin-top: 80px;  /* compensa action-bar sticky + nav */
 }
 .sf-card.sf-final {
   border-left: 3px solid #b8955e;
@@ -1748,7 +1748,7 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .sf-cost-head { flex-direction: column; gap: 0.3rem; align-items: flex-start; margin-bottom: 0.6rem; }
   .sf-cost-title { font-size: 1.15rem; }
 
-  /* Tabela vira lista vertical */
+  /* Tabela vira lista vertical com posicionamento absoluto pro custo */
   .ficha-table, .ficha-table thead, .ficha-table tbody, .ficha-table tfoot, .ficha-table tr {
     display: block;
     width: 100%;
@@ -1756,60 +1756,50 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .ficha-table { font-size: 0.82rem; }
   .ficha-table thead { display: none; }
   .ficha-table tr {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.15rem 0.7rem;
-    padding: 0.55rem 0;
+    position: relative;
+    padding: 0.65rem 90px 0.65rem 0;  /* espaço à direita para o custo */
     border-bottom: 1px dotted #ebe9e1;
-    align-items: baseline;
   }
   .ficha-table td {
-    display: block;
+    display: inline;
     border: none !important;
     padding: 0 !important;
     text-align: left !important;
     font-size: 0.8rem;
-    line-height: 1.35;
+    line-height: 1.4;
   }
   .ficha-table td::before { display: none; }
-  /* Linha 1: Insumo + Custo */
+  /* Nome: ocupa linha inteira */
   .ficha-table td:nth-child(1) {
-    grid-row: 1;
-    grid-column: 1;
+    display: block;
     font-family: 'Cormorant Garamond', serif;
     font-size: 1rem;
     color: #1a1a1a;
     font-weight: 500;
-    line-height: 1.2;
+    line-height: 1.25;
+    margin-bottom: 0.2rem;
   }
+  /* Meta (qty, unit, preço) flow inline em linha secundária */
+  .ficha-table td:nth-child(2),
+  .ficha-table td:nth-child(3),
+  .ficha-table td:nth-child(4) {
+    display: inline;
+    color: #888;
+    font-size: 0.78rem;
+  }
+  .ficha-table td:nth-child(2)::after { content: ' '; }
+  .ficha-table td:nth-child(3)::after { content: ' · '; }
+  /* Custo: absoluto à direita, centrado verticalmente */
   .ficha-table td:nth-child(5) {
-    grid-row: 1;
-    grid-column: 2;
+    position: absolute;
+    right: 0;
+    top: 0.65rem;
+    display: block;
     font-weight: 600;
     color: #1a1a1a;
     font-size: 0.95rem;
     white-space: nowrap;
     text-align: right !important;
-  }
-  /* Linha 2: Qtd · Preço unit (em cinza, juntos) */
-  .ficha-table td:nth-child(2),
-  .ficha-table td:nth-child(3) {
-    grid-row: 2;
-    display: inline-block;
-    color: #888;
-  }
-  .ficha-table td:nth-child(2) { grid-column: 1; }
-  .ficha-table td:nth-child(3) {
-    grid-column: 1;
-    margin-left: 0.2rem;
-    justify-self: start;
-  }
-  /* Preço unit. empurrado pra próxima linha pra caber */
-  .ficha-table td:nth-child(4) {
-    grid-row: 2;
-    grid-column: 1 / -1;
-    color: #888;
-    font-size: 0.78rem;
   }
   /* tfoot (subtotal) */
   .ficha-table tfoot { display: block; padding-top: 0.3rem; }
@@ -1817,26 +1807,27 @@ label.field textarea { min-height: 90px; resize: vertical; }
     background: #1a1a1a;
     color: #fff;
     border: none;
-    padding: 0.6rem 0.85rem;
-    margin-top: 0.25rem;
-    grid-template-columns: 1fr auto;
-    gap: 0.5rem;
-    align-items: center;
+    padding: 0.7rem 1rem;
+    margin-top: 0.35rem;
+    position: relative;
   }
   .ficha-table tfoot td {
     font-family: 'Inter', sans-serif !important;
   }
   .ficha-table tfoot td:first-child {
-    grid-row: 1; grid-column: 1;
-    font-size: 0.75rem !important;
+    display: block;
+    padding-right: 90px !important;
+    font-size: 0.72rem !important;
     color: #d8d5cb !important;
     font-weight: 400 !important;
-    font-family: 'Inter', sans-serif !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   .ficha-table tfoot td:last-child {
-    grid-row: 1; grid-column: 2;
+    position: absolute;
+    right: 1rem;
+    top: 0.65rem;
+    display: block;
     color: #fff !important;
     font-weight: 700 !important;
     font-size: 1rem !important;
