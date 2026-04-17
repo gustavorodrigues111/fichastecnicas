@@ -1111,6 +1111,31 @@ async function inviteUser(email, name, role, clienteIds) {
   renderUsuariosAdmin();
 }
 
+// ---------- Unidade canônica: helpers ----------
+const CANONICAL_UNITS = ['kg', 'l', 'und', 'folhas', 'fatias', 'colher de sopa'];
+function unitCategory(u) {
+  const s = (u || '').toLowerCase().trim();
+  if (['kg','g','mg','gr'].includes(s)) return 'weight';
+  if (['l','ml','lt'].includes(s)) return 'volume';
+  if (['und','unidade','unidades'].includes(s)) return 'unit';
+  if (['folha','folhas'].includes(s)) return 'folhas';
+  if (['fatia','fatias'].includes(s)) return 'fatias';
+  if (s === 'colher de sopa') return 'colher de sopa';
+  return s;
+}
+function buildUnitSelect(currentUnit) {
+  const sel = el('select', { class: 'unit-select' });
+  const cur = (currentUnit || 'kg').toLowerCase().trim();
+  const opts = [...CANONICAL_UNITS];
+  if (cur && !opts.includes(cur)) opts.push(cur);
+  opts.forEach(u => {
+    const o = el('option', { value: u }, u);
+    if (u === cur) o.setAttribute('selected', '');
+    sel.appendChild(o);
+  });
+  return sel;
+}
+
 // ---------- Cost calculations (same core as before) ----------
 function findInsumo(id) { return STATE.insumos.find(i => i.id === id); }
 function nrm(s) {
@@ -1378,16 +1403,26 @@ function renderClienteHome(cid) {
 }
 
 function renderClienteContext(cid) {
-  const bar = el('div', { class: 'context-bar' });
+  const wrap = el('div', { class: 'cliente-nav' });
+  // Back link (só para master/staff) em linha superior separada
   if (isMaster() || isStaff()) {
-    bar.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Todos os restaurantes'));
+    wrap.appendChild(el('a', { href: '#/clientes', class: 'cliente-back' }, '← Todos os restaurantes'));
   }
-  bar.appendChild(el('div', { class: 'ctx-links' },
-    el('a', { class: 'ctx-link', href: `#/c/${cid}` }, 'Cardápio'),
-    el('a', { class: 'ctx-link', href: `#/c/${cid}/insumos` }, 'Insumos'),
-    canEditCliente(cid) ? el('a', { class: 'ctx-link', href: `#/c/${cid}/admin` }, 'Gerenciar') : null,
-  ));
-  return bar;
+  // Tabs com active state baseado na rota atual
+  const hash = location.hash.slice(1) || '/';
+  const isAdmin = hash.includes(`/c/${cid}/admin`);
+  const isInsumos = hash.includes(`/c/${cid}/insumos`);
+  const isCardapio = !isAdmin && !isInsumos;
+  const tabs = el('nav', { class: 'cliente-tabs' },
+    el('a', { class: 'cliente-tab' + (isCardapio ? ' active' : ''), href: `#/c/${cid}` },
+      el('span', { class: 'tab-icon' }, '◉'), 'Cardápio'),
+    el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
+      el('span', { class: 'tab-icon' }, '◎'), 'Insumos'),
+    canEditCliente(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
+      el('span', { class: 'tab-icon' }, '⚙'), 'Gerenciar') : null,
+  );
+  wrap.appendChild(tabs);
+  return wrap;
 }
 
 // ---------- Views: Ficha (with scaling + kitchen mode on mobile) ----------
@@ -1797,11 +1832,20 @@ function renderInsumos(cid) {
       .filter(i => !f || i.name.toLowerCase().includes(f))
       .filter(i => cat === 'all' || categorizeInsumo(i) === cat)
       .forEach(insumo => {
-        const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
+        const unitInput = buildUnitSelect(insumo.unit || 'kg');
         const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
         if (!canEdit) { unitInput.disabled = true; priceInput.disabled = true; }
         unitInput.addEventListener('change', () => {
-          insumo.unit = unitInput.value.trim();
+          const oldUnit = insumo.unit || '';
+          const newUnit = unitInput.value;
+          if (oldUnit && unitCategory(oldUnit) !== unitCategory(newUnit)) {
+            if (!confirm(`Trocar de "${oldUnit}" para "${newUnit}" muda a categoria da unidade. O preço por ${newUnit} pode estar errado — revise após salvar. Continuar?`)) {
+              unitInput.value = oldUnit;
+              return;
+            }
+            toast('⚠ Categoria da unidade mudou — revise o preço');
+          }
+          insumo.unit = newUnit;
           scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
         });
         priceInput.addEventListener('input', () => {
@@ -1842,7 +1886,7 @@ function openNovoInsumoModal(cid) {
       el('p', { class: 'modal-subtitle' }, 'Adiciona um novo insumo à lista deste cliente'),
       (() => {
         const nameInput = el('input', { type: 'text', placeholder: 'Ex: Farinha de Arroz' });
-        const unitInput = el('input', { type: 'text', placeholder: 'kg / l / und / folhas' });
+        const unitInput = buildUnitSelect('kg');
         const priceInput = el('input', { type: 'number', min: '0', step: '0.01', placeholder: '0,00' });
         const formEl = el('div', { class: 'form-grid' },
           el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
@@ -1851,7 +1895,7 @@ function openNovoInsumoModal(cid) {
         );
         modal.__submit = async () => {
           const name = nameInput.value.trim();
-          const unit = unitInput.value.trim().toLowerCase() || 'kg';
+          const unit = unitInput.value || 'kg';
           const price = parseFloat(priceInput.value) || 0;
           if (!name) { alert('Nome obrigatório'); return; }
           const id = slugify(name);
