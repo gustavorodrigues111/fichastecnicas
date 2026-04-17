@@ -633,6 +633,23 @@ tr.row-subproduto .num { color: #8a7050; }
 }
 .usage-cell.has-usage:hover .usage-tooltip { display: block; }
 
+/* ============ Referência a sub-ficha / subproduto no editor ============ */
+.ref-badge-wrap {
+  margin: -0.1rem 0 0.5rem 0;
+  padding: 0.25rem 0.6rem;
+  background: #f5f0e3;
+  border-left: 2px solid #b8955e;
+  font-size: 0.78rem;
+  color: #5a4520;
+  display: flex;
+  align-items: center;
+}
+.ref-badge {
+  color: #5a4520;
+  font-weight: 500;
+  cursor: help;
+}
+
 /* ============ Variations modal ============ */
 .modal-wide .modal-content,
 .modal .modal-wide { max-width: 620px; }

@@ -2763,11 +2763,70 @@ function renderAdminEdit(cid, dishId) {
         ingList.innerHTML = '';
         sf.ingredientes.forEach((ing, ingIdx) => {
           const row = el('div', { class: 'ingredient-row' });
-          const nameInput = el('input', { type: 'text', value: ing.insumo_name, placeholder: 'Insumo', list: 'all-insumos' });
+          const nameInput = el('input', { type: 'text', value: ing.insumo_name, placeholder: 'Insumo ou sub-ficha', list: 'all-insumos' });
           // Placeholder - reference set após varSelect ser criado
           const fcInput = el('input', { type: 'number', step: '0.01', min: '1', placeholder: 'FC', value: ing.fc || '', title: 'Fator de correção' });
           const varSelect = el('select', { class: 'var-select', title: 'Variação (ex: brunoise, julienne)' });
+          const refBadge = el('span', { class: 'ref-badge', style: 'display:none' }, '');
+          const unitInput = el('input', { type: 'text', value: ing.unit || '', placeholder: 'g' });
+          function detectRef() {
+            // Verifica se o nome bate com uma sub-ficha do mesmo prato (exceto a atual)
+            const n = nrm(nameInput.value);
+            if (!n) return null;
+            for (const otherSf of dish.sub_fichas) {
+              if (otherSf.id === sf.id) continue;
+              if (nrm(otherSf.name) === n) {
+                return { type: 'subref', sf: otherSf };
+              }
+            }
+            // Verifica subproduto (mesma ficha ou outra)
+            const hit = findSubproduto(nameInput.value);
+            if (hit && !(hit.dish.id === dish.id && hit.sf.id === sf.id)) {
+              return { type: 'subproduto', hit };
+            }
+            return null;
+          }
           function rebuildVarSelect() {
+            const ref = detectRef();
+            // Se for referência a sub-ficha ou subproduto, oculta FC/var e mostra badge
+            if (ref) {
+              fcInput.style.display = 'none';
+              varSelect.style.display = 'none';
+              refBadge.style.display = '';
+              if (refBadge.__wrapEl) refBadge.__wrapEl.style.display = '';
+              if (ref.type === 'subref') {
+                refBadge.textContent = `↪ sub-ficha: ${ref.sf.name}`;
+                refBadge.title = `Custo será puxado da sub-ficha "${ref.sf.name}"`;
+                ing.subref_id = ref.sf.id;
+                delete ing.fc;
+                delete ing.variation_name;
+                ing.insumo_id = '';
+                // Auto-preenche unidade com o rendimento da sub-ficha referenciada
+                const refRend = getSfRendimento(ref.sf);
+                if (refRend.unit && !ing.unit) {
+                  ing.unit = refRend.unit;
+                  unitInput.value = refRend.unit;
+                }
+              } else {
+                refBadge.textContent = `↳ subproduto de: ${ref.hit.dish.name}`;
+                refBadge.title = `Subproduto da sub-ficha "${ref.hit.sf.name}" (${ref.hit.dish.name}) — custo zero`;
+                delete ing.subref_id;
+                delete ing.fc;
+                delete ing.variation_name;
+                ing.insumo_id = '';
+                // Auto-preenche unidade com a unidade do subproduto
+                const subU = ref.hit.subproduto.rendimento_unit || '';
+                if (subU && !ing.unit) {
+                  ing.unit = subU;
+                  unitInput.value = subU;
+                }
+              }
+              return;
+            } else {
+              refBadge.style.display = 'none';
+              if (refBadge.__wrapEl) refBadge.__wrapEl.style.display = 'none';
+              if (ing.subref_id) delete ing.subref_id;
+            }
             const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
             const isReut = !!(match && match.reutilizavel);
             // Oculta FC e limpa se insumo é reutilizável
@@ -2796,8 +2855,11 @@ function renderAdminEdit(cid, dishId) {
           }
           nameInput.addEventListener('input', () => {
             ing.insumo_name = nameInput.value;
-            const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
-            ing.insumo_id = match ? match.id : slugify(nameInput.value);
+            const ref = detectRef();
+            if (!ref) {
+              const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
+              ing.insumo_id = match ? match.id : slugify(nameInput.value);
+            }
             rebuildVarSelect();
           });
           varSelect.addEventListener('change', () => {
@@ -2824,7 +2886,6 @@ function renderAdminEdit(cid, dishId) {
             ing.is_qb = qtyInput.value.toLowerCase() === 'q.b';
           });
           row.appendChild(qtyInput);
-          const unitInput = el('input', { type: 'text', value: ing.unit || '', placeholder: 'g' });
           unitInput.addEventListener('input', () => { ing.unit = unitInput.value; });
           row.appendChild(unitInput);
           const obsInput = el('input', { type: 'text', value: ing.observacao || '', placeholder: 'Observação' });
@@ -2838,6 +2899,12 @@ function renderAdminEdit(cid, dishId) {
           row.appendChild(fcInput);
           row.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: () => { sf.ingredientes.splice(ingIdx, 1); renderIngs(); } }, '×'));
           ingList.appendChild(row);
+          // Badge de referência (sub-ficha ou subproduto) - sempre inserido, visibilidade controlada por detectRef
+          const badgeWrap = el('div', { class: 'ref-badge-wrap' }, refBadge);
+          badgeWrap.style.display = (refBadge.style.display === 'none') ? 'none' : '';
+          ingList.appendChild(badgeWrap);
+          // Atualiza wrap visibility quando rebuildVarSelect for chamado
+          refBadge.__wrapEl = badgeWrap;
         });
         ingList.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
           sf.ingredientes.push({ insumo_id: '', insumo_name: '', qty: null, qty_raw: '', unit: 'g', observacao: '', is_qb: false });
@@ -2871,6 +2938,10 @@ function renderAdminEdit(cid, dishId) {
 
   const dl = el('datalist', { id: 'all-insumos' });
   STATE.insumos.forEach(i => dl.appendChild(el('option', { value: i.name })));
+  // Sub-fichas do prato atual (pra usar uma sub-ficha anterior como ingrediente)
+  (dish.sub_fichas || []).forEach(otherSf => {
+    if (otherSf.name) dl.appendChild(el('option', { value: otherSf.name }, 'sub-ficha deste prato'));
+  });
   // Adiciona subprodutos de todos os pratos como opções (identificadas como "subproduto")
   listAllSubprodutos().forEach(({ dish: d, subproduto }) => {
     dl.appendChild(el('option', { value: subproduto.name }, `subproduto de ${d.name}`));
