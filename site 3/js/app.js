@@ -249,6 +249,100 @@ async function loadClientesList() {
   }
 }
 
+// ---------- Sync estrutural: só correções de estrutura, preserva conteúdo editado ----------
+async function syncStructureOnly(cid) {
+  if (!isMaster() && !isStaff()) { toast('Sem permissão'); return; }
+  const ok = confirm(
+    'Sincronizar correções estruturais?\n\n' +
+    '• ATUALIZA: rendimento (qty + unidade) das sub-fichas, subref_id (referências entre sub-fichas), fc (fator de correção) dos ingredientes.\n\n' +
+    '• PRESERVA: nomes, modo de preparo, fotos, preços, markup/CMV, observações, louça, equipamentos — tudo o que você editou no admin.\n\n' +
+    'Fichas novas do data.json que não existem no seu cliente serão adicionadas. Fichas que você tem mas não estão no data.json serão mantidas.'
+  );
+  if (!ok) return;
+  try {
+    toast('Sincronizando estrutura...');
+    const resp = await fetch('data/data.json');
+    const seed = await resp.json();
+    const existingSnap = await getDocs(dishesCol(cid));
+    const existingMap = {};
+    existingSnap.docs.forEach(d => { existingMap[d.id] = { id: d.id, ...d.data() }; });
+
+    let batch = writeBatch(db);
+    let count = 0;
+    let updatedDishes = 0, addedDishes = 0;
+    const flush = async () => { if (count > 0) { await batch.commit(); batch = writeBatch(db); count = 0; } };
+
+    for (const seedDish of seed.dishes) {
+      const existing = existingMap[seedDish.id];
+      if (!existing) {
+        // Ficha não existe → adiciona integral
+        const clean = { ...seedDish };
+        delete clean.id;
+        batch.set(dishDoc(cid, seedDish.id), clean);
+        count++; addedDishes++;
+        if (count >= 400) await flush();
+        continue;
+      }
+
+      // Merge estrutural
+      let changed = false;
+      const existingSubs = [...(existing.sub_fichas || [])];
+
+      for (const seedSf of seedDish.sub_fichas || []) {
+        // Match por id, senão por nome
+        let existingSf = existingSubs.find(s => s.id === seedSf.id) ||
+                         existingSubs.find(s => (s.name||'').toLowerCase() === (seedSf.name||'').toLowerCase());
+        if (!existingSf) {
+          // Sub-ficha nova no seed → adiciona
+          existingSubs.push(JSON.parse(JSON.stringify(seedSf)));
+          changed = true;
+          continue;
+        }
+        // Atualiza só rendimento_qty e rendimento_unit
+        if (seedSf.rendimento_qty != null && existingSf.rendimento_qty !== seedSf.rendimento_qty) {
+          existingSf.rendimento_qty = seedSf.rendimento_qty; changed = true;
+        }
+        if (seedSf.rendimento_unit && existingSf.rendimento_unit !== seedSf.rendimento_unit) {
+          existingSf.rendimento_unit = seedSf.rendimento_unit; changed = true;
+        }
+        // Atualiza ingredientes: só subref_id e fc, matching por insumo_id ou nome
+        for (const seedIng of seedSf.ingredientes || []) {
+          const existingIngs = existingSf.ingredientes || [];
+          let existingIng = existingIngs.find(i => i.insumo_id && i.insumo_id === seedIng.insumo_id) ||
+                            existingIngs.find(i => (i.insumo_name||'').toLowerCase() === (seedIng.insumo_name||'').toLowerCase());
+          if (!existingIng) continue;
+          // subref_id
+          if (seedIng.subref_id && existingIng.subref_id !== seedIng.subref_id) {
+            existingIng.subref_id = seedIng.subref_id; changed = true;
+          } else if (!seedIng.subref_id && existingIng.subref_id) {
+            delete existingIng.subref_id; changed = true;
+          }
+          // fc
+          if (seedIng.fc != null && existingIng.fc !== seedIng.fc) {
+            existingIng.fc = seedIng.fc; changed = true;
+          } else if (seedIng.fc == null && existingIng.fc) {
+            delete existingIng.fc; changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        existing.sub_fichas = existingSubs;
+        const clean = { ...existing };
+        delete clean.id;
+        batch.set(dishDoc(cid, seedDish.id), clean);
+        count++; updatedDishes++;
+        if (count >= 400) await flush();
+      }
+    }
+    await flush();
+    toast(`✓ Estrutura sincronizada: ${updatedDishes} fichas atualizadas${addedDishes ? `, ${addedDishes} adicionadas` : ''}`);
+  } catch (err) {
+    console.error(err);
+    toast('Erro ao sincronizar: ' + err.message);
+  }
+}
+
 // ---------- Sync de preços apenas (sem mexer em fichas ou outros campos) ----------
 async function syncPricesOnly(cid) {
   if (!isMaster() && !isStaff()) { toast('Sem permissão'); return; }
@@ -612,6 +706,7 @@ async function renderClientesAdmin() {
             catch (err) { toast('Erro: ' + err.message); }
           } }, '✎ Renomear'),
           el('button', { class: 'btn btn-small btn-accent', onclick: () => syncPricesOnly(c.id), title: 'Atualiza só os preços dos insumos com valores do data.json' }, '₴ Atualizar preços'),
+          el('button', { class: 'btn btn-small btn-accent', onclick: () => syncStructureOnly(c.id), title: 'Atualiza só rendimentos, subref_id e fc (sem perder nada que você editou)' }, '⚙ Atualizar estrutura'),
           el('button', { class: 'btn btn-small', onclick: () => {
             if (!confirm(`Reimportar dados iniciais em "${c.name}"?\n\n• Sobrescreve fichas com versão do data.json\n• Preços existentes > 0 são preservados\n• Insumos e fichas órfãos são excluídos`)) return;
             seedClienteFromJson(c.id, c.name).catch(e => toast('Erro: ' + e.message));
