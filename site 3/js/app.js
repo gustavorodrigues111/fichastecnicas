@@ -68,14 +68,29 @@ const WEIGHT_MG = ['mg'];
 const WEIGHT_KG = ['kg','quilo','quilos','quilograma','quilogramas'];
 const VOL_ML = ['ml','millilitro','mililitro'];
 const VOL_L = ['l','lt','litro','litros'];
+// Escolhe melhor unidade pra exibir peso: kg se >= 1kg, g se < 1kg (3 casas pra subgramas)
+function pickWeightDisplay(qty_kg) {
+  if (qty_kg >= 1) return { qty: qty_kg, unit: 'kg', text: fmtNum(qty_kg, 3) };
+  // abaixo de 1 kg → mostra em gramas
+  const g = qty_kg * 1000;
+  const dec = g >= 10 ? 1 : (g >= 1 ? 2 : 3);
+  return { qty: g, unit: 'g', text: fmtNum(g, dec) };
+}
+// Idem para volume
+function pickVolumeDisplay(qty_l) {
+  if (qty_l >= 1) return { qty: qty_l, unit: 'l', text: fmtNum(qty_l, 3) };
+  const ml = qty_l * 1000;
+  const dec = ml >= 10 ? 1 : (ml >= 1 ? 2 : 3);
+  return { qty: ml, unit: 'ml', text: fmtNum(ml, dec) };
+}
 function normUnitForDisplay(qty, unit) {
   if (qty == null) return { qty: null, unit: unit || '', text: '—' };
   const u = (unit || '').toLowerCase().trim().replace(/\s+/g, '');
-  if (WEIGHT_G.includes(u)) return { qty: qty/1000, unit: 'kg', text: fmtNum(qty/1000, 3) };
-  if (WEIGHT_MG.includes(u)) return { qty: qty/1e6, unit: 'kg', text: fmtNum(qty/1e6, 3) };
-  if (WEIGHT_KG.includes(u)) return { qty, unit: 'kg', text: fmtNum(qty, 3) };
-  if (VOL_ML.includes(u)) return { qty: qty/1000, unit: 'l', text: fmtNum(qty/1000, 3) };
-  if (VOL_L.includes(u)) return { qty, unit: 'l', text: fmtNum(qty, 3) };
+  if (WEIGHT_G.includes(u)) return pickWeightDisplay(qty / 1000);
+  if (WEIGHT_MG.includes(u)) return pickWeightDisplay(qty / 1e6);
+  if (WEIGHT_KG.includes(u)) return pickWeightDisplay(qty);
+  if (VOL_ML.includes(u)) return pickVolumeDisplay(qty / 1000);
+  if (VOL_L.includes(u)) return pickVolumeDisplay(qty);
   const dec = qty % 1 === 0 ? 0 : 2;
   return { qty, unit: unit || '', text: fmtNum(qty, dec) };
 }
