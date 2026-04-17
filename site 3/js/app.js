@@ -273,6 +273,9 @@ function subscribeCliente(cid) {
   STATE.unsubs.config = onSnapshot(configDoc(cid, 'equipamentos'), (snap) => {
     STATE.equipamentos = snap.exists() ? (snap.data().list || []) : [];
     if (pendingLoads > 0) maybeRender();
+    // Atualiza editor de equipamentos aberto, se houver
+    const eqBox = document.querySelector('.equipamentos-select');
+    if (eqBox && eqBox.__rerender) eqBox.__rerender();
   }, err => { console.error('config err', err); if (pendingLoads > 0) maybeRender(); });
 }
 
@@ -582,6 +585,260 @@ async function seedClienteFromJson(cid, clienteName) {
   toast('Importação concluída!');
 }
 
+// ---------- Excel import/export ----------
+// Gera planilha modelo com 4 abas: Insumos, Variações, Fichas, Equipamentos
+function downloadExcelTemplate() {
+  const XLSX = window.XLSX;
+  const wb = XLSX.utils.book_new();
+
+  const insumosData = [
+    ['nome', 'unidade', 'preco'],
+    ['Cebola Branca', 'kg', 4.50],
+    ['Sal Refinado', 'kg', 3.20],
+    ['Azeite', 'l', 28.00],
+  ];
+  const variacoesData = [
+    ['insumo_base', 'variacao', 'fc'],
+    ['Cebola Branca', 'brunoise', 1.15],
+    ['Cebola Branca', 'julienne', 1.12],
+  ];
+  const fichasData = [
+    ['ficha', 'sub_ficha', 'rendimento_qty', 'rendimento_unit', 'insumo', 'variacao', 'qtd', 'unidade', 'fc', 'observacao', 'modo_preparo', 'subref'],
+    ['Arroz com Feijão', 'Feijão', 6, 'kg', 'Feijão Preto', '', 1, 'kg', '', 'demolhado', 'Cozinhar o feijão em panela de pressão por 30min', ''],
+    ['Arroz com Feijão', 'Feijão', '', '', 'Cebola Branca', 'brunoise', 0.05, 'kg', '', '', '', ''],
+    ['Arroz com Feijão', 'Montagem', 1, 'porção', 'Feijão', '', 0.2, 'kg', '', '', 'Sirva quente', 'Feijão'],
+  ];
+  const equipamentosData = [['nome'], ['Fogão'], ['Forno'], ['Liquidificador']];
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(insumosData), 'Insumos');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(variacoesData), 'Variacoes');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fichasData), 'Fichas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(equipamentosData), 'Equipamentos');
+
+  XLSX.writeFile(wb, 'modelo-importacao-appmise.xlsx');
+}
+
+// Lê arquivo Excel, extrai estrutura de dados parseada
+async function parseExcelFile(file) {
+  const XLSX = window.XLSX;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const readSheet = (name) => {
+    const ws = wb.Sheets[name];
+    if (!ws) return [];
+    return XLSX.utils.sheet_to_json(ws, { defval: '' });
+  };
+  const rawInsumos = readSheet('Insumos');
+  const rawVariacoes = readSheet('Variacoes');
+  const rawFichas = readSheet('Fichas');
+  const rawEquipamentos = readSheet('Equipamentos');
+
+  // Monta insumos (map por nome lowercase)
+  const insumosByName = {};
+  for (const r of rawInsumos) {
+    const name = String(r.nome || '').trim();
+    if (!name) continue;
+    const unit = String(r.unidade || 'kg').trim().toLowerCase();
+    const price = parseFloat(r.preco) || 0;
+    const id = slugify(name);
+    insumosByName[name.toLowerCase()] = { id, name, unit, price };
+  }
+  // Variações
+  for (const r of rawVariacoes) {
+    const base = String(r.insumo_base || '').trim().toLowerCase();
+    const varName = String(r.variacao || '').trim();
+    const fc = parseFloat(r.fc);
+    if (!base || !varName || !fc) continue;
+    const ins = insumosByName[base];
+    if (!ins) continue;
+    if (!ins.variations) ins.variations = [];
+    ins.variations.push({ name: varName, fc });
+  }
+  // Fichas: agrupa por ficha → sub-ficha → lista de ingredientes
+  const dishes = {};
+  for (const r of rawFichas) {
+    const dishName = String(r.ficha || '').trim();
+    const sfName = String(r.sub_ficha || '').trim();
+    if (!dishName || !sfName) continue;
+    if (!dishes[dishName]) dishes[dishName] = { id: slugify(dishName), name: dishName, description: '', photos: [], louca: '', equipamentos: [], sub_fichas: [], markup: 300 };
+    const dish = dishes[dishName];
+    let sf = dish.sub_fichas.find(s => s.name === sfName);
+    if (!sf) {
+      sf = { id: uid(), name: sfName, rendimento: '', rendimento_qty: null, rendimento_unit: '', ingredientes: [], modo_preparo: '' };
+      dish.sub_fichas.push(sf);
+    }
+    const rq = parseFloat(r.rendimento_qty);
+    const ru = String(r.rendimento_unit || '').trim().toLowerCase();
+    if (!isNaN(rq) && ru) {
+      sf.rendimento_qty = rq;
+      sf.rendimento_unit = ru;
+      sf.rendimento = `${String(rq).replace('.', ',')} ${ru}`;
+    }
+    if (r.modo_preparo && !sf.modo_preparo) sf.modo_preparo = String(r.modo_preparo).trim();
+    const insumoName = String(r.insumo || '').trim();
+    if (!insumoName) continue;
+    const qty = parseFloat(r.qtd);
+    const unit = String(r.unidade || '').trim().toLowerCase();
+    const fcExtra = parseFloat(r.fc);
+    const obs = String(r.observacao || '').trim();
+    const variacao = String(r.variacao || '').trim();
+    const subref = String(r.subref || '').trim();
+
+    const ing = { insumo_name: insumoName, qty: isNaN(qty) ? null : qty, unit, observacao: obs };
+    // Referência a outra sub-ficha?
+    if (subref) {
+      const targetSf = dish.sub_fichas.find(s => s.name === subref);
+      if (targetSf) {
+        ing.subref_id = targetSf.id;
+        ing.insumo_id = '';
+      }
+    } else {
+      const insMatch = insumosByName[insumoName.toLowerCase()];
+      ing.insumo_id = insMatch ? insMatch.id : slugify(insumoName);
+      if (variacao && insMatch && insMatch.variations) {
+        const v = insMatch.variations.find(x => x.name.toLowerCase() === variacao.toLowerCase());
+        if (v) {
+          ing.variation_name = v.name;
+          ing.fc = v.fc;
+        }
+      }
+      if (!ing.fc && !isNaN(fcExtra) && fcExtra > 1) ing.fc = fcExtra;
+    }
+    sf.ingredientes.push(ing);
+  }
+
+  const equipamentos = rawEquipamentos
+    .map(r => String(r.nome || '').trim())
+    .filter(Boolean);
+
+  return {
+    insumos: Object.values(insumosByName),
+    dishes: Object.values(dishes),
+    equipamentos,
+  };
+}
+
+// Aplica import: mode = 'append' (merge) ou 'replace' (apaga tudo e seta)
+async function applyExcelImport(cid, parsed, mode) {
+  let batch = writeBatch(db);
+  let count = 0;
+  const flush = async () => { if (count > 0) { await batch.commit(); batch = writeBatch(db); count = 0; } };
+  const push = async (op, ref, data) => {
+    if (op === 'set') batch.set(ref, data);
+    else if (op === 'delete') batch.delete(ref);
+    count++;
+    if (count >= 400) await flush();
+  };
+
+  if (mode === 'replace') {
+    const [dSnap, iSnap] = await Promise.all([getDocs(dishesCol(cid)), getDocs(insumosCol(cid))]);
+    for (const d of dSnap.docs) await push('delete', dishDoc(cid, d.id));
+    for (const d of iSnap.docs) await push('delete', insumoDoc(cid, d.id));
+  }
+
+  for (const ins of parsed.insumos) {
+    const clean = { ...ins }; delete clean.id;
+    await push('set', insumoDoc(cid, ins.id), clean);
+  }
+  for (const dish of parsed.dishes) {
+    const clean = { ...dish }; delete clean.id;
+    await push('set', dishDoc(cid, dish.id), clean);
+  }
+  // Equipamentos: sempre faz merge (não apaga os existentes em replace, a menos que a planilha tenha dados)
+  if (parsed.equipamentos.length > 0) {
+    if (mode === 'replace') {
+      await push('set', configDoc(cid, 'equipamentos'), { list: parsed.equipamentos });
+    } else {
+      // Append: une com os existentes
+      const existing = await getDoc(configDoc(cid, 'equipamentos'));
+      const existingList = existing.exists() ? (existing.data().list || []) : [];
+      const merged = [...new Set([...existingList, ...parsed.equipamentos])];
+      await push('set', configDoc(cid, 'equipamentos'), { list: merged });
+    }
+  }
+  await flush();
+}
+
+function openImportExcelModal(cid, clienteName) {
+  let parsed = null;
+  const modal = el('div', { class: 'modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
+  );
+  const content = el('div', { class: 'modal-content modal-wide' });
+  content.appendChild(el('h2', {}, `Importar de Excel — ${clienteName || cid}`));
+  content.appendChild(el('p', { class: 'modal-subtitle' },
+    'Envie uma planilha .xlsx com as abas Insumos, Variacoes, Fichas e Equipamentos. ' +
+    'Baixe o modelo abaixo se for sua primeira vez.'));
+
+  content.appendChild(el('button', {
+    class: 'btn btn-small',
+    onclick: () => downloadExcelTemplate()
+  }, '↓ Baixar modelo .xlsx'));
+
+  const fileInput = el('input', { type: 'file', accept: '.xlsx,.xls', class: 'import-file-input' });
+  const previewArea = el('div', { class: 'import-preview' });
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    previewArea.innerHTML = '';
+    previewArea.appendChild(el('p', { class: 'muted' }, 'Lendo planilha...'));
+    try {
+      parsed = await parseExcelFile(f);
+      previewArea.innerHTML = '';
+      previewArea.appendChild(el('div', { class: 'import-summary' },
+        el('p', {}, el('strong', {}, `${parsed.insumos.length} insumos`), ' serão criados/atualizados'),
+        el('p', {}, el('strong', {}, `${parsed.insumos.reduce((s, i) => s + ((i.variations || []).length), 0)} variações`), ' cadastradas em insumos'),
+        el('p', {}, el('strong', {}, `${parsed.dishes.length} fichas`), ` (${parsed.dishes.reduce((s, d) => s + d.sub_fichas.length, 0)} sub-fichas)`),
+        el('p', {}, el('strong', {}, `${parsed.equipamentos.length} equipamentos`))
+      ));
+      // Lista de fichas pra preview
+      if (parsed.dishes.length > 0) {
+        const ul = el('ul', { class: 'import-dish-list' });
+        parsed.dishes.forEach(d => {
+          ul.appendChild(el('li', {}, `${d.name} — ${d.sub_fichas.length} sub-fichas, ${d.sub_fichas.reduce((s, sf) => s + sf.ingredientes.length, 0)} ingredientes`));
+        });
+        previewArea.appendChild(el('details', {}, el('summary', {}, 'Ver fichas importadas'), ul));
+      }
+    } catch (err) {
+      previewArea.innerHTML = '';
+      previewArea.appendChild(el('p', { class: 'error' }, 'Erro ao ler planilha: ' + err.message));
+    }
+  });
+  content.appendChild(fileInput);
+  content.appendChild(previewArea);
+
+  // Modo: append vs replace
+  const modeWrap = el('div', { class: 'import-mode' },
+    el('label', { class: 'field' },
+      el('input', { type: 'radio', name: 'import-mode', value: 'append', checked: true }),
+      el('span', {}, ' ADICIONAR — mantém os dados existentes e insere os da planilha')
+    ),
+    el('label', { class: 'field' },
+      el('input', { type: 'radio', name: 'import-mode', value: 'replace' }),
+      el('span', {}, ' SUBSTITUIR — apaga tudo e insere só o que está na planilha')
+    )
+  );
+  content.appendChild(modeWrap);
+
+  content.appendChild(el('div', { class: 'modal-actions' },
+    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      if (!parsed) { alert('Selecione uma planilha primeiro'); return; }
+      const mode = content.querySelector('input[name="import-mode"]:checked').value;
+      if (mode === 'replace' && !confirm('Tem certeza? Isso APAGA tudo que existe e insere só o que está na planilha.')) return;
+      try {
+        toast('Importando...');
+        await applyExcelImport(cid, parsed, mode);
+        toast('Importação concluída!');
+        modal.remove();
+        if (typeof renderClientesAdmin === 'function') renderClientesAdmin();
+      } catch (err) { toast('Erro: ' + err.message); }
+    } }, 'Importar')
+  ));
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
 // ---------- Auth ----------
 async function ensureUserDoc(user) {
   const ref = doc(db, 'users', user.uid);
@@ -872,6 +1129,7 @@ async function renderClientesAdmin() {
         el('a', { class: 'btn btn-primary btn-block', href: `#/c/${c.id}` }, 'Abrir restaurante →'),
         el('div', { class: 'cc-menu' },
           el('button', { class: 'btn btn-small', onclick: () => openEditClienteModal(c), title: 'Editar nome, consultor e configurações' }, '✎ Editar'),
+          el('button', { class: 'btn btn-small', onclick: () => openImportExcelModal(c.id, c.name), title: 'Importar/adicionar fichas e insumos via planilha Excel' }, '↑ Importar Excel'),
           el('button', { class: 'btn btn-small btn-accent', onclick: () => openUpdateFromFileModal(c), title: 'Sincronizar do arquivo data.json' }, '↻ Atualizar do arquivo'),
           el('button', { class: 'btn btn-small', onclick: async () => {
             // Backup do cliente (precisa garantir que estamos subscritos a ele)
@@ -1616,9 +1874,10 @@ function renderFichaTrabalho(dish, sf, state, idx) {
     if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
 
     const formatted = formatIngQty(ing, sfScale);
+    const displayName = (subSf ? '↪ ' : '') + ing.insumo_name + (ing.variation_name ? ` — ${ing.variation_name}` : '');
     const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
       el('div', { class: 'k-row-main' },
-        el('span', { class: 'k-name' }, (subSf ? '↪ ' : '') + ing.insumo_name),
+        el('span', { class: 'k-name' }, displayName),
         el('span', { class: 'k-qty' },
           el('span', { class: 'qty-num' }, formatted.text),
           formatted.unit ? el('span', { class: 'qty-unit' }, formatted.unit) : null
@@ -1681,7 +1940,8 @@ function renderFichaCusto(dish, cid) {
           const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
           priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
           const fcBadge = (fc && fc > 1) ? el('span', { class: 'fc-badge', title: `Fator de correção ${fc}x — considera perda no processamento` }, ` · FC ${fmtNum(fc, 2)}`) : null;
-          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, fcBadge);
+          const varBadge = ing.variation_name ? el('span', { class: 'var-badge', title: 'Variação do insumo' }, ` — ${ing.variation_name}`) : null;
+          nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, varBadge, fcBadge);
         }
         return el('tr', { class: isSubref ? 'row-subref' : '' },
           nameCell,
@@ -1840,6 +2100,7 @@ function renderInsumos(cid) {
       el('th', {}, 'Insumo'),
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
+      el('th', {}, 'Variações'),
       el('th', {}, 'Usado em')
     ))
   );
@@ -1876,10 +2137,17 @@ function renderInsumos(cid) {
           insumo.price = parseFloat(priceInput.value) || 0;
           scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
         });
+        const varCount = (insumo.variations || []).length;
+        const varBtn = el('button', {
+          class: 'btn btn-small' + (varCount > 0 ? ' btn-primary' : ''),
+          onclick: () => openVariationsModal(cid, insumo)
+        }, varCount > 0 ? `${varCount} variação${varCount > 1 ? 'ões' : ''}` : '+ adicionar');
+        if (!canFullEdit) varBtn.disabled = true;
         const cells = [
           el('td', { 'data-label': 'Insumo' }, insumo.name),
           el('td', { 'data-label': 'Unidade' }, unitInput),
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
+          el('td', { 'data-label': 'Variações' }, varBtn),
           el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
         ];
         tbody.appendChild(el('tr', {}, ...cells));
@@ -1900,6 +2168,73 @@ function renderInsumos(cid) {
     $$('.chip-filter', filterBar).forEach(x => x.classList.toggle('active', x === b));
     buildRows();
   });
+}
+
+// Modal de variações do insumo (ex: Cebola branca → brunoise FC 1,15, julienne FC 1,12)
+function openVariationsModal(cid, insumo) {
+  const variations = JSON.parse(JSON.stringify(insumo.variations || []));
+  const modal = el('div', { class: 'modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
+  );
+  const content = el('div', { class: 'modal-content modal-wide' },
+    el('h2', {}, 'Variações de ' + insumo.name),
+    el('p', { class: 'modal-subtitle' },
+      'Variações são cortes ou preparos do insumo base (ex: brunoise, julienne) com fator de correção próprio. ' +
+      'Nas fichas, selecionar uma variação carrega o FC automaticamente. Na lista de compras, agrega no insumo base.')
+  );
+  const varList = el('div', { class: 'variations-list' });
+  function renderVars() {
+    varList.innerHTML = '';
+    if (variations.length === 0) {
+      varList.appendChild(el('p', { class: 'muted empty-variations' }, 'Nenhuma variação cadastrada. Clique em "+ Adicionar variação" abaixo.'));
+    }
+    variations.forEach((v, idx) => {
+      const nameI = el('input', { type: 'text', value: v.name || '', placeholder: 'Ex: brunoise' });
+      nameI.addEventListener('input', () => v.name = nameI.value);
+      const fcI = el('input', { type: 'text', inputmode: 'decimal', value: v.fc != null ? String(v.fc).replace('.', ',') : '', placeholder: 'Ex: 1,15' });
+      fcI.addEventListener('input', () => {
+        const n = parseFloat(fcI.value.replace(',', '.'));
+        v.fc = isNaN(n) ? null : n;
+      });
+      const delBtn = el('button', { class: 'btn btn-small btn-danger', onclick: () => {
+        variations.splice(idx, 1); renderVars();
+      } }, '×');
+      varList.appendChild(el('div', { class: 'variation-row' },
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameI),
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'FC'), fcI),
+        delBtn
+      ));
+    });
+  }
+  renderVars();
+  content.appendChild(varList);
+  content.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
+    variations.push({ name: '', fc: 1 });
+    renderVars();
+  } }, '+ Adicionar variação'));
+  content.appendChild(el('div', { class: 'modal-actions' },
+    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      // Valida: nomes únicos, FC válido
+      const clean = variations
+        .filter(v => (v.name || '').trim())
+        .map(v => ({ name: v.name.trim(), fc: (typeof v.fc === 'number' && v.fc > 0) ? v.fc : 1 }));
+      const names = new Set();
+      for (const v of clean) {
+        if (names.has(v.name.toLowerCase())) { alert(`Nome duplicado: "${v.name}"`); return; }
+        names.add(v.name.toLowerCase());
+      }
+      try {
+        insumo.variations = clean.length > 0 ? clean : undefined;
+        if (insumo.variations === undefined) delete insumo.variations;
+        await saveInsumo(cid, insumo);
+        toast('Variações salvas');
+        modal.remove();
+      } catch (err) { toast('Erro: ' + err.message); }
+    } }, 'Salvar')
+  ));
+  modal.appendChild(content);
+  document.body.appendChild(modal);
 }
 
 function openNovoInsumoModal(cid) {
@@ -2041,16 +2376,58 @@ function renderAdminEdit(cid, dishId) {
 
   panel.appendChild(el('h3', {}, 'Equipamentos necessários'));
   const eqBox = el('div', { class: 'equipamentos-select' });
-  (STATE.equipamentos || []).forEach(eq => {
-    const i = el('input', { type: 'checkbox' });
-    if (dish.equipamentos.includes(eq)) i.setAttribute('checked', '');
-    i.addEventListener('change', () => {
-      if (i.checked) { if (!dish.equipamentos.includes(eq)) dish.equipamentos.push(eq); }
-      else dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
+  function renderEquipamentos() {
+    eqBox.innerHTML = '';
+    (STATE.equipamentos || []).forEach(eq => {
+      const i = el('input', { type: 'checkbox' });
+      if (dish.equipamentos.includes(eq)) i.setAttribute('checked', '');
+      i.addEventListener('change', () => {
+        if (i.checked) { if (!dish.equipamentos.includes(eq)) dish.equipamentos.push(eq); }
+        else dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
+      });
+      const removeBtn = el('button', {
+        class: 'eq-remove',
+        title: 'Remover equipamento da lista',
+        onclick: async (e) => {
+          e.preventDefault();
+          if (!confirm(`Remover "${eq}" da lista de equipamentos deste restaurante?`)) return;
+          const newList = (STATE.equipamentos || []).filter(x => x !== eq);
+          try {
+            await setDoc(configDoc(cid, 'equipamentos'), { list: newList });
+            dish.equipamentos = dish.equipamentos.filter(x => x !== eq);
+            toast('Equipamento removido');
+          } catch (err) { toast('Erro: ' + err.message); }
+        }
+      }, '×');
+      eqBox.appendChild(el('label', { class: 'equipamento-item' }, i, document.createTextNode(' ' + eq), removeBtn));
     });
-    eqBox.appendChild(el('label', {}, i, document.createTextNode(' ' + eq)));
-  });
+  }
+  renderEquipamentos();
   panel.appendChild(eqBox);
+  // Botão adicionar novo equipamento
+  const addEqRow = el('div', { class: 'add-equipamento-row' });
+  const newEqInput = el('input', { type: 'text', placeholder: 'Novo equipamento (ex: Sous-vide)', class: 'add-eq-input' });
+  const addEqBtn = el('button', { class: 'btn btn-small', onclick: async (e) => {
+    e.preventDefault();
+    const name = newEqInput.value.trim();
+    if (!name) return;
+    if ((STATE.equipamentos || []).some(x => x.toLowerCase() === name.toLowerCase())) {
+      toast('Equipamento já existe'); return;
+    }
+    const newList = [...(STATE.equipamentos || []), name];
+    try {
+      await setDoc(configDoc(cid, 'equipamentos'), { list: newList });
+      newEqInput.value = '';
+      toast('Equipamento adicionado');
+      // STATE.equipamentos atualiza via onSnapshot, mas re-renderiza agora pra feedback imediato
+    } catch (err) { toast('Erro: ' + err.message); }
+  } }, '+ Adicionar');
+  newEqInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addEqBtn.click(); } });
+  addEqRow.appendChild(newEqInput);
+  addEqRow.appendChild(addEqBtn);
+  panel.appendChild(addEqRow);
+  // Re-render checkboxes quando equipamentos mudarem via snapshot
+  eqBox.__rerender = renderEquipamentos;
 
   panel.appendChild(el('h2', {}, 'Sub-fichas (preparações)'));
   const sfWrap = el('div', {});
@@ -2095,12 +2472,49 @@ function renderAdminEdit(cid, dishId) {
         sf.ingredientes.forEach((ing, ingIdx) => {
           const row = el('div', { class: 'ingredient-row' });
           const nameInput = el('input', { type: 'text', value: ing.insumo_name, placeholder: 'Insumo', list: 'all-insumos' });
+          // Placeholder - reference set após varSelect ser criado
+          const fcInput = el('input', { type: 'number', step: '0.01', min: '1', placeholder: 'FC', value: ing.fc || '', title: 'Fator de correção' });
+          const varSelect = el('select', { class: 'var-select', title: 'Variação (ex: brunoise, julienne)' });
+          function rebuildVarSelect() {
+            const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
+            varSelect.innerHTML = '';
+            const vars = (match && Array.isArray(match.variations)) ? match.variations : [];
+            if (vars.length === 0) {
+              varSelect.style.display = 'none';
+              return;
+            }
+            varSelect.style.display = '';
+            varSelect.appendChild(el('option', { value: '' }, '— sem variação —'));
+            vars.forEach(v => {
+              const opt = el('option', { value: v.name }, `${v.name} (FC ${String(v.fc).replace('.', ',')})`);
+              if (ing.variation_name && ing.variation_name.toLowerCase() === v.name.toLowerCase()) {
+                opt.setAttribute('selected', '');
+              }
+              varSelect.appendChild(opt);
+            });
+          }
           nameInput.addEventListener('input', () => {
             ing.insumo_name = nameInput.value;
             const match = STATE.insumos.find(i => i.name.toLowerCase() === nameInput.value.toLowerCase());
             ing.insumo_id = match ? match.id : slugify(nameInput.value);
+            rebuildVarSelect();
           });
+          varSelect.addEventListener('change', () => {
+            const match = STATE.insumos.find(i => i.id === ing.insumo_id);
+            const chosen = (match && match.variations || []).find(v => v.name === varSelect.value);
+            if (chosen) {
+              ing.variation_name = chosen.name;
+              ing.fc = chosen.fc;
+              fcInput.value = chosen.fc;
+            } else {
+              delete ing.variation_name;
+              delete ing.fc;
+              fcInput.value = '';
+            }
+          });
+          rebuildVarSelect();
           row.appendChild(nameInput);
+          row.appendChild(varSelect);
           const qtyInput = el('input', { type: 'number', step: '0.01', value: ing.qty != null ? ing.qty : '', placeholder: 'Qtd' });
           qtyInput.addEventListener('input', () => {
             const v = parseFloat(qtyInput.value);
@@ -2115,7 +2529,6 @@ function renderAdminEdit(cid, dishId) {
           const obsInput = el('input', { type: 'text', value: ing.observacao || '', placeholder: 'Observação' });
           obsInput.addEventListener('input', () => { ing.observacao = obsInput.value; });
           row.appendChild(obsInput);
-          const fcInput = el('input', { type: 'number', step: '0.01', min: '1', placeholder: 'FC', value: ing.fc || '', title: 'Fator de correção' });
           fcInput.addEventListener('input', () => {
             const v = parseFloat(fcInput.value);
             if (!v || v <= 1) delete ing.fc;
