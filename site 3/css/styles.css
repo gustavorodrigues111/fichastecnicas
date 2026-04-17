@@ -345,15 +345,18 @@ main { padding: 3rem 0 4rem; flex: 1; }
 .ficha-header .back-link:hover { color: #b8955e; }
 .ficha-header h1 { font-size: 3rem; margin-bottom: 0.5rem; }
 
-/* Gallery — fotos compactas */
+/* Gallery — fotos compactas, centralizadas quando 1-2 */
 .gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 180px));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.75rem;
-  margin-bottom: 2rem;
+  margin: 0 auto 2rem;
   max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+}
+.gallery .photo {
+  flex: 0 1 180px;
+  min-width: 140px;
 }
 .gallery .photo {
   aspect-ratio: 4 / 3;
@@ -1016,24 +1019,25 @@ label.field textarea { min-height: 90px; resize: vertical; }
   margin-top: 0.1rem;
 }
 .consultor-credit-ficha {
+  display: block;
   margin: 0 0 1.25rem;
-  padding: 0.5rem 1rem;
-  max-width: none;
+  padding: 0.55rem 0.9rem;
   border: none;
   border-left: 2px solid #b8955e;
   background: #faf8f2;
-  align-items: flex-start;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  color: #6a6a6a;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  max-width: none;
   text-align: left;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0.5rem;
 }
-.consultor-credit-ficha .consultor-name { font-size: 1rem; }
-.consultor-credit-ficha .consultor-info { font-size: 0.75rem; margin-top: 0; }
 @media (max-width: 640px) {
   .consultor-credit { margin: -0.5rem 0 1.75rem; padding: 0.6rem 0.9rem; }
   .consultor-credit .consultor-name { font-size: 1.05rem; }
-  .consultor-credit-ficha { padding: 0.4rem 0.75rem; margin-bottom: 1rem; }
+  .consultor-credit-ficha { padding: 0.45rem 0.75rem; margin-bottom: 1rem; font-size: 0.78rem; }
 }
 
 /* ============ Cardápio list (home) ============ */
@@ -1562,15 +1566,17 @@ label.field textarea { min-height: 90px; resize: vertical; }
   color: #666;
 }
 .scale-ctrl input {
-  width: 90px;
-  padding: 0.5rem 0.65rem;
+  width: 110px;
+  padding: 0.5rem 0.7rem;
   border: 1px solid #d8d5cb;
   background: #fff;
   font-family: 'Cormorant Garamond', serif;
   font-size: 1.25rem;
   font-weight: 600;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
+.scale-ctrl input:focus { outline: none; border-color: #b8955e; }
 .scale-unit { color: #666; font-size: 0.9rem; }
 .btn-ghost { background: transparent; border: 1px solid #b8955e; color: #b8955e; }
 .btn-ghost:hover { background: #b8955e; color: #fff; }
@@ -1830,14 +1836,13 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .ficha-header h1 { font-size: 1.8rem; }
   .ficha-header .back-link { font-size: 0.78rem; margin-bottom: 0.75rem; }
 
-  /* Gallery mobile: 2 colunas compactas, não ocupa a tela toda */
+  /* Gallery mobile: centralizadas, max 2 colunas */
   .gallery {
-    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem;
-    margin-bottom: 1.25rem;
+    margin: 0 auto 1.25rem;
     max-width: 280px;
   }
-  .gallery .photo { aspect-ratio: 4 / 3; }
+  .gallery .photo { aspect-ratio: 4 / 3; flex: 0 1 130px; min-width: 120px; }
 
   /* View toggle — full width, 2 buttons flex */
   .view-toggle {
@@ -2127,7 +2132,7 @@ label.field textarea { min-height: 90px; resize: vertical; }
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  .scale-ctrl input { flex: 0 1 auto; width: 110px; font-size: 1.1rem; }
+  .scale-ctrl input { flex: 0 1 auto; width: 120px; font-size: 1.15rem; padding: 0.55rem 0.7rem; }
   .scale-label { flex-shrink: 0; }
   .scale-unit { flex-shrink: 0; }
   .k-section-title { font-size: 0.72rem; margin: 1.75rem 0 0.75rem; letter-spacing: 0.14em; }

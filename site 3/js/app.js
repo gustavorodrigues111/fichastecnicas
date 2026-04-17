@@ -1452,14 +1452,11 @@ function renderFicha(cid, dishId, initialSfId = null) {
   );
   app.appendChild(header);
 
-  // Consultoria (se ativa)
+  // Consultoria (se ativa) — uma linha só, tipografia consistente
   const cliente = STATE.currentCliente;
   if (cliente?.show_consultor !== false && cliente?.consultor_name) {
-    app.appendChild(el('div', { class: 'consultor-credit consultor-credit-ficha' },
-      el('span', { class: 'consultor-by' }, 'Consultoria por'),
-      el('span', { class: 'consultor-name' }, cliente.consultor_name),
-      cliente.consultor_info ? el('span', { class: 'consultor-info' }, cliente.consultor_info) : null
-    ));
+    const text = 'Consultoria por ' + cliente.consultor_name + (cliente.consultor_info ? ' · ' + cliente.consultor_info : '');
+    app.appendChild(el('div', { class: 'consultor-credit-ficha' }, text));
   }
 
   // Top action bar — view toggle + exports (sticky)
@@ -1489,12 +1486,19 @@ function renderFicha(cid, dishId, initialSfId = null) {
     el('div', { class: 'scale-ctrl' },
       el('span', { class: 'scale-label' }, 'Produzir:'),
       (() => {
-        const input = el('input', { type: 'number', step: '1', min: '0.001', value: state.finalTargetQty });
+        const input = el('input', {
+          type: 'text',
+          inputmode: 'decimal',
+          autocomplete: 'off',
+          value: String(state.finalTargetQty).replace('.', ',')
+        });
         input.addEventListener('input', () => {
-          const v = parseFloat(input.value.replace(',', '.'));
+          // Aceita vírgula ou ponto. Filtra tudo que não é dígito/separador
+          const cleaned = input.value.replace(/[^\d,.]/g, '').replace(',', '.');
+          const v = parseFloat(cleaned);
           if (isNaN(v) || v <= 0) return;
           state.finalTargetQty = v;
-          updateBody();  // só atualiza o body, não re-monta tudo
+          updateBody();
         });
         return input;
       })(),
