@@ -188,7 +188,9 @@ async function deleteCliente(cid) {
 function clearListeners() {
   Object.entries(STATE.unsubs).forEach(([k, u]) => { if (u) { u(); STATE.unsubs[k] = null; } });
   STATE.dishes = []; STATE.insumos = []; STATE.equipamentos = []; STATE.currentCliente = null;
+  STATE.currentClienteId = null;
   STATE.loaded = false;
+  updateBreadcrumb();
 }
 
 function subscribeCliente(cid) {
@@ -204,6 +206,7 @@ function subscribeCliente(cid) {
   STATE.unsubs.clienteDoc = onSnapshot(clienteDoc(cid), (snap) => {
     if (snap.exists()) STATE.currentCliente = { id: snap.id, ...snap.data() };
     else STATE.currentCliente = null;
+    updateBreadcrumb();
     if (pendingLoads > 0) maybeRender();
   });
   // Dishes
@@ -247,6 +250,62 @@ async function loadClientesList() {
     STATE.clientes = [];
     toast('Erro ao listar restaurantes: ' + err.message);
   }
+}
+
+// ---------- Modal unificado para escolher tipo de atualização ----------
+function openUpdateFromFileModal(cliente) {
+  const existing = $('#update-from-file-modal');
+  if (existing) existing.remove();
+
+  const modal = el('div', { class: 'modal', id: 'update-from-file-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content modal-content-wide' },
+      el('h2', {}, `Atualizar "${cliente.name}" a partir do arquivo`),
+      el('p', { class: 'modal-subtitle' }, 'Escolha o que sincronizar do arquivo data.json'),
+      (() => {
+        const form = el('form', { class: 'update-options-form' });
+        const opts = [
+          { val: 'prices', label: 'Só preços', icon: '₴', tag: 'SEGURO',
+            desc: 'Atualiza só o preço dos insumos. Não toca em fichas, nem adiciona ou remove insumos. Preço existente é sobrescrito pelo do arquivo se o arquivo tiver preço.' },
+          { val: 'structure', label: 'Só estrutura', icon: '⚙', tag: 'SEGURO',
+            desc: 'Atualiza rendimento (qty + unidade), subref_id (referências entre sub-fichas) e fator de correção. Preserva tudo que você editou (nomes, modo de preparo, fotos, preços, markup/CMV, observações).' },
+          { val: 'full', label: 'Tudo', icon: '⟳', tag: '⚠ SOBRESCREVE',
+            desc: 'Reimporta completo. Sobrescreve fichas com a versão do arquivo, preserva só preços de insumos > 0. Insumos e fichas órfãos (que não estão no arquivo) são excluídos. Use se você não editou nada localmente ou se quer resetar tudo.' }
+        ];
+        opts.forEach((o, i) => {
+          const id = 'upd-opt-' + o.val;
+          const card = el('label', { class: 'upd-opt', for: id },
+            el('input', { type: 'radio', name: 'upd-type', value: o.val, id, ...(i === 1 ? { checked: '' } : {}) }),
+            el('div', { class: 'upd-opt-body' },
+              el('div', { class: 'upd-opt-head' },
+                el('span', { class: 'upd-opt-icon' }, o.icon),
+                el('span', { class: 'upd-opt-label' }, o.label),
+                el('span', { class: 'upd-opt-tag' + (o.tag.startsWith('⚠') ? ' warn' : '') }, o.tag)
+              ),
+              el('p', { class: 'upd-opt-desc' }, o.desc)
+            )
+          );
+          form.appendChild(card);
+        });
+        return form;
+      })(),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: async () => {
+          const selected = $('input[name="upd-type"]:checked', modal)?.value;
+          if (!selected) return;
+          modal.remove();
+          if (selected === 'prices') syncPricesOnly(cliente.id);
+          else if (selected === 'structure') syncStructureOnly(cliente.id);
+          else if (selected === 'full') {
+            if (!confirm(`Reimportar TUDO em "${cliente.name}"?\n\nSobrescreve fichas e pode perder edições que você fez no admin.\nPreços existentes > 0 são preservados.`)) return;
+            seedClienteFromJson(cliente.id, cliente.name).catch(e => toast('Erro: ' + e.message));
+          }
+        } }, 'Atualizar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // ---------- Sync estrutural: só correções de estrutura, preserva conteúdo editado ----------
@@ -472,9 +531,7 @@ function updateAuthUI() {
   if (STATE.user && STATE.userDoc) {
     authBtn.textContent = 'Sair';
     authBtn.classList.add('logged-in');
-    // Show navigation
     nav.classList.add('logged');
-    // Show admin-only items
     const navClientes = $('#nav-clientes');
     const navUsuarios = $('#nav-usuarios');
     navClientes && (navClientes.style.display = (isMaster() || isStaff()) ? '' : 'none');
@@ -483,6 +540,18 @@ function updateAuthUI() {
     authBtn.textContent = 'Entrar';
     authBtn.classList.remove('logged-in');
     nav.classList.remove('logged');
+  }
+  updateBreadcrumb();
+}
+function updateBreadcrumb() {
+  const el = $('#brand-cliente');
+  if (!el) return;
+  if (STATE.currentCliente && STATE.currentClienteId) {
+    el.textContent = ' · ' + STATE.currentCliente.name;
+    el.style.display = '';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
   }
 }
 
@@ -705,12 +774,29 @@ async function renderClientesAdmin() {
             try { await saveCliente({ ...c, name: newName }); toast('Renomeado'); renderClientesAdmin(); }
             catch (err) { toast('Erro: ' + err.message); }
           } }, '✎ Renomear'),
-          el('button', { class: 'btn btn-small btn-accent', onclick: () => syncPricesOnly(c.id), title: 'Atualiza só os preços dos insumos com valores do data.json' }, '₴ Atualizar preços'),
-          el('button', { class: 'btn btn-small btn-accent', onclick: () => syncStructureOnly(c.id), title: 'Atualiza só rendimentos, subref_id e fc (sem perder nada que você editou)' }, '⚙ Atualizar estrutura'),
-          el('button', { class: 'btn btn-small', onclick: () => {
-            if (!confirm(`Reimportar dados iniciais em "${c.name}"?\n\n• Sobrescreve fichas com versão do data.json\n• Preços existentes > 0 são preservados\n• Insumos e fichas órfãos são excluídos`)) return;
-            seedClienteFromJson(c.id, c.name).catch(e => toast('Erro: ' + e.message));
-          }, title: 'Reimporta TUDO do data.json (sobrescreve fichas)' }, '⟳ Reimportar tudo'),
+          el('button', { class: 'btn btn-small btn-accent', onclick: () => openUpdateFromFileModal(c), title: 'Sincronizar do arquivo data.json' }, '↻ Atualizar do arquivo'),
+          el('button', { class: 'btn btn-small', onclick: async () => {
+            // Backup do cliente (precisa garantir que estamos subscritos a ele)
+            try {
+              const [dSnap, iSnap, cfgSnap] = await Promise.all([
+                getDocs(dishesCol(c.id)),
+                getDocs(insumosCol(c.id)),
+                getDoc(configDoc(c.id, 'equipamentos'))
+              ]);
+              const payload = {
+                cliente: c,
+                dishes: dSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                insumos: iSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+                equipamentos_disponiveis: cfgSnap.exists() ? (cfgSnap.data().list || []) : []
+              };
+              const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = `backup-${c.id}-${new Date().toISOString().slice(0,10)}.json`;
+              a.click(); URL.revokeObjectURL(url);
+              toast('Backup baixado');
+            } catch (err) { toast('Erro: ' + err.message); }
+          }, title: 'Baixar JSON com tudo deste cliente' }, '↓ Backup'),
           el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
             if (!confirm(`EXCLUIR "${c.name}"?\n\nIsso apaga fichas, insumos e configs. Baixe um backup antes se houver dados importantes.`)) return;
             try {
@@ -1138,11 +1224,8 @@ function renderClienteHome(cid) {
   const hero = el('section', { class: 'home-hero' },
     el('h1', {}, 'Cardápio'),
     el('p', { class: 'subtitle' }, STATE.currentCliente?.name || ''),
-    el('div', { class: 'home-stats' },
-      el('span', {}, el('strong', {}, STATE.dishes.length.toString()), 'Pratos'),
-      el('span', {}, el('strong', {}, totalSubfichas.toString()), 'Sub-fichas'),
-      el('span', {}, el('strong', {}, STATE.insumos.length.toString()), 'Insumos')
-    )
+    el('p', { class: 'home-stats-mini' },
+      `${STATE.dishes.length} pratos · ${totalSubfichas} sub-fichas · ${STATE.insumos.length} insumos`)
   );
   app.appendChild(hero);
 
@@ -1164,9 +1247,10 @@ function renderClienteHome(cid) {
     const { costPerPortion } = dishCost(dish);
     const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
     const rendDisplay = lastSf?.rendimento ? formatRendimento(lastSf.rendimento) : '—';
+    const finalSfId = lastSf?.id;
     const dishGroup = el('article', { class: 'dish-group' },
       el('header', { class: 'dish-head' },
-        el('a', { class: 'dish-title', href: `#/c/${cid}/ficha/${dish.id}` },
+        el('a', { class: 'dish-title', href: finalSfId ? `#/c/${cid}/ficha/${dish.id}/${finalSfId}` : `#/c/${cid}/ficha/${dish.id}` },
           el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
           el('span', { class: 'dish-name' }, dish.name)
         ),
@@ -1219,25 +1303,33 @@ function renderFicha(cid, dishId, initialSfId = null) {
   }
   app.appendChild(renderClienteContext(cid));
 
-  const defaultSf = initialSfId && dish.sub_fichas.some(s => s.id === initialSfId)
-    ? initialSfId
-    : (dish.sub_fichas[0]?.id || null);
-  // Escala em cascata: define rendimento alvo APENAS no prato final; propaga pra todas as sub-fichas.
   const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
   const originalFinal = getSfRendimento(finalSf);
   const state = {
     view: 'trabalho',
-    activeSf: defaultSf,
-    finalTargetQty: originalFinal.qty,  // padrão = rendimento original
+    finalTargetQty: originalFinal.qty,
     finalUnit: originalFinal.unit,
   };
   state.scales = () => computeCascadeScales(dish, state.finalTargetQty);
 
-  const header = el('div', { class: 'ficha-header' },
-    el('a', { class: 'back-link', href: `#/c/${cid}` }, '← Voltar ao cardápio'),
+  // Header with back link, title, and inline action bar
+  const header = el('div', { class: 'ficha-header-v2' },
+    el('a', { class: 'back-link', href: `#/c/${cid}` }, '← Cardápio'),
     el('h1', {}, dish.name)
   );
   app.appendChild(header);
+
+  // Top action bar — view toggle + exports (sticky)
+  const toggle = el('div', { class: 'view-toggle' },
+    el('button', { 'data-view': 'trabalho' }, 'Trabalho'),
+    el('button', { 'data-view': 'custo' }, 'Custo')
+  );
+  const exports = el('div', { class: 'export-actions' },
+    el('button', { class: 'btn btn-small', title: 'Exportar PDF', onclick: () => exportFichaPDF(dish, state) }, '📄 PDF'),
+    el('button', { class: 'btn btn-small', title: 'Exportar Excel', onclick: () => exportFichaXLSX(dish, state) }, '📊 Excel')
+  );
+  const actionBar = el('div', { class: 'ficha-action-bar' }, toggle, exports);
+  app.appendChild(actionBar);
 
   if (dish.photos && dish.photos.length) {
     const gallery = el('div', { class: 'gallery' });
@@ -1245,13 +1337,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
     app.appendChild(gallery);
   }
 
-  const toggle = el('div', { class: 'view-toggle' },
-    el('button', { 'data-view': 'trabalho' }, 'Ficha de trabalho'),
-    el('button', { 'data-view': 'custo' }, 'Ficha de custo')
-  );
-  app.appendChild(toggle);
-
-  // Production scale bar (dish-level) — aparece só na ficha de trabalho
+  // Scale bar — só em modo trabalho
   const scaleBar = el('div', { class: 'rend-bar dish-scale-bar' },
     el('div', { class: 'rend-info' },
       el('span', { class: 'rend-label' }, 'Rendimento original'),
@@ -1260,13 +1346,12 @@ function renderFicha(cid, dishId, initialSfId = null) {
     el('div', { class: 'scale-ctrl' },
       el('span', { class: 'scale-label' }, 'Produzir:'),
       (() => {
-        const input = el('input', { type: 'number', step: '1', min: '0.001',
-          value: state.finalTargetQty });
+        const input = el('input', { type: 'number', step: '1', min: '0.001', value: state.finalTargetQty });
         input.addEventListener('input', () => {
           const v = parseFloat(input.value.replace(',', '.'));
           if (isNaN(v) || v <= 0) return;
           state.finalTargetQty = v;
-          updateUI();
+          updateBody();  // só atualiza o body, não re-monta tudo
         });
         return input;
       })(),
@@ -1275,58 +1360,88 @@ function renderFicha(cid, dishId, initialSfId = null) {
   );
   app.appendChild(scaleBar);
 
-  const tabs = el('div', { class: 'subficha-tabs' });
-  (dish.sub_fichas || []).forEach(sf => {
-    tabs.appendChild(el('button', { 'data-sf': sf.id }, sf.name));
+  // Quick-nav anchors
+  const quickNav = el('nav', { class: 'sf-quicknav' });
+  (dish.sub_fichas || []).forEach((sf, idx) => {
+    const isFinal = idx === dish.sub_fichas.length - 1;
+    quickNav.appendChild(el('a', { href: `#sf-${sf.id}`, class: isFinal ? 'is-final' : '' },
+      `${idx + 1}. ${sf.name}`
+    ));
   });
-  app.appendChild(tabs);
+  app.appendChild(quickNav);
 
-  const body = el('div', {});
+  // Body (all sub-fichas stacked)
+  const body = el('div', { id: 'ficha-body-container' });
   app.appendChild(body);
 
-  const actions = el('div', { class: 'ficha-actions' },
-    el('button', { class: 'btn', onclick: () => exportFichaPDF(dish, state) }, 'Exportar PDF'),
-    el('button', { class: 'btn', onclick: () => exportFichaXLSX(dish, state) }, 'Exportar Excel')
-  );
-  app.appendChild(actions);
-
-  function updateUI() {
+  function updateBody() {
     $$('.view-toggle button', toggle).forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
-    $$('.subficha-tabs button', tabs).forEach(b => b.classList.toggle('active', b.dataset.sf === state.activeSf));
-    // Scale bar visible só no modo trabalho
     scaleBar.style.display = state.view === 'trabalho' ? '' : 'none';
-    const sf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
     body.innerHTML = '';
-    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf, state));
-    else body.appendChild(renderFichaCusto(dish, sf, cid));
+    if (state.view === 'trabalho') {
+      // Todas as sub-fichas stacked em modo cozinha
+      (dish.sub_fichas || []).forEach((sf, idx) => {
+        const card = renderFichaTrabalho(dish, sf, state, idx);
+        card.id = `sf-${sf.id}`;
+        body.appendChild(card);
+      });
+      // Louça + equipamentos ao final (só uma vez)
+      if (dish.louca) {
+        body.appendChild(el('div', { class: 'info-box' },
+          el('strong', {}, 'Apresentação / Louça'),
+          dish.louca
+        ));
+      }
+      if (dish.equipamentos && dish.equipamentos.length) {
+        const box = el('div', { class: 'info-box' }, el('strong', {}, 'Equipamentos necessários'));
+        const list = el('div', { class: 'equipamentos-list' });
+        dish.equipamentos.forEach(eq => list.appendChild(el('span', { class: 'chip' }, eq)));
+        box.appendChild(list);
+        body.appendChild(box);
+      }
+    } else {
+      body.appendChild(renderFichaCusto(dish, cid));
+    }
   }
-  toggle.addEventListener('click', e => { if (e.target.dataset.view) { state.view = e.target.dataset.view; updateUI(); } });
-  tabs.addEventListener('click', e => { if (e.target.dataset.sf) { state.activeSf = e.target.dataset.sf; updateUI(); } });
-  updateUI();
+  toggle.addEventListener('click', e => { if (e.target.dataset.view) { state.view = e.target.dataset.view; updateBody(); } });
+  updateBody();
+
+  // Scroll pra sub-ficha se vier do cardápio com /ficha/X/Y
+  if (initialSfId) {
+    setTimeout(() => {
+      const target = document.getElementById(`sf-${initialSfId}`);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
 }
 
-function renderFichaTrabalho(dish, sf, state) {
-  const wrap = el('div', { class: 'ficha-body kitchen-mode' });
-  wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha Técnica Operacional'));
-  wrap.appendChild(el('h2', {}, sf.name));
+function renderFichaTrabalho(dish, sf, state, idx) {
+  const isFinal = idx === dish.sub_fichas.length - 1;
+  const wrap = el('section', { class: 'sf-card kitchen-mode' + (isFinal ? ' sf-final' : '') });
 
-  // Escala em cascata: pega a escala desta sub-ficha baseada no alvo final
   const scales = state.scales();
   const sfScale = scales[sf.id] || 1;
 
-  // Mostra rendimento desta sub-ficha (escalado)
+  // Header da sub-ficha com número + nome + rendimento
   const parsedRend = getSfRendimento(sf);
   const scaledRendQty = parsedRend.qty * sfScale;
   const normRend = normUnitForDisplay(scaledRendQty, parsedRend.unit);
-  const rendInfo = el('div', { class: 'ficha-meta-line' },
-    'Rendimento: ',
-    el('strong', {}, `${normRend.text} ${normRend.unit}`.trim()),
-    sfScale !== 1 ? el('span', { class: 'muted', style: 'margin-left:0.5rem;' }, `(${fmtNum(sfScale, 2)}× do original)`) : null
-  );
-  wrap.appendChild(rendInfo);
 
-  // Ingredients (kitchen style) — quantities scaled by this sub-ficha's cascade factor
-  const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
+  wrap.appendChild(el('header', { class: 'sf-card-head' },
+    el('div', { class: 'sf-num-name' },
+      el('span', { class: 'sf-num' }, String(idx + 1).padStart(2, '0')),
+      el('h2', { class: 'sf-title' }, sf.name),
+      isFinal ? el('span', { class: 'sf-final-tag' }, 'prato final') : null
+    ),
+    el('div', { class: 'sf-rend-inline' },
+      el('span', { class: 'muted' }, 'rendimento '),
+      el('strong', {}, `${normRend.text} ${normRend.unit}`.trim()),
+      sfScale !== 1 ? el('span', { class: 'muted', style: 'margin-left:0.4rem;' }, `(${fmtNum(sfScale, 2)}×)`) : null
+    )
+  ));
+
+  // Ingredientes
+  const sfIdx = idx;
   const ingList = el('ul', { class: 'kitchen-ingredients' });
   (sf.ingredientes || []).forEach(ing => {
     let subSf = null;
@@ -1343,7 +1458,7 @@ function renderFichaTrabalho(dish, sf, state) {
         )
       ),
       ing.observacao ? el('div', { class: 'k-obs' }, ing.observacao) : null,
-      subSf ? el('div', { class: 'k-sub-note' }, 'ver preparação: ' + subSf.name) : null
+      subSf ? el('div', { class: 'k-sub-note' }, el('a', { href: `#sf-${subSf.id}` }, 'ver preparação: ' + subSf.name)) : null
     );
     ingList.appendChild(li);
   });
@@ -1354,43 +1469,37 @@ function renderFichaTrabalho(dish, sf, state) {
     wrap.appendChild(el('h3', { class: 'k-section-title' }, 'Modo de preparo'));
     wrap.appendChild(el('div', { class: 'kitchen-preparo' }, sf.modo_preparo));
   }
-  if (dish.louca) {
-    wrap.appendChild(el('div', { class: 'info-box' },
-      el('strong', {}, 'Apresentação / Louça'),
-      dish.louca
-    ));
-  }
-  if (dish.equipamentos && dish.equipamentos.length) {
-    const box = el('div', { class: 'info-box' }, el('strong', {}, 'Equipamentos necessários'));
-    const list = el('div', { class: 'equipamentos-list' });
-    dish.equipamentos.forEach(eq => list.appendChild(el('span', { class: 'chip' }, eq)));
-    box.appendChild(list);
-    wrap.appendChild(box);
-  }
 
   return wrap;
 }
 
-function renderFichaCusto(dish, currentSf, cid) {
+function renderFichaCusto(dish, cid) {
   const wrap = el('div', { class: 'ficha-body' });
   if (!canEditInsumoPrice(cid)) {
     wrap.appendChild(el('p', { class: 'muted' }, 'Ficha de custo não disponível para seu perfil.'));
     return wrap;
   }
-  wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha de Custo por Rendimento'));
-  wrap.appendChild(el('h2', {}, dish.name));
 
   const all = dishCost(dish);
-  all.sfCosts.forEach(({ sf, rows, total }) => {
+  const finalSfId = dish.sub_fichas[dish.sub_fichas.length - 1]?.id;
+  all.sfCosts.forEach(({ sf, rows, total }, idx) => {
+    const isFinal = sf.id === finalSfId;
     const rendDisplay = sf.rendimento ? formatRendimento(sf.rendimento) : '';
-    const section = el('div', { class: 'ficha-section' },
-      el('h3', {}, sf.name + (rendDisplay ? ` — rendimento: ${rendDisplay}` : ''))
+    const section = el('section', { class: 'sf-cost-card' + (isFinal ? ' sf-final' : '') , id: `sf-cost-${sf.id}` },
+      el('header', { class: 'sf-cost-head' },
+        el('div', {},
+          el('span', { class: 'sf-num' }, String(idx + 1).padStart(2, '0')),
+          el('h3', { class: 'sf-cost-title' }, sf.name),
+          isFinal ? el('span', { class: 'sf-final-tag' }, 'prato final') : null
+        ),
+        el('span', { class: 'muted' }, rendDisplay ? 'rend. ' + rendDisplay : '')
+      )
     );
     const tbl = el('table', { class: 'ficha-table' },
       el('thead', {}, el('tr', {},
         el('th', {}, 'Insumo'),
-        el('th', { class: 'num' }, 'Quantidade'),
-        el('th', {}, 'Unidade'),
+        el('th', { class: 'num' }, 'Qtd'),
+        el('th', {}, 'Un.'),
         el('th', { class: 'num' }, 'Preço unit.'),
         el('th', { class: 'num' }, 'Custo')
       )),
@@ -1398,26 +1507,25 @@ function renderFichaCusto(dish, currentSf, cid) {
         const fmt = formatIngQty(ing);
         let priceTxt, nameCell;
         if (isSubref && subSf) {
-          priceTxt = el('span', { class: 'subref-note' }, `sub-ficha (${formatRendimento(subSf.rendimento || '')})`);
+          priceTxt = el('span', { class: 'subref-note' }, `sub-ficha`);
           nameCell = el('td', { 'data-label': 'Insumo', class: 'subref-cell' },
             el('span', { class: 'subref-arrow' }, '↪ '), ing.insumo_name);
         } else {
           const normPrice = insumo ? normalizePriceForDisplay(insumo) : null;
           priceTxt = normPrice ? `${fmtBRL(normPrice.price)} / ${normPrice.unit}` : '—';
-          // Show FC badge next to name if applicable
-          const fcBadge = (fc && fc > 1) ? el('span', { class: 'fc-badge', title: `Fator de correção ${fc}x` }, ` · FC ${fmtNum(fc, 2)}`) : null;
+          const fcBadge = (fc && fc > 1) ? el('span', { class: 'fc-badge', title: `Fator de correção ${fc}x — considera perda no processamento` }, ` · FC ${fmtNum(fc, 2)}`) : null;
           nameCell = el('td', { 'data-label': 'Insumo' }, ing.insumo_name, fcBadge);
         }
         return el('tr', { class: isSubref ? 'row-subref' : '' },
           nameCell,
-          el('td', { class: 'num', 'data-label': 'Quantidade' }, fmt.text),
-          el('td', { 'data-label': 'Unidade' }, fmt.unit || '—'),
+          el('td', { class: 'num', 'data-label': 'Qtd' }, fmt.text),
+          el('td', { 'data-label': 'Un.' }, fmt.unit || '—'),
           el('td', { class: 'num', 'data-label': 'Preço unit.' }, priceTxt),
           el('td', { class: 'num', 'data-label': 'Custo' }, fmtBRL(cost))
         );
       })),
       el('tfoot', {}, el('tr', {},
-        el('td', { colspan: '4' }, 'Subtotal — ' + sf.name),
+        el('td', { colspan: '4' }, isFinal ? 'Subtotal (= custo do prato)' : 'Subtotal do lote (informativo)'),
         el('td', { class: 'num' }, fmtBRL(total))
       ))
     );
@@ -1434,6 +1542,8 @@ function renderFichaCusto(dish, currentSf, cid) {
       el('span', { class: 'stat-value gold' }, fmtBRL(all.costPerPortion)))
   );
   wrap.appendChild(total);
+  wrap.appendChild(el('p', { class: 'cost-total-note muted' },
+    'O custo total é calculado pela sub-ficha final, que já incorpora proporcionalmente o que é consumido das sub-fichas anteriores. Os subtotais das sub-fichas intermediárias são informativos (custo do lote inteiro daquela preparação).'));
 
   // 3 campos bidirecionais: CMV / Markup / Preço de Venda
   // Edite qualquer um → os outros 2 se ajustam. Armazena target_cmv como fonte de verdade.
@@ -1505,11 +1615,30 @@ function renderFichaCusto(dish, currentSf, cid) {
 }
 
 // ---------- Views: Insumos ----------
+// Auto-categorização por palavras-chave no nome
+const INSUMO_CATEGORIES = [
+  { id: 'proteinas', label: 'Proteínas', kws: ['acem','atum','barriga','copa','coracao','costelinha','frango','joelho','linguica','lula','moela','osso','ovo','peito','peixe','pele','pe de','rabada','gema','coracao','suina','suino'] },
+  { id: 'hortifruti', label: 'Hortifruti', kws: ['agriao','alho','banana','cebola','cebolinha','cenoura','ciboulette','coentro','dill','gengibre','limao','maca','milho','salsinha','salsao','tomate','quirera'] },
+  { id: 'laticinios', label: 'Laticínios', kws: ['leite','manteiga','mussarela','queijo','requeijao','catupiry','coco'] },
+  { id: 'secos', label: 'Secos / Especiarias', kws: ['acucar','amido','cominho','cravo','extrato','farinha','flor de sal','fuba','louro','mostarda','panko','paprica','pimenta','polvilho','sal ','sal refinado','sal\u00a0'] },
+  { id: 'liquidos', label: 'Líquidos / Condimentos', kws: ['agua','azeite','cerveja','molho','oleo','shoyu','suco','sweet','vinagre','chili'] },
+];
+function categorizeInsumo(ins) {
+  const n = (ins.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  for (const cat of INSUMO_CATEGORIES) {
+    for (const kw of cat.kws) {
+      if (n.includes(kw)) return cat.id;
+    }
+  }
+  return 'outros';
+}
+
 function renderInsumos(cid) {
   const app = $('#app');
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   const canEdit = canEditInsumoPrice(cid);
+  const canFullEdit = canEditCliente(cid);
   const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Insumos'),
@@ -1517,9 +1646,22 @@ function renderInsumos(cid) {
         ? 'Atualize os preços — salva automaticamente e todas as fichas recalculam.'
         : 'Preços dos insumos.')
     ),
-    el('input', { type: 'search', class: 'insumos-search', placeholder: 'Buscar insumo…' })
+    el('div', { class: 'insumos-actions' },
+      el('input', { type: 'search', class: 'insumos-search', placeholder: 'Buscar insumo…' }),
+      canFullEdit ? el('button', { class: 'btn btn-primary btn-small', onclick: () => openNovoInsumoModal(cid) }, '+ Novo insumo') : null
+    )
   );
   app.appendChild(header);
+
+  // Filter chips por categoria
+  const allCats = [{ id: 'all', label: 'Todos' }, ...INSUMO_CATEGORIES, { id: 'outros', label: 'Outros' }];
+  const filterState = { category: 'all', search: '' };
+  const filterBar = el('div', { class: 'insumo-filter-chips' });
+  allCats.forEach(c => {
+    const btn = el('button', { class: 'chip-filter' + (c.id === 'all' ? ' active' : ''), 'data-cat': c.id }, c.label);
+    filterBar.appendChild(btn);
+  });
+  app.appendChild(filterBar);
 
   const tbl = el('table', { class: 'insumos-table' },
     el('thead', {}, el('tr', {},
@@ -1527,7 +1669,7 @@ function renderInsumos(cid) {
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
       el('th', {}, 'Usado em'),
-      canEditCliente(cid) ? el('th', {}, '') : null
+      canFullEdit ? el('th', {}, '') : null
     ))
   );
   const tbody = el('tbody', {});
@@ -1535,44 +1677,97 @@ function renderInsumos(cid) {
   STATE.dishes.forEach(d => (d.sub_fichas || []).forEach(sf =>
     (sf.ingredientes || []).forEach(i => { usageMap[i.insumo_id] = (usageMap[i.insumo_id] || 0) + 1; })
   ));
-  function buildRows(filter) {
+  function buildRows() {
     tbody.innerHTML = '';
-    const f = (filter || '').toLowerCase().trim();
-    STATE.insumos.filter(i => !f || i.name.toLowerCase().includes(f)).forEach(insumo => {
-      const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
-      const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
-      if (!canEdit) { unitInput.disabled = true; priceInput.disabled = true; }
-      unitInput.addEventListener('change', () => {
-        insumo.unit = unitInput.value.trim();
-        scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+    const f = filterState.search.toLowerCase().trim();
+    const cat = filterState.category;
+    STATE.insumos
+      .filter(i => !f || i.name.toLowerCase().includes(f))
+      .filter(i => cat === 'all' || categorizeInsumo(i) === cat)
+      .forEach(insumo => {
+        const unitInput = el('input', { class: 'unit-input', value: insumo.unit || '', placeholder: 'g' });
+        const priceInput = el('input', { type: 'number', min: '0', step: '0.01', value: insumo.price || 0 });
+        if (!canEdit) { unitInput.disabled = true; priceInput.disabled = true; }
+        unitInput.addEventListener('change', () => {
+          insumo.unit = unitInput.value.trim();
+          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+        });
+        priceInput.addEventListener('input', () => {
+          insumo.price = parseFloat(priceInput.value) || 0;
+          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+        });
+        const cells = [
+          el('td', { 'data-label': 'Insumo' }, insumo.name),
+          el('td', { 'data-label': 'Unidade' }, unitInput),
+          el('td', { 'data-label': 'Preço (R$)' }, priceInput),
+          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
+        ];
+        if (canFullEdit) {
+          cells.push(el('td', { 'data-label': '' },
+            el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+              const uses = usageMap[insumo.id] || 0;
+              if (!confirm(uses > 0 ? `Excluir "${insumo.name}"? Usado em ${uses} receita(s).` : `Excluir "${insumo.name}"?`)) return;
+              try { await deleteInsumo(cid, insumo.id); toast('Excluído'); } catch (e) { toast('Erro: ' + e.message); }
+            } }, 'Excluir')
+          ));
+        }
+        tbody.appendChild(el('tr', {}, ...cells));
       });
-      priceInput.addEventListener('input', () => {
-        insumo.price = parseFloat(priceInput.value) || 0;
-        scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
-      });
-      const cells = [
-        el('td', { 'data-label': 'Insumo' }, insumo.name),
-        el('td', { 'data-label': 'Unidade' }, unitInput),
-        el('td', { 'data-label': 'Preço (R$)' }, priceInput),
-        el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
-      ];
-      if (canEditCliente(cid)) {
-        cells.push(el('td', { 'data-label': '' },
-          el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-            const uses = usageMap[insumo.id] || 0;
-            if (!confirm(uses > 0 ? `Excluir "${insumo.name}"? Usado em ${uses} receita(s).` : `Excluir "${insumo.name}"?`)) return;
-            try { await deleteInsumo(cid, insumo.id); toast('Excluído'); } catch (e) { toast('Erro: ' + e.message); }
-          } }, 'Excluir')
-        ));
-      }
-      tbody.appendChild(el('tr', {}, ...cells));
-    });
   }
-  buildRows('');
+  buildRows();
   tbl.appendChild(tbody);
   const tableWrap = el('div', { class: 'insumos-table-wrap' }, tbl);
   app.appendChild(tableWrap);
-  $('.insumos-search', header).addEventListener('input', e => buildRows(e.target.value));
+  $('.insumos-search', header).addEventListener('input', e => {
+    filterState.search = e.target.value;
+    buildRows();
+  });
+  filterBar.addEventListener('click', e => {
+    const b = e.target.closest('.chip-filter');
+    if (!b) return;
+    filterState.category = b.dataset.cat;
+    $$('.chip-filter', filterBar).forEach(x => x.classList.toggle('active', x === b));
+    buildRows();
+  });
+}
+
+function openNovoInsumoModal(cid) {
+  const modal = el('div', { class: 'modal', id: 'novo-insumo-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content' },
+      el('h2', {}, 'Novo insumo'),
+      el('p', { class: 'modal-subtitle' }, 'Adiciona um novo insumo à lista deste cliente'),
+      (() => {
+        const nameInput = el('input', { type: 'text', placeholder: 'Ex: Farinha de Arroz' });
+        const unitInput = el('input', { type: 'text', placeholder: 'kg / l / und / folhas' });
+        const priceInput = el('input', { type: 'number', min: '0', step: '0.01', placeholder: '0,00' });
+        const formEl = el('div', { class: 'form-grid' },
+          el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+          el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Unidade'), unitInput),
+          el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Preço (R$)'), priceInput)
+        );
+        modal.__submit = async () => {
+          const name = nameInput.value.trim();
+          const unit = unitInput.value.trim().toLowerCase() || 'kg';
+          const price = parseFloat(priceInput.value) || 0;
+          if (!name) { alert('Nome obrigatório'); return; }
+          const id = slugify(name);
+          if (STATE.insumos.find(i => i.id === id)) { alert('Já existe um insumo com esse nome'); return; }
+          try {
+            await saveInsumo(cid, { id, name, unit, price });
+            toast('Insumo criado');
+            modal.remove();
+          } catch (err) { toast('Erro: ' + err.message); }
+        };
+        return formEl;
+      })(),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: () => modal.__submit() }, 'Criar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // ---------- Views: Admin dishes ----------
@@ -1691,15 +1886,21 @@ function renderAdminEdit(cid, dishId) {
   function renderSubfichas() {
     sfWrap.innerHTML = '';
     dish.sub_fichas.forEach((sf, idx) => {
-      const box = el('div', { class: 'subficha-editor' },
-        el('h4', {}, el('span', {}, `${idx + 1}. Preparação`),
-          el('span', {},
-            el('button', { class: 'btn btn-small', onclick: () => { if (idx > 0) { [dish.sub_fichas[idx-1], dish.sub_fichas[idx]] = [dish.sub_fichas[idx], dish.sub_fichas[idx-1]]; renderSubfichas(); } } }, '↑'), ' ',
-            el('button', { class: 'btn btn-small', onclick: () => { if (idx < dish.sub_fichas.length - 1) { [dish.sub_fichas[idx], dish.sub_fichas[idx+1]] = [dish.sub_fichas[idx+1], dish.sub_fichas[idx]]; renderSubfichas(); } } }, '↓'), ' ',
-            el('button', { class: 'btn btn-small btn-danger', onclick: () => { if (confirm('Excluir esta preparação?')) { dish.sub_fichas.splice(idx, 1); renderSubfichas(); } } }, 'Excluir')
-          )
-        ),
-        el('div', { class: 'form-grid' },
+      const isFinal = idx === dish.sub_fichas.length - 1;
+      const box = el('details', { class: 'subficha-editor', ...(isFinal ? { open: '' } : {}) });
+      const summary = el('summary', { class: 'subficha-editor-summary' },
+        el('span', { class: 'sf-editor-num' }, String(idx + 1).padStart(2, '0')),
+        el('span', { class: 'sf-editor-name' }, sf.name || '(nova preparação)'),
+        el('span', { class: 'sf-editor-meta' }, sf.rendimento || ''),
+        el('span', { class: 'sf-editor-chev' }, '▾'),
+        el('span', { class: 'sf-editor-actions', onclick: e => e.stopPropagation() },
+          el('button', { class: 'btn btn-small', onclick: (e) => { e.preventDefault(); if (idx > 0) { [dish.sub_fichas[idx-1], dish.sub_fichas[idx]] = [dish.sub_fichas[idx], dish.sub_fichas[idx-1]]; renderSubfichas(); } }, title: 'Mover para cima' }, '↑'),
+          el('button', { class: 'btn btn-small', onclick: (e) => { e.preventDefault(); if (idx < dish.sub_fichas.length - 1) { [dish.sub_fichas[idx], dish.sub_fichas[idx+1]] = [dish.sub_fichas[idx+1], dish.sub_fichas[idx]]; renderSubfichas(); } }, title: 'Mover para baixo' }, '↓'),
+          el('button', { class: 'btn btn-small btn-danger', onclick: (e) => { e.preventDefault(); if (confirm('Excluir esta preparação?')) { dish.sub_fichas.splice(idx, 1); renderSubfichas(); } } }, '×')
+        )
+      );
+      box.appendChild(summary);
+      box.appendChild(el('div', { class: 'form-grid' },
           fieldInput('Nome da preparação', 'text', sf.name, v => sf.name = v),
           fieldInput('Rendimento (quantidade)', 'number', sf.rendimento_qty ?? '', v => {
             const n = parseFloat(v);
@@ -1783,6 +1984,15 @@ function renderAdminEdit(cid, dishId) {
     el('a', { class: 'btn', href: `#/c/${cid}/admin` }, 'Cancelar')
   ));
   app.appendChild(panel);
+  // Sticky save bar sempre visível durante a edição
+  const stickyBar = el('div', { class: 'sticky-save-bar' },
+    el('span', { class: 'muted', style: 'font-size:0.82rem;' }, 'Editando ficha — salve antes de sair'),
+    el('div', { style: 'display:flex;gap:0.5rem;' },
+      el('a', { class: 'btn btn-small', href: `#/c/${cid}/admin` }, 'Cancelar'),
+      el('button', { class: 'btn btn-small btn-primary', onclick: () => saveDishAction(cid, dish, dishId) }, 'Salvar')
+    )
+  );
+  app.appendChild(stickyBar);
 }
 
 async function saveDishAction(cid, dish, originalId) {
@@ -2125,19 +2335,4 @@ $('#login-form').addEventListener('submit', e => {
 $('#login-cancel').addEventListener('click', closeLoginModal);
 $('.modal-overlay').addEventListener('click', closeLoginModal);
 
-// Optional: download backup of current cliente (admin only)
-const btnBackup = $('#btn-download-backup');
-if (btnBackup) btnBackup.addEventListener('click', () => {
-  if (!STATE.currentClienteId) { toast('Abra um cliente antes'); return; }
-  const payload = {
-    cliente: STATE.currentCliente,
-    dishes: STATE.dishes, insumos: STATE.insumos,
-    equipamentos_disponiveis: STATE.equipamentos
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `backup-${STATE.currentClienteId}-${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); URL.revokeObjectURL(url);
-  toast('Backup baixado');
-});
+// Backup do cliente agora é feito via Gerenciar Restaurantes (botão ↓ Backup por cliente)
