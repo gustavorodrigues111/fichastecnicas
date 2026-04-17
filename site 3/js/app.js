@@ -183,27 +183,41 @@ async function deleteDish(cid, did) {
   await cleanupOrphanInsumos(cid).catch(err => console.warn('cleanup insumos:', err));
 }
 
-// Remove insumos que não são referenciados por nenhuma ficha
+// Remove insumos que não são referenciados por nenhuma ficha, OU cujo nome bate com um subproduto/subref
 async function cleanupOrphanInsumos(cid) {
   const [insumosSnap, dishesSnap] = await Promise.all([
     getDocs(insumosCol(cid)),
     getDocs(dishesCol(cid))
   ]);
+  // Coleta nomes de subprodutos (não são insumos — são produzidos)
+  const subprodutoNames = new Set();
+  // Coleta nomes de sub-fichas (subrefs por detecção)
+  const sfNames = new Set();
   // IDs de insumos referenciados por qualquer ingrediente real (não subref)
   const referenced = new Set();
+  // Nomes de insumos que são referenciados por nome (mas podem não ter insumo_id setado ainda)
+  const referencedByName = new Set();
   dishesSnap.docs.forEach(d => {
     const data = d.data();
     (data.sub_fichas || []).forEach(sf => {
+      if (sf.name) sfNames.add(nrm(sf.name));
+      if (sf.subproduto && sf.subproduto.name) subprodutoNames.add(nrm(sf.subproduto.name));
       (sf.ingredientes || []).forEach(ing => {
         if (!ing.subref_id && ing.insumo_id) referenced.add(ing.insumo_id);
+        if (!ing.subref_id && ing.insumo_name) referencedByName.add(nrm(ing.insumo_name));
       });
     });
   });
-  // Deletar insumos não referenciados
+  // Deletar insumos: não referenciados OR cujo nome bate com subproduto/sub-ficha
   let batch = writeBatch(db);
   let count = 0, deleted = 0;
   for (const ins of insumosSnap.docs) {
-    if (!referenced.has(ins.id)) {
+    const data = ins.data();
+    const n = nrm(data.name || '');
+    const isSubproduto = subprodutoNames.has(n);
+    const isSfName = sfNames.has(n);
+    const isOrphan = !referenced.has(ins.id) && !referencedByName.has(n);
+    if (isOrphan || isSubproduto || isSfName) {
       batch.delete(insumoDoc(cid, ins.id));
       deleted++;
       count++;
@@ -2196,6 +2210,12 @@ function renderInsumos(cid) {
     ),
     el('div', { class: 'insumos-actions' },
       el('input', { type: 'search', class: 'insumos-search', placeholder: 'Buscar insumo…' }),
+      canFullEdit ? el('button', { class: 'btn btn-small', title: 'Remove insumos que não são usados em nenhuma ficha e insumos que são subprodutos (caldos gerados por sub-fichas etc.)', onclick: async () => {
+        try {
+          const n = await cleanupOrphanInsumos(cid);
+          toast(n > 0 ? `${n} insumo${n > 1 ? 's' : ''} removido${n > 1 ? 's' : ''}` : 'Nenhum insumo órfão encontrado');
+        } catch (err) { toast('Erro: ' + err.message); }
+      } }, '↻ Limpar órfãos') : null,
       canFullEdit ? el('button', { class: 'btn btn-primary btn-small', onclick: () => openNovoInsumoModal(cid) }, '+ Novo insumo') : null
     )
   );
@@ -2222,9 +2242,14 @@ function renderInsumos(cid) {
     ))
   );
   const tbody = el('tbody', {});
+  // Usa Set pra agregar nomes únicos de pratos por insumo_id (não conta 2x se o insumo aparece em 2 sub-fichas do mesmo prato)
   const usageMap = {};
   STATE.dishes.forEach(d => (d.sub_fichas || []).forEach(sf =>
-    (sf.ingredientes || []).forEach(i => { usageMap[i.insumo_id] = (usageMap[i.insumo_id] || 0) + 1; })
+    (sf.ingredientes || []).forEach(i => {
+      if (!i.insumo_id || i.subref_id) return;
+      if (!usageMap[i.insumo_id]) usageMap[i.insumo_id] = new Set();
+      usageMap[i.insumo_id].add(d.name);
+    })
   ));
   function buildRows() {
     tbody.innerHTML = '';
@@ -2271,13 +2296,25 @@ function renderInsumos(cid) {
           }
           scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
         });
+        const usedIn = usageMap[insumo.id] ? Array.from(usageMap[insumo.id]).sort() : [];
+        const usageTooltip = el('div', { class: 'usage-tooltip' },
+          el('strong', {}, 'Usado em:'),
+          ...usedIn.map(name => el('div', { class: 'usage-tooltip-item' }, name))
+        );
+        const usageCell = el('td', {
+          'data-label': 'Usado em',
+          class: 'usage-cell' + (usedIn.length > 0 ? ' has-usage' : ''),
+        },
+          el('span', { class: 'usage-count' }, usedIn.length + ' receita' + (usedIn.length === 1 ? '' : 's')),
+          usedIn.length > 0 ? usageTooltip : null
+        );
         const cells = [
           el('td', { 'data-label': 'Insumo' }, insumo.name, insumo.reutilizavel ? el('span', { class: 'reut-badge-inline' }, 'rateio') : null),
           el('td', { 'data-label': 'Unidade' }, unitInput),
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
           el('td', { 'data-label': 'Rateio', class: 'reut-cell' }, reutInput),
           el('td', { 'data-label': 'Variações' }, varBtn),
-          el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
+          usageCell,
         ];
         tbody.appendChild(el('tr', { class: insumo.reutilizavel ? 'is-reut-row' : '' }, ...cells));
       });
@@ -2861,12 +2898,32 @@ async function saveDishAction(cid, dish, originalId) {
   const newId = slugify(dish.name);
   dish.id = newId;
   try {
+    // Coleta nomes de subprodutos (global + da ficha atual) pra evitar criar insumo pra eles
+    const subprodutoNames = new Set();
+    for (const sf of dish.sub_fichas) {
+      if (sf.subproduto && sf.subproduto.name) subprodutoNames.add(nrm(sf.subproduto.name));
+    }
+    STATE.dishes.forEach(d => {
+      if (d.id === dish.id) return;
+      for (const sf of d.sub_fichas || []) {
+        if (sf.subproduto && sf.subproduto.name) subprodutoNames.add(nrm(sf.subproduto.name));
+      }
+    });
+    // Nomes de sub-fichas do próprio prato (subref por detecção) também não devem virar insumo
+    const sfNames = new Set((dish.sub_fichas || []).map(s => nrm(s.name)).filter(Boolean));
+
     // Register new insumos
     const batch = writeBatch(db);
     let bc = 0;
     for (const sf of dish.sub_fichas) {
       for (const ing of sf.ingredientes) {
         if (!ing.insumo_name.trim()) continue;
+        const ingNrm = nrm(ing.insumo_name);
+        // Skip se for subproduto ou nome de sub-ficha (subref) — esses não são insumos
+        if (subprodutoNames.has(ingNrm) || sfNames.has(ingNrm) || ing.subref_id) {
+          ing.insumo_id = '';
+          continue;
+        }
         const existing = STATE.insumos.find(i => i.name.toLowerCase() === ing.insumo_name.toLowerCase());
         if (!existing) {
           const newIns = { id: slugify(ing.insumo_name), name: ing.insumo_name.trim(), unit: ing.unit || 'g', price: 0 };

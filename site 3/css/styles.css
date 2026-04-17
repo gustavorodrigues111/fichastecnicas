@@ -589,6 +589,50 @@ tr.row-subproduto .num { color: #8a7050; }
   line-height: 1.5;
 }
 
+/* ============ Usage tooltip em insumos ============ */
+.usage-cell {
+  position: relative;
+  font-size: 0.82rem;
+  color: #666;
+}
+.usage-cell.has-usage .usage-count {
+  cursor: help;
+  border-bottom: 1px dotted #b8955e;
+  color: #4a3a20;
+}
+.usage-tooltip {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 0.3rem;
+  z-index: 100;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #333;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  font-size: 0.78rem;
+  min-width: 200px;
+  max-width: 320px;
+  line-height: 1.5;
+  display: none;
+  pointer-events: none;
+}
+.usage-tooltip strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #d4b97b;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.usage-tooltip-item {
+  padding: 0.1rem 0;
+  color: #eee;
+  font-weight: 400;
+}
+.usage-cell.has-usage:hover .usage-tooltip { display: block; }
+
 /* ============ Variations modal ============ */
 .modal-wide .modal-content,
 .modal .modal-wide { max-width: 620px; }
