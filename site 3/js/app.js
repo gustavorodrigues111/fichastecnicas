@@ -1118,15 +1118,15 @@ function renderFichaTrabalho(dish, sf, state, rerender) {
 
     const formatted = formatIngQty(ing, state.scaleFactor);
     const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
-      el('div', { class: 'k-qty' },
-        el('span', { class: 'qty-num' }, formatted.text),
-        el('span', { class: 'qty-unit' }, formatted.unit || '')
-      ),
-      el('div', { class: 'k-info' },
+      el('div', { class: 'k-row-main' },
         el('span', { class: 'k-name' }, (subSf ? '↪ ' : '') + ing.insumo_name),
-        ing.observacao ? el('span', { class: 'k-obs' }, ing.observacao) : null,
-        subSf ? el('span', { class: 'k-sub-note' }, 'ver preparação: ' + subSf.name) : null
-      )
+        el('span', { class: 'k-qty' },
+          el('span', { class: 'qty-num' }, formatted.text),
+          formatted.unit ? el('span', { class: 'qty-unit' }, formatted.unit) : null
+        )
+      ),
+      ing.observacao ? el('div', { class: 'k-obs' }, ing.observacao) : null,
+      subSf ? el('div', { class: 'k-sub-note' }, 'ver preparação: ' + subSf.name) : null
     );
     ingList.appendChild(li);
   });
