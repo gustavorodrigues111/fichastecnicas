@@ -164,6 +164,39 @@ async function saveDish(cid, dish) {
 }
 async function deleteDish(cid, did) {
   await deleteDoc(dishDoc(cid, did));
+  // Auto-cleanup: remove insumos órfãos (que ficaram sem nenhuma ficha referenciando)
+  await cleanupOrphanInsumos(cid).catch(err => console.warn('cleanup insumos:', err));
+}
+
+// Remove insumos que não são referenciados por nenhuma ficha
+async function cleanupOrphanInsumos(cid) {
+  const [insumosSnap, dishesSnap] = await Promise.all([
+    getDocs(insumosCol(cid)),
+    getDocs(dishesCol(cid))
+  ]);
+  // IDs de insumos referenciados por qualquer ingrediente real (não subref)
+  const referenced = new Set();
+  dishesSnap.docs.forEach(d => {
+    const data = d.data();
+    (data.sub_fichas || []).forEach(sf => {
+      (sf.ingredientes || []).forEach(ing => {
+        if (!ing.subref_id && ing.insumo_id) referenced.add(ing.insumo_id);
+      });
+    });
+  });
+  // Deletar insumos não referenciados
+  let batch = writeBatch(db);
+  let count = 0, deleted = 0;
+  for (const ins of insumosSnap.docs) {
+    if (!referenced.has(ins.id)) {
+      batch.delete(insumoDoc(cid, ins.id));
+      deleted++;
+      count++;
+      if (count >= 400) { await batch.commit(); batch = writeBatch(db); count = 0; }
+    }
+  }
+  if (count > 0) await batch.commit();
+  return deleted;
 }
 async function saveInsumo(cid, insumo) {
   const clean = { ...insumo };
@@ -640,8 +673,8 @@ function renderLoginLanding() {
   const app = $('#app');
   app.innerHTML = '';
   const box = el('section', { class: 'login-landing' },
-    el('h1', {}, 'Fichas Técnicas'),
-    el('p', { class: 'subtitle' }, 'Acesso para consultoria gastronômica'),
+    el('h1', {}, 'AppMise'),
+    el('p', { class: 'subtitle' }, 'Fichas técnicas e gestão de cardápio'),
     el('button', { class: 'btn btn-primary btn-lg', onclick: openLoginModal }, 'Entrar')
   );
   app.appendChild(box);
@@ -1244,10 +1277,12 @@ function renderClienteHome(cid) {
 
   const listWrap = el('div', { class: 'cardapio-list' });
   STATE.dishes.forEach((dish, idx) => {
-    const { costPerPortion } = dishCost(dish);
+    const costInfo = dishCost(dish);
+    const { costPerPortion, suggestedPrice, cmv, markup } = costInfo;
     const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
     const rendDisplay = lastSf?.rendimento ? formatRendimento(lastSf.rendimento) : '—';
     const finalSfId = lastSf?.id;
+    const showCost = canEditInsumoPrice(cid);
     const dishGroup = el('article', { class: 'dish-group' },
       el('header', { class: 'dish-head' },
         el('a', { class: 'dish-title', href: finalSfId ? `#/c/${cid}/ficha/${dish.id}/${finalSfId}` : `#/c/${cid}/ficha/${dish.id}` },
@@ -1255,8 +1290,11 @@ function renderClienteHome(cid) {
           el('span', { class: 'dish-name' }, dish.name)
         ),
         el('div', { class: 'dish-meta' },
-          el('span', { class: 'meta-item' }, el('em', {}, 'rendimento: '), rendDisplay),
-          canEditInsumoPrice(cid) ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção: '), fmtBRL(costPerPortion)) : null
+          el('span', { class: 'meta-item' }, el('em', {}, 'rendimento '), rendDisplay),
+          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção '), fmtBRL(costPerPortion)) : null,
+          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'preço venda '), fmtBRL(suggestedPrice)) : null,
+          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'CMV '), fmtNum(cmv, 1) + '%') : null,
+          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'markup '), fmtNum(markup, 0) + '%') : null
         )
       ),
       (() => {
@@ -1360,17 +1398,19 @@ function renderFicha(cid, dishId, initialSfId = null) {
   );
   app.appendChild(scaleBar);
 
-  // Quick-nav anchors
+  // Quick-nav anchors — ordem invertida: prato final primeiro, preparações depois
   const quickNav = el('nav', { class: 'sf-quicknav' });
-  (dish.sub_fichas || []).forEach((sf, idx) => {
-    const isFinal = idx === dish.sub_fichas.length - 1;
+  const subFichasReversed = [...(dish.sub_fichas || [])].reverse();
+  subFichasReversed.forEach((sf) => {
+    const originalIdx = dish.sub_fichas.indexOf(sf);
+    const isFinal = originalIdx === dish.sub_fichas.length - 1;
     quickNav.appendChild(el('a', { href: `#sf-${sf.id}`, class: isFinal ? 'is-final' : '' },
-      `${idx + 1}. ${sf.name}`
+      `${originalIdx + 1}. ${sf.name}`
     ));
   });
   app.appendChild(quickNav);
 
-  // Body (all sub-fichas stacked)
+  // Body (all sub-fichas stacked — ordem invertida no modo trabalho)
   const body = el('div', { id: 'ficha-body-container' });
   app.appendChild(body);
 
@@ -1379,9 +1419,10 @@ function renderFicha(cid, dishId, initialSfId = null) {
     scaleBar.style.display = state.view === 'trabalho' ? '' : 'none';
     body.innerHTML = '';
     if (state.view === 'trabalho') {
-      // Todas as sub-fichas stacked em modo cozinha
-      (dish.sub_fichas || []).forEach((sf, idx) => {
-        const card = renderFichaTrabalho(dish, sf, state, idx);
+      // Ordem invertida: prato final primeiro, depois preparações
+      [...(dish.sub_fichas || [])].reverse().forEach((sf) => {
+        const originalIdx = dish.sub_fichas.indexOf(sf);
+        const card = renderFichaTrabalho(dish, sf, state, originalIdx);
         card.id = `sf-${sf.id}`;
         body.appendChild(card);
       });
@@ -1668,8 +1709,7 @@ function renderInsumos(cid) {
       el('th', {}, 'Insumo'),
       el('th', {}, 'Unidade'),
       el('th', {}, 'Preço (R$)'),
-      el('th', {}, 'Usado em'),
-      canFullEdit ? el('th', {}, '') : null
+      el('th', {}, 'Usado em')
     ))
   );
   const tbody = el('tbody', {});
@@ -1702,15 +1742,6 @@ function renderInsumos(cid) {
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
           el('td', { 'data-label': 'Usado em' }, (usageMap[insumo.id] || 0) + ' receitas'),
         ];
-        if (canFullEdit) {
-          cells.push(el('td', { 'data-label': '' },
-            el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-              const uses = usageMap[insumo.id] || 0;
-              if (!confirm(uses > 0 ? `Excluir "${insumo.name}"? Usado em ${uses} receita(s).` : `Excluir "${insumo.name}"?`)) return;
-              try { await deleteInsumo(cid, insumo.id); toast('Excluído'); } catch (e) { toast('Erro: ' + e.message); }
-            } }, 'Excluir')
-          ));
-        }
         tbody.appendChild(el('tr', {}, ...cells));
       });
   }
@@ -2021,6 +2052,8 @@ async function saveDishAction(cid, dish, originalId) {
     if (bc > 0) await batch.commit();
     if (originalId && originalId !== newId) await deleteDish(cid, originalId);
     await saveDish(cid, dish);
+    // Remove insumos órfãos (que deixaram de ser usados)
+    cleanupOrphanInsumos(cid).catch(err => console.warn('cleanup:', err));
     toast('Salvo');
     location.hash = `#/c/${cid}/ficha/${dish.id}`;
   } catch (err) { console.error(err); toast('Erro: ' + err.message); }
@@ -2120,8 +2153,9 @@ function exportFichaPDF(dish, state) {
       y = docPdf.lastAutoTable.finalY + 10;
     }
 
-    // --- 2. Cada sub-ficha em sequência ---
-    dish.sub_fichas.forEach((s, idx) => {
+    // --- 2. Cada sub-ficha em sequência (ordem invertida: final primeiro) ---
+    [...dish.sub_fichas].reverse().forEach((s) => {
+      const idx = dish.sub_fichas.indexOf(s);
       if (y > 230) { docPdf.addPage(); y = margin; }
       const scale = scales[s.id] || 1;
       // Título da sub-ficha
@@ -2291,7 +2325,8 @@ function exportFichaXLSX(dish, state) {
   // Sequência completa de sub-fichas escaladas
   if (scaleChanged && state?.view === 'trabalho') {
     const scaledAll = [[`PRODUÇÃO ESCALADA — alvo final ${fmtNum(state.finalTargetQty, 2)} ${state.finalUnit}`], []];
-    dish.sub_fichas.forEach((s, idx) => {
+    [...dish.sub_fichas].reverse().forEach((s) => {
+      const idx = dish.sub_fichas.indexOf(s);
       const sScale = scales[s.id] || 1;
       scaledAll.push([`${idx+1}. ${s.name}${sScale !== 1 ? ` (× ${fmtNum(sScale, 2)})` : ''}`]);
       scaledAll.push(['Rendimento', sfRendimentoText(s, sScale)]);
