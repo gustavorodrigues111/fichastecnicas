@@ -985,6 +985,39 @@ function scaleRendStr(rendStr, factor) {
   });
 }
 
+// ---------- Cascade scale: target quantity at FINAL sub-ficha propagates up the chain ----------
+function computeCascadeScales(dish, finalTargetQty) {
+  const scales = {};
+  const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+  if (!finalSf) return scales;
+  const finalRend = parseRendimentoQty(finalSf.rendimento);
+  const finalScale = finalRend.qty > 0 ? finalTargetQty / finalRend.qty : 1;
+  scales[finalSf.id] = finalScale;
+
+  function propagate(sfId, scale, visited = new Set()) {
+    if (visited.has(sfId)) return;
+    visited.add(sfId);
+    const sf = dish.sub_fichas.find(s => s.id === sfId);
+    if (!sf) return;
+    for (const ing of sf.ingredientes || []) {
+      if (ing.subref_id) {
+        const ref = dish.sub_fichas.find(s => s.id === ing.subref_id);
+        if (!ref) continue;
+        const refRend = parseRendimentoQty(ref.rendimento);
+        if (refRend.qty <= 0 || ing.qty == null) continue;
+        // Normalize units (ing.unit and refRend.unit)
+        const [qC] = normalizeSubrefQty(ing.qty, ing.unit, refRend.unit);
+        const needed = qC * scale;
+        const refScale = needed / refRend.qty;
+        // Accumulate (multiple sub-fichas could reference the same)
+        scales[ref.id] = (scales[ref.id] || 0) + refScale;
+        propagate(ref.id, refScale, visited);
+      }
+    }
+  }
+  propagate(finalSf.id, finalScale);
+  return scales;
+}
 // ---------- Views: Cliente home (cardápio) — list format ----------
 function renderClienteHome(cid) {
   const app = $('#app');
@@ -1077,16 +1110,19 @@ function renderFicha(cid, dishId, initialSfId = null) {
   }
   app.appendChild(renderClienteContext(cid));
 
-  // If initialSfId is provided and exists, start on it; otherwise default to first sub-ficha (for kitchen flow)
   const defaultSf = initialSfId && dish.sub_fichas.some(s => s.id === initialSfId)
     ? initialSfId
     : (dish.sub_fichas[0]?.id || null);
+  // Escala em cascata: define rendimento alvo APENAS no prato final; propaga pra todas as sub-fichas.
+  const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+  const originalFinal = parseRendimentoQty(finalSf?.rendimento);
   const state = {
     view: 'trabalho',
     activeSf: defaultSf,
-    scaleFactor: 1,
-    targetYield: null,
+    finalTargetQty: originalFinal.qty,  // padrão = rendimento original
+    finalUnit: originalFinal.unit,
   };
+  state.scales = () => computeCascadeScales(dish, state.finalTargetQty);
 
   const header = el('div', { class: 'ficha-header' },
     el('a', { class: 'back-link', href: `#/c/${cid}` }, '← Voltar ao cardápio'),
@@ -1106,6 +1142,39 @@ function renderFicha(cid, dishId, initialSfId = null) {
   );
   app.appendChild(toggle);
 
+  // Production scale bar (dish-level) — aparece só na ficha de trabalho
+  const scaleBar = el('div', { class: 'rend-bar dish-scale-bar' },
+    el('div', { class: 'rend-info' },
+      el('span', { class: 'rend-label' }, 'Rendimento original'),
+      el('span', { class: 'rend-value' }, formatRendimento(finalSf?.rendimento || '—'))
+    ),
+    el('div', { class: 'scale-ctrl' },
+      el('span', { class: 'scale-label' }, 'Produzir:'),
+      (() => {
+        const input = el('input', { type: 'number', step: '1', min: '0.001',
+          value: state.finalTargetQty });
+        input.addEventListener('input', () => {
+          const v = parseFloat(input.value.replace(',', '.'));
+          if (isNaN(v) || v <= 0) return;
+          state.finalTargetQty = v;
+          updateUI();
+        });
+        return input;
+      })(),
+      el('span', { class: 'scale-unit' }, state.finalUnit || ''),
+      (() => {
+        const btn = el('button', { class: 'btn btn-small btn-ghost', onclick: () => {
+          state.finalTargetQty = originalFinal.qty;
+          updateUI();
+        } }, 'Resetar');
+        btn.style.display = 'none';
+        btn.id = 'scale-reset';
+        return btn;
+      })()
+    )
+  );
+  app.appendChild(scaleBar);
+
   const tabs = el('div', { class: 'subficha-tabs' });
   (dish.sub_fichas || []).forEach(sf => {
     tabs.appendChild(el('button', { 'data-sf': sf.id }, sf.name));
@@ -1124,9 +1193,13 @@ function renderFicha(cid, dishId, initialSfId = null) {
   function updateUI() {
     $$('.view-toggle button', toggle).forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
     $$('.subficha-tabs button', tabs).forEach(b => b.classList.toggle('active', b.dataset.sf === state.activeSf));
+    // Scale bar visible só no modo trabalho
+    scaleBar.style.display = state.view === 'trabalho' ? '' : 'none';
+    const resetBtn = $('#scale-reset', scaleBar);
+    if (resetBtn) resetBtn.style.display = (state.finalTargetQty !== originalFinal.qty) ? '' : 'none';
     const sf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
     body.innerHTML = '';
-    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf, state, updateUI));
+    if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf, state));
     else body.appendChild(renderFichaCusto(dish, sf, cid));
   }
   toggle.addEventListener('click', e => { if (e.target.dataset.view) { state.view = e.target.dataset.view; updateUI(); } });
@@ -1134,52 +1207,27 @@ function renderFicha(cid, dishId, initialSfId = null) {
   updateUI();
 }
 
-function renderFichaTrabalho(dish, sf, state, rerender) {
+function renderFichaTrabalho(dish, sf, state) {
   const wrap = el('div', { class: 'ficha-body kitchen-mode' });
   wrap.appendChild(el('div', { class: 'ficha-meta-line' }, 'Ficha Técnica Operacional'));
   wrap.appendChild(el('h2', {}, sf.name));
 
-  // Scaling controls (units displayed in kg/l when applicable)
-  const originalRend = sf.rendimento || '';
-  const parsedRend = parseRendimentoQty(originalRend);
-  const normRend = normUnitForDisplay(parsedRend.qty, parsedRend.unit);
-  // Target/display quantity in normalized units
-  const displayQtyOriginal = normRend.qty; // in kg or l or original
-  const displayUnitOriginal = normRend.unit;
-  const displayQtyScaled = displayQtyOriginal * (state.scaleFactor || 1);
-  const rendBar = el('div', { class: 'rend-bar' },
-    el('div', { class: 'rend-info' },
-      el('span', { class: 'rend-label' }, 'Rendimento'),
-      el('span', { class: 'rend-value' }, `${fmtNum(displayQtyScaled, (['kg','l'].includes(displayUnitOriginal) ? 3 : (displayQtyScaled % 1 === 0 ? 0 : 2)))} ${displayUnitOriginal}`.trim())
-    ),
-    el('div', { class: 'scale-ctrl' },
-      el('span', { class: 'scale-label' }, 'Produzir:'),
-      (() => {
-        const useDecimals = ['kg', 'l'].includes(displayUnitOriginal);
-        const input = el('input', { type: 'number', step: useDecimals ? '0.001' : '1', min: '0',
-          value: state.targetYield != null ? state.targetYield : (useDecimals ? displayQtyOriginal.toFixed(3) : displayQtyOriginal),
-          placeholder: String(displayQtyOriginal) });
-        input.addEventListener('change', () => {
-          const v = parseFloat(input.value.replace(',', '.'));
-          if (isNaN(v) || v <= 0) return;
-          state.targetYield = v;
-          state.scaleFactor = displayQtyOriginal > 0 ? (v / displayQtyOriginal) : 1;
-          rerender();
-        });
-        return input;
-      })(),
-      el('span', { class: 'scale-unit' }, displayUnitOriginal || 'unid.'),
-      state.scaleFactor !== 1
-        ? el('button', { class: 'btn btn-small btn-ghost', onclick: () => { state.scaleFactor = 1; state.targetYield = null; rerender(); } }, 'Resetar')
-        : null
-    ),
-    state.scaleFactor !== 1
-      ? el('div', { class: 'scale-note muted' }, `Original: ${fmtNum(displayQtyOriginal, (['kg','l'].includes(displayUnitOriginal) ? 3 : 0))} ${displayUnitOriginal}  ·  Fator ${fmtNum(state.scaleFactor, 2)}×`)
-      : null
-  );
-  wrap.appendChild(rendBar);
+  // Escala em cascata: pega a escala desta sub-ficha baseada no alvo final
+  const scales = state.scales();
+  const sfScale = scales[sf.id] || 1;
 
-  // Ingredients (kitchen style)
+  // Mostra rendimento desta sub-ficha (escalado)
+  const parsedRend = parseRendimentoQty(sf.rendimento || '');
+  const scaledRendQty = parsedRend.qty * sfScale;
+  const normRend = normUnitForDisplay(scaledRendQty, parsedRend.unit);
+  const rendInfo = el('div', { class: 'ficha-meta-line' },
+    'Rendimento: ',
+    el('strong', {}, `${normRend.text} ${normRend.unit}`.trim()),
+    sfScale !== 1 ? el('span', { class: 'muted', style: 'margin-left:0.5rem;' }, `(${fmtNum(sfScale, 2)}× do original)`) : null
+  );
+  wrap.appendChild(rendInfo);
+
+  // Ingredients (kitchen style) — quantities scaled by this sub-ficha's cascade factor
   const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
   const ingList = el('ul', { class: 'kitchen-ingredients' });
   (sf.ingredientes || []).forEach(ing => {
@@ -1187,7 +1235,7 @@ function renderFichaTrabalho(dish, sf, state, rerender) {
     if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
     if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
 
-    const formatted = formatIngQty(ing, state.scaleFactor);
+    const formatted = formatIngQty(ing, sfScale);
     const li = el('li', { class: 'kitchen-ing' + (subSf ? ' is-subref' : '') },
       el('div', { class: 'k-row-main' },
         el('span', { class: 'k-name' }, (subSf ? '↪ ' : '') + ing.insumo_name),
@@ -1689,20 +1737,24 @@ function exportFichaPDF(dish, state) {
   docPdf.line(pageWidth / 2 - 20, y, pageWidth / 2 + 20, y);
   y += 8;
 
-  const factor = state.scaleFactor || 1;
+  // Cascade scales (dish-level scaling)
+  const scales = typeof state.scales === 'function' ? state.scales() : {};
+  const sfScale = scales[currentSf?.id] || 1;
+  const finalSf2 = dish.sub_fichas[dish.sub_fichas.length - 1];
+  const scaleChanged = sfScale !== 1;
   if (isTrabalho) {
     docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
     docPdf.text(sf.name, margin, y); y += 5;
     if (sf.rendimento) {
       docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(120);
-      const rendStr = formatRendimento(sf.rendimento, factor) + (factor !== 1 ? ` (escalado ${fmtNum(factor, 2)}×)` : '');
+      const rendStr = formatRendimento(sf.rendimento, sfScale) + (scaleChanged ? ` (escalado ${fmtNum(sfScale, 2)}×)` : '');
       docPdf.text('Rendimento: ' + rendStr, margin, y); y += 6;
     }
     docPdf.autoTable({
       startY: y, margin: { left: margin, right: margin },
       head: [['Insumo', 'Quantidade', 'Unidade', 'Observação']],
       body: (sf.ingredientes || []).map(i => {
-        const f = formatIngQty(i, factor);
+        const f = formatIngQty(i, sfScale);
         return [
           i.insumo_name,
           f.text,
@@ -1784,7 +1836,7 @@ function exportFichaPDF(dish, state) {
     docPdf.setTextColor(80).setFont('helvetica', 'normal').setFontSize(9);
     docPdf.text(`Markup: ${fmtNum(all.markup, 0)}%   ·   CMV: ${fmtNum(all.cmv, 1)}%   ·   Porções: ${all.portions}`, margin, y);
   }
-  const suffix = state.scaleFactor !== 1 ? `-escalado${fmtNum(state.scaleFactor, 2)}x` : '';
+  const suffix = scaleChanged ? `-escalado${fmtNum(sfScale, 2)}x` : '';
   docPdf.save(`${slugify(dish.name)}-${isTrabalho ? 'trabalho' : 'custo'}${suffix}.pdf`);
 }
 
@@ -1792,11 +1844,14 @@ function exportFichaXLSX(dish, state) {
   const wb = XLSX.utils.book_new();
   const all = dishCost(dish);
   const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
-  const factor = state?.scaleFactor || 1;
+  // Cascade scales (dish-level)
+  const scales = typeof state?.scales === 'function' ? state.scales() : {};
+  const finalScale = scales[lastSf?.id] || 1;
+  const scaleChanged = finalScale !== 1;
   const summary = [
     ['FICHA TÉCNICA'],
     ['Prato', dish.name],
-    ['Rendimento final', (lastSf?.rendimento || '—') + (factor !== 1 ? ` (escalado ${fmtNum(factor, 2)}x)` : '')],
+    ['Rendimento final', (lastSf?.rendimento || '—') + (scaleChanged ? ` (escalado ${fmtNum(finalScale, 2)}x)` : '')],
     [],
     ['Custo total', all.total],
     ['Porções', all.portions],
@@ -1829,26 +1884,24 @@ function exportFichaXLSX(dish, state) {
     const name = ('SF' + (idx + 1) + '-' + sf.name).replace(/[/\\?*\[\]:]/g, '').slice(0, 30);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), name);
   });
-  // Trabalho scaled view: if factor != 1 and we're in Trabalho view, add a "Ficha Escalada" sheet
-  if (factor !== 1 && state?.view === 'trabalho') {
-    const sfActive = (dish.sub_fichas || []).find(s => s.id === state.activeSf);
-    if (sfActive) {
-      const scaledData = [
-        [`Ficha de trabalho ESCALADA — fator ${fmtNum(factor, 2)}×`],
-        [sfActive.name],
-        ['Rendimento', formatRendimento(sfActive.rendimento, factor)],
-        [],
-        ['Insumo', 'Quantidade', 'Unidade', 'Observação'],
-        ...(sfActive.ingredientes || []).map(i => {
-          const f = formatIngQty(i, factor);
-          return [i.insumo_name, f.text || '', f.unit || '', i.observacao || ''];
-        }),
-        [], ['Modo de preparo'], [sfActive.modo_preparo || '']
-      ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scaledData), 'Escalada');
-    }
+  // Se escala foi alterada, adiciona uma aba "Escalada" com TODAS as sub-fichas em escala
+  if (scaleChanged && state?.view === 'trabalho') {
+    const scaledAll = [[`PRODUÇÃO ESCALADA — alvo final ${fmtNum(state.finalTargetQty, 2)} ${state.finalUnit}`], []];
+    dish.sub_fichas.forEach(s => {
+      const sScale = scales[s.id] || 1;
+      scaledAll.push([s.name + (sScale !== 1 ? ` (× ${fmtNum(sScale, 2)})` : '')]);
+      scaledAll.push(['Rendimento', formatRendimento(s.rendimento, sScale)]);
+      scaledAll.push([]);
+      scaledAll.push(['Insumo', 'Quantidade', 'Unidade', 'Observação']);
+      (s.ingredientes || []).forEach(i => {
+        const f = formatIngQty(i, sScale);
+        scaledAll.push([i.insumo_name, f.text || '', f.unit || '', i.observacao || '']);
+      });
+      scaledAll.push([]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scaledAll), 'Escalada');
   }
-  const suffix = factor !== 1 ? `-esc${fmtNum(factor, 2)}x` : '';
+  const suffix = scaleChanged ? `-esc${fmtNum(finalScale, 2)}x` : '';
   XLSX.writeFile(wb, `${slugify(dish.name)}${suffix}.xlsx`);
 }
 
