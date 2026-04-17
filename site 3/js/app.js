@@ -1001,6 +1001,7 @@ async function route() {
     if (rest.length === 0) { renderClienteHome(cid); return; }
     if (rest[0] === 'ficha' && rest[1]) { renderFicha(cid, rest[1], rest[2] || null); return; }
     if (rest[0] === 'insumos') { renderInsumos(cid); return; }
+    if (rest[0] === 'producao') { renderProducao(cid); return; }
     if (rest[0] === 'admin') {
       if (!canEditCliente(cid)) { renderNoAccess(); return; }
       if (rest[1] === 'new') { renderAdminEdit(cid, null); return; }
@@ -1711,37 +1712,39 @@ function renderClienteHome(cid) {
     const { costPerPortion, suggestedPrice, cmv, markup } = costInfo;
     const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
     const rendDisplay = lastSf?.rendimento ? formatRendimento(lastSf.rendimento) : '—';
-    const finalSfId = lastSf?.id;
     const showCost = canEditInsumoPrice(cid);
-    const dishGroup = el('article', { class: 'dish-group' },
-      el('header', { class: 'dish-head' },
-        el('a', { class: 'dish-title', href: `#/c/${cid}/ficha/${dish.id}` },
-          el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
-          el('span', { class: 'dish-name' }, dish.name)
-        ),
-        el('div', { class: 'dish-meta' },
-          el('span', { class: 'meta-item' }, el('em', {}, 'rendimento '), rendDisplay),
-          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção '), fmtBRL(costPerPortion)) : null,
-          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'preço venda '), fmtBRL(suggestedPrice)) : null,
-          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'CMV '), fmtNum(cmv, 1) + '%') : null,
-          showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'markup '), fmtNum(markup, 0) + '%') : null
-        )
+    const dishGroup = el('details', { class: 'dish-group' });
+    const summary = el('summary', { class: 'dish-head dish-summary' },
+      el('span', { class: 'dish-chev' }, '▸'),
+      el('span', { class: 'dish-title-compact' },
+        el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
+        el('span', { class: 'dish-name' }, dish.name)
       ),
-      (() => {
-        const ul = el('ul', { class: 'subficha-sublist' });
-        (dish.sub_fichas || []).forEach((sf, sfIdx) => {
-          const isFinal = sfIdx === dish.sub_fichas.length - 1;
-          ul.appendChild(el('li', { class: 'subficha-item' + (isFinal ? ' is-final' : '') },
-            el('a', { href: `#/c/${cid}/ficha/${dish.id}/${sf.id}` },
-              el('span', { class: 'sf-marker' }, isFinal ? '●' : '○'),
-              el('span', { class: 'sf-name' }, sf.name),
-              sf.rendimento ? el('span', { class: 'sf-rend' }, formatRendimento(sf.rendimento)) : null
-            )
-          ));
-        });
-        return ul;
-      })()
+      el('div', { class: 'dish-meta' },
+        el('span', { class: 'meta-item' }, el('em', {}, 'rendimento '), rendDisplay),
+        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção '), fmtBRL(costPerPortion)) : null,
+        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'preço '), fmtBRL(suggestedPrice)) : null,
+        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'CMV '), fmtNum(cmv, 1) + '%') : null
+      )
     );
+    dishGroup.appendChild(summary);
+    const body = el('div', { class: 'dish-body' });
+    body.appendChild(el('div', { class: 'dish-body-actions' },
+      el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver ficha completa →')
+    ));
+    const ul = el('ul', { class: 'subficha-sublist' });
+    (dish.sub_fichas || []).forEach((sf, sfIdx) => {
+      const isFinal = sfIdx === dish.sub_fichas.length - 1;
+      ul.appendChild(el('li', { class: 'subficha-item' + (isFinal ? ' is-final' : '') },
+        el('a', { href: `#/c/${cid}/ficha/${dish.id}/${sf.id}` },
+          el('span', { class: 'sf-marker' }, isFinal ? '●' : '○'),
+          el('span', { class: 'sf-name' }, sf.name),
+          sf.rendimento ? el('span', { class: 'sf-rend' }, formatRendimento(sf.rendimento)) : null
+        )
+      ));
+    });
+    body.appendChild(ul);
+    dishGroup.appendChild(body);
     listWrap.appendChild(dishGroup);
   });
   app.appendChild(listWrap);
@@ -1757,10 +1760,13 @@ function renderClienteContext(cid) {
   const hash = location.hash.slice(1) || '/';
   const isAdmin = hash.includes(`/c/${cid}/admin`);
   const isInsumos = hash.includes(`/c/${cid}/insumos`);
-  const isCardapio = !isAdmin && !isInsumos;
+  const isProducao = hash.includes(`/c/${cid}/producao`);
+  const isCardapio = !isAdmin && !isInsumos && !isProducao;
   const tabs = el('nav', { class: 'cliente-tabs' },
     el('a', { class: 'cliente-tab' + (isCardapio ? ' active' : ''), href: `#/c/${cid}` },
       el('span', { class: 'tab-icon' }, '◉'), 'Cardápio'),
+    el('a', { class: 'cliente-tab' + (isProducao ? ' active' : ''), href: `#/c/${cid}/producao` },
+      el('span', { class: 'tab-icon' }, '▲'), 'Produção'),
     el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
       el('span', { class: 'tab-icon' }, '◎'), 'Insumos'),
     canEditCliente(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
@@ -2193,6 +2199,456 @@ function categorizeInsumo(ins) {
     }
   }
   return 'outros';
+}
+
+// ---------- Views: Produção ----------
+// Estado do plano de produção (sessão apenas, não persistido)
+const PROD_PLAN = { items: [] };
+// item: { dishId, targetQty, targetUnit, excludedSfIds: Set<string> }
+
+function renderProducao(cid) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Plano de produção'),
+      el('p', {}, `Selecione os pratos e quantidades para o dia. Lista de compras e requisição de estoque são geradas automaticamente.`)
+    ),
+    el('div', {},
+      el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
+    )
+  ));
+
+  const container = el('div', { class: 'producao-wrap' });
+  const planList = el('div', { class: 'prod-plan-list' });
+  const summary = el('div', { class: 'prod-summary' });
+  const subfichasOut = el('div', { class: 'prod-subfichas' });
+  const shoppingOut = el('div', { class: 'prod-shopping' });
+
+  function recompute() {
+    planList.innerHTML = '';
+    summary.innerHTML = '';
+    subfichasOut.innerHTML = '';
+    shoppingOut.innerHTML = '';
+
+    if (PROD_PLAN.items.length === 0) {
+      planList.appendChild(el('div', { class: 'empty-state' },
+        el('p', {}, 'Nenhum prato no plano.'),
+        el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
+      ));
+      return;
+    }
+
+    let totalCost = 0;
+    let totalPortions = 0;
+
+    PROD_PLAN.items.forEach((item, itemIdx) => {
+      const dish = STATE.dishes.find(d => d.id === item.dishId);
+      if (!dish) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const origRend = getSfRendimento(finalSf);
+      // Escala: qty alvo / rendimento original (se unidades batem)
+      let scale = 1;
+      if (item.targetQty > 0 && origRend.qty > 0) {
+        const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+        scale = qConv / origRend.qty;
+      }
+      const scales = computeCascadeScales(dish, scale * origRend.qty);
+      const cost = dishCost(dish);
+      const itemTotalCost = cost.total * scale;
+      totalCost += itemTotalCost;
+
+      const itemCard = el('article', { class: 'prod-item' });
+      const head = el('div', { class: 'prod-item-head' },
+        el('div', { class: 'prod-item-name' },
+          el('span', { class: 'prod-item-num' }, String(itemIdx + 1).padStart(2, '0')),
+          el('span', {}, dish.name)
+        ),
+        el('div', { class: 'prod-item-controls' },
+          (() => {
+            const qtyInput = el('input', { type: 'number', step: '0.01', min: '0', value: item.targetQty || '' , class: 'prod-qty-input', placeholder: 'Qty' });
+            qtyInput.addEventListener('input', () => {
+              const v = parseFloat(qtyInput.value);
+              item.targetQty = isNaN(v) ? 0 : v;
+              recompute();
+            });
+            return qtyInput;
+          })(),
+          (() => {
+            const unitInput = el('input', { type: 'text', value: item.targetUnit || '', class: 'prod-unit-input', placeholder: 'kg / porções' });
+            unitInput.addEventListener('input', () => { item.targetUnit = unitInput.value.trim().toLowerCase(); recompute(); });
+            return unitInput;
+          })(),
+          el('span', { class: 'prod-scale muted' }, scale > 0 ? `${fmtNum(scale, 2)}×` : '—'),
+          el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)),
+          el('button', { class: 'btn btn-small btn-danger', onclick: () => {
+            PROD_PLAN.items.splice(itemIdx, 1); recompute();
+          } }, '×')
+        )
+      );
+      itemCard.appendChild(head);
+
+      // Sub-fichas checkboxes
+      const sfBox = el('div', { class: 'prod-sf-box' });
+      if (!item.excludedSfIds) item.excludedSfIds = new Set();
+      dish.sub_fichas.forEach((sf, sfIdx) => {
+        const isFinal = sfIdx === dish.sub_fichas.length - 1;
+        const sfScale = scales[sf.id] || 1;
+        const sfR = getSfRendimento(sf);
+        const scaledQty = sfR.qty * sfScale;
+        const sn = normUnitForDisplay(scaledQty, sfR.unit);
+        const checked = !item.excludedSfIds.has(sf.id);
+        const chk = el('input', { type: 'checkbox' });
+        if (checked) chk.setAttribute('checked', '');
+        chk.addEventListener('change', () => {
+          if (chk.checked) item.excludedSfIds.delete(sf.id);
+          else item.excludedSfIds.add(sf.id);
+          recompute();
+        });
+        sfBox.appendChild(el('label', { class: 'prod-sf-check' }, chk,
+          el('span', { class: 'prod-sf-name' + (isFinal ? ' is-final' : '') }, sf.name),
+          el('span', { class: 'prod-sf-rend muted' }, `${sn.text} ${sn.unit}`.trim())
+        ));
+      });
+      itemCard.appendChild(sfBox);
+      planList.appendChild(itemCard);
+
+      // Conta porções se unidade é 'porções' ou 'porção' ou 'und'
+      const unitLower = (item.targetUnit || origRend.unit || '').toLowerCase();
+      if (['porção', 'porçao', 'porções', 'porcoes', 'und'].includes(unitLower)) {
+        totalPortions += item.targetQty;
+      }
+    });
+
+    // Resumo
+    summary.appendChild(el('div', { class: 'prod-summary-card' },
+      el('div', { class: 'prod-sum-row' },
+        el('span', { class: 'muted' }, 'Custo total estimado'),
+        el('strong', {}, fmtBRL(totalCost))
+      ),
+      totalPortions > 0 ? el('div', { class: 'prod-sum-row' },
+        el('span', { class: 'muted' }, 'Porções'),
+        el('strong', {}, fmtNum(totalPortions, 0))
+      ) : null,
+      el('div', { class: 'prod-actions' },
+        el('button', { class: 'btn btn-small', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'),
+        el('button', { class: 'btn btn-small', onclick: () => exportRequisicaoPDF(cid) }, '↓ PDF Requisição'),
+        el('button', { class: 'btn btn-small', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel')
+      )
+    ));
+
+    // Sub-fichas a produzir (agrupadas por prato)
+    subfichasOut.appendChild(el('h2', { class: 'prod-section-title' }, 'Sub-fichas a produzir'));
+    PROD_PLAN.items.forEach(item => {
+      const dish = STATE.dishes.find(d => d.id === item.dishId);
+      if (!dish) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const origRend = getSfRendimento(finalSf);
+      let scale = 1;
+      if (item.targetQty > 0 && origRend.qty > 0) {
+        const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+        scale = qConv / origRend.qty;
+      }
+      const scales = computeCascadeScales(dish, scale * origRend.qty);
+      const activeSfs = dish.sub_fichas.filter(sf => !item.excludedSfIds.has(sf.id));
+      if (activeSfs.length === 0) {
+        subfichasOut.appendChild(el('div', { class: 'prod-dish-block' },
+          el('h3', { class: 'prod-dish-name' }, dish.name),
+          el('p', { class: 'muted' }, 'Nenhuma sub-ficha selecionada — só usa estoque.')
+        ));
+        return;
+      }
+      const block = el('div', { class: 'prod-dish-block' },
+        el('h3', { class: 'prod-dish-name' }, `${dish.name} — ${fmtNum(item.targetQty, 2)} ${item.targetUnit || origRend.unit}`)
+      );
+      const list = el('div', { class: 'prod-sf-produce-list' });
+      activeSfs.forEach(sf => {
+        const sfScale = scales[sf.id] || 1;
+        const sfR = getSfRendimento(sf);
+        const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
+        list.appendChild(el('div', { class: 'prod-sf-produce-item' },
+          el('span', { class: 'prod-sf-bullet' }, '•'),
+          el('a', { href: `#/c/${cid}/ficha/${dish.id}/${sf.id}` }, sf.name),
+          el('span', { class: 'muted' }, ` — ${sn.text} ${sn.unit}`.trimEnd())
+        ));
+      });
+      block.appendChild(list);
+      subfichasOut.appendChild(block);
+    });
+
+    // Lista de compras agregada
+    shoppingOut.appendChild(el('h2', { class: 'prod-section-title' }, 'Lista de compras consolidada'));
+    const shoppingAgg = buildProducaoShoppingList();
+    if (shoppingAgg.length === 0) {
+      shoppingOut.appendChild(el('p', { class: 'muted' }, 'Nenhum insumo a comprar (todas sub-fichas desmarcadas).'));
+    } else {
+      const tbl = el('table', { class: 'prod-shopping-table' },
+        el('thead', {}, el('tr', {},
+          el('th', {}, 'Insumo'),
+          el('th', { class: 'num' }, 'Qtd total'),
+          el('th', {}, 'Unidade'),
+          el('th', {}, 'De onde vem')
+        )),
+        el('tbody', {}, ...shoppingAgg.map(row => {
+          const sources = row.sources.map(s => `${s.dishName} / ${s.sfName} (${fmtNum(s.qty, 3)} ${s.unit})`).join('\n');
+          const norm = normUnitForDisplay(row.qty, row.unit);
+          return el('tr', {},
+            el('td', {}, row.name, row.isReutilizavel ? el('span', { class: 'reut-badge-inline' }, 'rateio') : null),
+            el('td', { class: 'num' }, norm.text),
+            el('td', {}, norm.unit),
+            el('td', { class: 'prod-sources-cell', title: sources }, `${row.sources.length} sub-ficha${row.sources.length > 1 ? 's' : ''}`)
+          );
+        }))
+      );
+      shoppingOut.appendChild(tbl);
+    }
+  }
+
+  function buildProducaoShoppingList() {
+    const agg = {}; // key: insumo_id
+    PROD_PLAN.items.forEach(item => {
+      const dish = STATE.dishes.find(d => d.id === item.dishId);
+      if (!dish) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const origRend = getSfRendimento(finalSf);
+      let scale = 1;
+      if (item.targetQty > 0 && origRend.qty > 0) {
+        const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+        scale = qConv / origRend.qty;
+      }
+      const scales = computeCascadeScales(dish, scale * origRend.qty);
+      for (const sf of dish.sub_fichas) {
+        if (item.excludedSfIds.has(sf.id)) continue;
+        const sfScale = scales[sf.id] || 1;
+        for (const ing of sf.ingredientes || []) {
+          if (ing.subref_id) continue;
+          if (ing.qty == null) continue;
+          // Pula subprodutos (não compra)
+          const subprodHit = findSubproduto(ing.insumo_name);
+          if (subprodHit && !(subprodHit.dish.id === dish.id && subprodHit.sf.id === sf.id)) continue;
+          const insumo = findInsumo(ing.insumo_id);
+          if (!insumo) continue;
+          const [qn, pn] = normalizeQtyPrice(ing, insumo);
+          if (qn == null || pn == null) continue;
+          const isReut = !!insumo.reutilizavel;
+          const fc = isReut ? 1 : (ing.fc || 1);
+          const key = ing.insumo_id;
+          if (!agg[key]) agg[key] = { name: insumo.name, unit: insumo.unit, qty: 0, cost: 0, isReutilizavel: isReut, sources: [] };
+          const addedQty = qn * sfScale * fc;
+          agg[key].qty += addedQty;
+          agg[key].cost += isReut ? 0 : (qn * pn * sfScale * fc);
+          agg[key].sources.push({ dishName: dish.name, sfName: sf.name, qty: addedQty, unit: insumo.unit });
+        }
+      }
+    });
+    return Object.values(agg).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+  }
+  window.__prodBuildShopping = buildProducaoShoppingList; // expose for export
+
+  container.appendChild(summary);
+  container.appendChild(planList);
+  container.appendChild(subfichasOut);
+  container.appendChild(shoppingOut);
+  app.appendChild(container);
+  recompute();
+}
+
+function openAddDishToPlanModal(cid) {
+  const modal = el('div', { class: 'modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
+  );
+  const content = el('div', { class: 'modal-content modal-wide' },
+    el('h2', {}, 'Adicionar prato ao plano'),
+    el('p', { class: 'modal-subtitle' }, 'Selecione um prato. Você pode definir a quantidade depois.')
+  );
+  const searchInput = el('input', { type: 'search', placeholder: 'Buscar prato...', class: 'copy-sf-search' });
+  content.appendChild(searchInput);
+  const list = el('div', { class: 'copy-sf-list' });
+  function renderList() {
+    list.innerHTML = '';
+    const q = searchInput.value.toLowerCase().trim();
+    const inPlan = new Set(PROD_PLAN.items.map(i => i.dishId));
+    STATE.dishes.forEach(dish => {
+      if (q && !dish.name.toLowerCase().includes(q)) return;
+      if (inPlan.has(dish.id)) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const rend = finalSf?.rendimento || '—';
+      const btn = el('button', { class: 'copy-sf-item', onclick: () => {
+        const finalR = getSfRendimento(finalSf);
+        PROD_PLAN.items.push({
+          dishId: dish.id,
+          targetQty: finalR.qty || 1,
+          targetUnit: finalR.unit || '',
+          excludedSfIds: new Set()
+        });
+        modal.remove();
+        renderProducao(cid);
+      } },
+        el('div', { class: 'copy-sf-item-name' }, dish.name),
+        el('div', { class: 'copy-sf-item-meta' }, `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
+      );
+      list.appendChild(btn);
+    });
+    if (!list.children.length) list.appendChild(el('p', { class: 'muted' }, inPlan.size >= STATE.dishes.length ? 'Todos os pratos já estão no plano.' : 'Nenhum prato encontrado.'));
+  }
+  renderList();
+  searchInput.addEventListener('input', renderList);
+  content.appendChild(list);
+  content.appendChild(el('div', { class: 'modal-actions' },
+    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar')
+  ));
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  searchInput.focus();
+}
+
+function exportProducaoPDF(cid) {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15;
+  let y = margin;
+  const pageWidth = docPdf.internal.pageSize.getWidth();
+  const cliente = STATE.currentCliente;
+  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
+  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
+  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
+  docPdf.text('Plano de Produção', pageWidth / 2, y, { align: 'center' }); y += 7;
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
+  docPdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth / 2, y, { align: 'center' }); y += 10;
+
+  // Pratos
+  PROD_PLAN.items.forEach(item => {
+    const dish = STATE.dishes.find(d => d.id === item.dishId);
+    if (!dish) return;
+    const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+    const origRend = getSfRendimento(finalSf);
+    let scale = 1;
+    if (item.targetQty > 0 && origRend.qty > 0) {
+      const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+      scale = qConv / origRend.qty;
+    }
+    const scales = computeCascadeScales(dish, scale * origRend.qty);
+    if (y > 240) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'bold').setFontSize(13).setTextColor(20);
+    docPdf.text(`${dish.name} — ${fmtNum(item.targetQty, 2)} ${item.targetUnit}`, margin, y); y += 6;
+    const activeSfs = dish.sub_fichas.filter(sf => !item.excludedSfIds.has(sf.id));
+    activeSfs.forEach(sf => {
+      const sfScale = scales[sf.id] || 1;
+      const sfR = getSfRendimento(sf);
+      const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
+      docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(50);
+      docPdf.text(`• ${sf.name} — ${sn.text} ${sn.unit}`, margin + 3, y); y += 4.5;
+      if (y > 270) { docPdf.addPage(); y = margin; }
+    });
+    y += 3;
+  });
+
+  // Lista de compras
+  const shopping = window.__prodBuildShopping ? window.__prodBuildShopping() : [];
+  if (shopping.length > 0) {
+    if (y > 220) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
+    docPdf.text('Lista de compras consolidada', margin, y); y += 5;
+    docPdf.autoTable({
+      startY: y, margin: { left: margin, right: margin },
+      head: [['Insumo', 'Qtd total']],
+      body: shopping.map(r => {
+        const norm = normUnitForDisplay(r.qty, r.unit);
+        const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
+        return [label, `${norm.text} ${norm.unit}`.trim()];
+      }),
+      theme: 'plain',
+      headStyles: { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+  }
+  docPdf.save(`producao-${new Date().toISOString().slice(0, 10)}.pdf`);
+  toast('PDF gerado');
+}
+
+function exportRequisicaoPDF(cid) {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15;
+  let y = margin;
+  const pageWidth = docPdf.internal.pageSize.getWidth();
+  const cliente = STATE.currentCliente;
+  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
+  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
+  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
+  docPdf.text('Requisição de Estoque', pageWidth / 2, y, { align: 'center' }); y += 7;
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
+  docPdf.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
+  docPdf.text(`Responsável: ____________________`, pageWidth - margin - 70, y); y += 8;
+
+  const shopping = window.__prodBuildShopping ? window.__prodBuildShopping() : [];
+  docPdf.autoTable({
+    startY: y, margin: { left: margin, right: margin },
+    head: [['Insumo', 'Qtd solicitada', 'Unidade', 'Qtd retirada', 'Assinatura']],
+    body: shopping.map(r => {
+      const norm = normUnitForDisplay(r.qty, r.unit);
+      return [r.name, norm.text, norm.unit, '', ''];
+    }),
+    theme: 'grid',
+    headStyles: { fillColor: [247, 245, 238], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
+    bodyStyles: { fontSize: 9, minCellHeight: 9 },
+    columnStyles: { 1: { halign: 'right' }, 3: { halign: 'right' }, 4: { cellWidth: 40 } }
+  });
+  const finalY = docPdf.lastAutoTable.finalY + 15;
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(80);
+  docPdf.text('Aprovado por: ____________________', margin, finalY);
+  docPdf.text('Data/hora: ____________________', pageWidth - margin - 70, finalY);
+  docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
+  toast('PDF gerado');
+}
+
+function exportProducaoXLSX(cid) {
+  const XLSX = window.XLSX;
+  const wb = XLSX.utils.book_new();
+  const cliente = STATE.currentCliente;
+  const hoje = new Date().toLocaleDateString('pt-BR');
+
+  // Resumo
+  const resumoData = [[`Plano de produção — ${cliente?.name || cid}`], [`Data: ${hoje}`], [],
+    ['Prato', 'Qty alvo', 'Unidade', 'Escala', 'Custo est.']];
+  PROD_PLAN.items.forEach(item => {
+    const dish = STATE.dishes.find(d => d.id === item.dishId);
+    if (!dish) return;
+    const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+    const origRend = getSfRendimento(finalSf);
+    let scale = 1;
+    if (item.targetQty > 0 && origRend.qty > 0) {
+      const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+      scale = qConv / origRend.qty;
+    }
+    const cost = dishCost(dish).total * scale;
+    resumoData.push([dish.name, item.targetQty, item.targetUnit, scale, cost]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumoData), 'Resumo');
+
+  // Lista de compras
+  const shopping = window.__prodBuildShopping ? window.__prodBuildShopping() : [];
+  const shopData = [['Lista de compras consolidada'], [], ['Insumo', 'Qty', 'Unidade', 'Rateio?']];
+  shopping.forEach(r => {
+    const norm = normUnitForDisplay(r.qty, r.unit);
+    shopData.push([r.name, norm.text, norm.unit, r.isReutilizavel ? 'SIM' : '']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(shopData), 'Compras');
+
+  // Requisição
+  const reqData = [[`REQUISIÇÃO DE ESTOQUE — ${cliente?.name || cid}`], [`Data: ${hoje}`], [`Responsável: ____________________`], [],
+    ['Insumo', 'Qty solicitada', 'Unidade', 'Qty retirada', 'Assinatura']];
+  shopping.forEach(r => {
+    const norm = normUnitForDisplay(r.qty, r.unit);
+    reqData.push([r.name, norm.text, norm.unit, '', '']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqData), 'Requisição');
+
+  XLSX.writeFile(wb, `producao-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  toast('Excel gerado');
 }
 
 function renderInsumos(cid) {
