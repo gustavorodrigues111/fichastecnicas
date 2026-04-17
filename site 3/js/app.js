@@ -877,6 +877,20 @@ function parseRendimentoQty(rendStr) {
   if (m) return { qty: parseFloat(m[1].replace(',', '.')), unit: (m[2] || '').toLowerCase() };
   return { qty: 1, unit: '' };
 }
+// Retorna rendimento estruturado preferindo os campos rendimento_qty/unit, senão parse da string
+function getSfRendimento(sf) {
+  if (!sf) return { qty: 1, unit: '' };
+  if (typeof sf.rendimento_qty === 'number' && sf.rendimento_qty > 0) {
+    return { qty: sf.rendimento_qty, unit: (sf.rendimento_unit || '').toLowerCase().trim() };
+  }
+  return getSfRendimento(sf);
+}
+function sfRendimentoText(sf, scale = 1) {
+  const r = getSfRendimento(sf);
+  const q = r.qty * scale;
+  const n = normUnitForDisplay(q, r.unit);
+  return `${n.text} ${n.unit}`.trim();
+}
 function subfichaCost(sf, dish, cache = null, visited = null) {
   cache = cache || new Map();
   visited = visited || new Set();
@@ -891,7 +905,7 @@ function subfichaCost(sf, dish, cache = null, visited = null) {
     if (!subSf && sfIdx > 0) subSf = detectSubref(dish, sfIdx, ing.insumo_name);
     if (subSf) {
       const subResult = subfichaCost(subSf, dish, cache, new Set(visited));
-      const subRend = parseRendimentoQty(subSf.rendimento);
+      const subRend = getSfRendimento(subSf);
       const ingQty = ing.qty;
       let cost = 0;
       if (ingQty != null && subRend.qty > 0) {
@@ -990,7 +1004,7 @@ function computeCascadeScales(dish, finalTargetQty) {
   const scales = {};
   const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
   if (!finalSf) return scales;
-  const finalRend = parseRendimentoQty(finalSf.rendimento);
+  const finalRend = getSfRendimento(finalSf);
   const finalScale = finalRend.qty > 0 ? finalTargetQty / finalRend.qty : 1;
   scales[finalSf.id] = finalScale;
 
@@ -1003,7 +1017,7 @@ function computeCascadeScales(dish, finalTargetQty) {
       if (ing.subref_id) {
         const ref = dish.sub_fichas.find(s => s.id === ing.subref_id);
         if (!ref) continue;
-        const refRend = parseRendimentoQty(ref.rendimento);
+        const refRend = getSfRendimento(ref);
         if (refRend.qty <= 0 || ing.qty == null) continue;
         // Normalize units (ing.unit and refRend.unit)
         const [qC] = normalizeSubrefQty(ing.qty, ing.unit, refRend.unit);
@@ -1115,7 +1129,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
     : (dish.sub_fichas[0]?.id || null);
   // Escala em cascata: define rendimento alvo APENAS no prato final; propaga pra todas as sub-fichas.
   const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
-  const originalFinal = parseRendimentoQty(finalSf?.rendimento);
+  const originalFinal = getSfRendimento(finalSf);
   const state = {
     view: 'trabalho',
     activeSf: defaultSf,
@@ -1217,7 +1231,7 @@ function renderFichaTrabalho(dish, sf, state) {
   const sfScale = scales[sf.id] || 1;
 
   // Mostra rendimento desta sub-ficha (escalado)
-  const parsedRend = parseRendimentoQty(sf.rendimento || '');
+  const parsedRend = getSfRendimento(sf);
   const scaledRendQty = parsedRend.qty * sfScale;
   const normRend = normUnitForDisplay(scaledRendQty, parsedRend.unit);
   const rendInfo = el('div', { class: 'ficha-meta-line' },
@@ -1603,7 +1617,19 @@ function renderAdminEdit(cid, dishId) {
         ),
         el('div', { class: 'form-grid' },
           fieldInput('Nome da preparação', 'text', sf.name, v => sf.name = v),
-          fieldInput('Rendimento', 'text', sf.rendimento, v => sf.rendimento = v)
+          fieldInput('Rendimento (quantidade)', 'number', sf.rendimento_qty ?? '', v => {
+            const n = parseFloat(v);
+            sf.rendimento_qty = isNaN(n) ? null : n;
+            if (sf.rendimento_qty != null && sf.rendimento_unit) {
+              sf.rendimento = `${String(sf.rendimento_qty).replace('.', ',')} ${sf.rendimento_unit}`;
+            }
+          }),
+          fieldInput('Unidade (kg / l / und / porções)', 'text', sf.rendimento_unit || '', v => {
+            sf.rendimento_unit = v.trim().toLowerCase();
+            if (sf.rendimento_qty != null && sf.rendimento_unit) {
+              sf.rendimento = `${String(sf.rendimento_qty).replace('.', ',')} ${sf.rendimento_unit}`;
+            }
+          })
         )
       );
       box.appendChild(el('h4', {}, 'Insumos'));
@@ -1715,6 +1741,28 @@ function fieldInput(label, type, value, onChange) {
 }
 
 // ---------- Exports ----------
+// Agrega todos os insumos necessários para produzir o prato (ignorando subrefs — eles são contados via suas sub-fichas)
+function buildShoppingList(dish, scales) {
+  const agg = {};
+  for (const sf of dish.sub_fichas) {
+    const scale = scales[sf.id] || 1;
+    for (const ing of (sf.ingredientes || [])) {
+      if (ing.subref_id) continue;
+      if (ing.qty == null) continue;
+      const insumo = findInsumo(ing.insumo_id);
+      if (!insumo) continue;
+      const [qn, pn] = normalizeQtyPrice(ing, insumo);
+      if (qn == null || pn == null) continue;
+      const fc = ing.fc || 1;
+      const key = ing.insumo_id;
+      if (!agg[key]) agg[key] = { name: insumo.name, unit: insumo.unit, qty: 0, cost: 0 };
+      agg[key].qty += qn * scale * fc;
+      agg[key].cost += qn * pn * scale * fc;
+    }
+  }
+  return Object.values(agg).sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
 function exportFichaPDF(dish, state) {
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -1724,9 +1772,14 @@ function exportFichaPDF(dish, state) {
   const contentWidth = pageWidth - margin * 2;
   const isTrabalho = state.view === 'trabalho';
   const all = dishCost(dish);
+  const scales = typeof state.scales === 'function' ? state.scales() : {};
+  const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+  const finalScale = scales[finalSf?.id] || 1;
+  const scaleChanged = finalScale !== 1;
   const currentSf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
-  const sf = state.view === 'trabalho' ? currentSf : null;
+  const sfScale = scales[currentSf?.id] || 1;
 
+  // --- Cabeçalho ---
   docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
   docPdf.text(isTrabalho ? 'Ficha Técnica Operacional' : 'Ficha de Custo por Rendimento', pageWidth / 2, y, { align: 'center' });
   y += 7;
@@ -1737,44 +1790,86 @@ function exportFichaPDF(dish, state) {
   docPdf.line(pageWidth / 2 - 20, y, pageWidth / 2 + 20, y);
   y += 8;
 
-  // Cascade scales (dish-level scaling)
-  const scales = typeof state.scales === 'function' ? state.scales() : {};
-  const sfScale = scales[currentSf?.id] || 1;
-  const finalSf2 = dish.sub_fichas[dish.sub_fichas.length - 1];
-  const scaleChanged = sfScale !== 1;
+  const headStyle = { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8, cellPadding: 2.5 };
+  const bodyStyle = { fontSize: 9, cellPadding: 2.5, textColor: [40, 40, 40] };
+  const altRowStyle = { fillColor: [252, 251, 247] };
+
   if (isTrabalho) {
-    docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
-    docPdf.text(sf.name, margin, y); y += 5;
-    if (sf.rendimento) {
+    // --- Meta: rendimento alvo ---
+    const finalR = getSfRendimento(finalSf);
+    const targetQty = state.finalTargetQty || finalR.qty;
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(80);
+    docPdf.text(`Produção: ${fmtNum(targetQty, targetQty % 1 === 0 ? 0 : 2)} ${finalR.unit}`, pageWidth / 2, y, { align: 'center' });
+    if (scaleChanged) {
+      y += 5;
+      docPdf.setFontSize(8).setTextColor(120);
+      docPdf.text(`(escalado ${fmtNum(finalScale, 2)}× do original)`, pageWidth / 2, y, { align: 'center' });
+    }
+    y += 10;
+
+    // --- 1. Lista de compras agregada ---
+    const shopping = buildShoppingList(dish, scales);
+    if (shopping.length > 0) {
+      docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
+      docPdf.text('Lista de compras (total necessário)', margin, y); y += 5;
+      docPdf.autoTable({
+        startY: y, margin: { left: margin, right: margin },
+        head: [['Insumo', 'Quantidade total', 'Custo']],
+        body: shopping.map(s => {
+          const norm = normUnitForDisplay(s.qty, s.unit);
+          return [s.name, `${norm.text} ${norm.unit}`.trim(), fmtBRL(s.cost)];
+        }),
+        foot: [['Total', '', fmtBRL(shopping.reduce((t, s) => t + s.cost, 0))]],
+        theme: 'plain',
+        headStyles: headStyle, bodyStyles: bodyStyle, alternateRowStyles: altRowStyle,
+        footStyles: { fontStyle: 'bold', fillColor: [240, 237, 227], fontSize: 9 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }
+      });
+      y = docPdf.lastAutoTable.finalY + 10;
+    }
+
+    // --- 2. Cada sub-ficha em sequência ---
+    dish.sub_fichas.forEach((s, idx) => {
+      if (y > 230) { docPdf.addPage(); y = margin; }
+      const scale = scales[s.id] || 1;
+      // Título da sub-ficha
+      docPdf.setFont('times', 'normal').setFontSize(13).setTextColor(20);
+      docPdf.text(`${idx + 1}. ${s.name}`, margin, y); y += 5;
       docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(120);
-      const rendStr = formatRendimento(sf.rendimento, sfScale) + (scaleChanged ? ` (escalado ${fmtNum(sfScale, 2)}×)` : '');
-      docPdf.text('Rendimento: ' + rendStr, margin, y); y += 6;
-    }
-    docPdf.autoTable({
-      startY: y, margin: { left: margin, right: margin },
-      head: [['Insumo', 'Quantidade', 'Unidade', 'Observação']],
-      body: (sf.ingredientes || []).map(i => {
-        const f = formatIngQty(i, sfScale);
-        return [
-          i.insumo_name,
-          f.text,
-          f.unit || '—', i.observacao || '—'
-        ];
-      }),
-      theme: 'plain',
-      headStyles: { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
-      bodyStyles: { fontSize: 9, cellPadding: 2.5, textColor: [40, 40, 40] },
-      alternateRowStyles: { fillColor: [252, 251, 247] }
+      docPdf.text(`Rendimento: ${sfRendimentoText(s, scale)}${scale !== 1 ? ` (${fmtNum(scale, 2)}× original)` : ''}`, margin, y);
+      y += 6;
+      // Tabela de ingredientes
+      docPdf.autoTable({
+        startY: y, margin: { left: margin, right: margin },
+        head: [['Insumo', 'Quantidade', 'Observação']],
+        body: (s.ingredientes || []).map(i => {
+          const ref = i.subref_id ? dish.sub_fichas.find(x => x.id === i.subref_id) : null;
+          const f = formatIngQty(i, scale);
+          return [
+            (ref ? '↪ ' : '') + i.insumo_name,
+            `${f.text} ${f.unit}`.trim(),
+            i.observacao || '—'
+          ];
+        }),
+        theme: 'plain',
+        headStyles: headStyle, bodyStyles: bodyStyle, alternateRowStyles: altRowStyle
+      });
+      y = docPdf.lastAutoTable.finalY + 5;
+      // Modo de preparo
+      if (s.modo_preparo) {
+        if (y > 250) { docPdf.addPage(); y = margin; }
+        docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
+        docPdf.text('MODO DE PREPARO', margin, y); y += 4;
+        docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(40);
+        const lines = docPdf.splitTextToSize(s.modo_preparo.replace(/\s+/g, ' '), contentWidth);
+        docPdf.text(lines, margin, y);
+        y += lines.length * 4 + 8;
+      } else {
+        y += 4;
+      }
     });
-    y = docPdf.lastAutoTable.finalY + 8;
-    if (sf.modo_preparo) {
-      if (y > 250) { docPdf.addPage(); y = margin; }
-      docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
-      docPdf.text('MODO DE PREPARO', margin, y); y += 5;
-      docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(40);
-      const lines = docPdf.splitTextToSize(sf.modo_preparo.replace(/\s+/g, ' '), contentWidth);
-      docPdf.text(lines, margin, y); y += lines.length * 4 + 6;
-    }
+
+    // --- 3. Louça + equipamentos ---
     if (dish.louca) {
       if (y > 260) { docPdf.addPage(); y = margin; }
       docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
@@ -1786,7 +1881,7 @@ function exportFichaPDF(dish, state) {
     if (dish.equipamentos && dish.equipamentos.length) {
       if (y > 260) { docPdf.addPage(); y = margin; }
       docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(100);
-      docPdf.text('EQUIPAMENTOS', margin, y); y += 5;
+      docPdf.text('EQUIPAMENTOS NECESSÁRIOS', margin, y); y += 5;
       docPdf.setFont('helvetica', 'normal').setTextColor(40);
       const lines = docPdf.splitTextToSize(dish.equipamentos.join(' · '), contentWidth);
       docPdf.text(lines, margin, y);
@@ -1884,22 +1979,44 @@ function exportFichaXLSX(dish, state) {
     const name = ('SF' + (idx + 1) + '-' + sf.name).replace(/[/\\?*\[\]:]/g, '').slice(0, 30);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), name);
   });
-  // Se escala foi alterada, adiciona uma aba "Escalada" com TODAS as sub-fichas em escala
+  // Lista de compras (sempre adicionada na aba "Lista de Compras")
+  const shopping = buildShoppingList(dish, scales);
+  if (shopping.length > 0) {
+    const shoppingData = [
+      [`LISTA DE COMPRAS${scaleChanged ? ` — produção escalada ${fmtNum(finalScale, 2)}×` : ''}`],
+      [`Rendimento alvo`, `${fmtNum(state?.finalTargetQty || 0, 2)} ${state?.finalUnit || ''}`],
+      [],
+      ['Insumo', 'Quantidade', 'Unidade', 'Custo'],
+      ...shopping.map(s => {
+        const norm = normUnitForDisplay(s.qty, s.unit);
+        return [s.name, norm.text, norm.unit, s.cost];
+      }),
+      [],
+      ['TOTAL', '', '', shopping.reduce((t, s) => t + s.cost, 0)]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(shoppingData), 'Lista de Compras');
+  }
+  // Sequência completa de sub-fichas escaladas
   if (scaleChanged && state?.view === 'trabalho') {
     const scaledAll = [[`PRODUÇÃO ESCALADA — alvo final ${fmtNum(state.finalTargetQty, 2)} ${state.finalUnit}`], []];
-    dish.sub_fichas.forEach(s => {
+    dish.sub_fichas.forEach((s, idx) => {
       const sScale = scales[s.id] || 1;
-      scaledAll.push([s.name + (sScale !== 1 ? ` (× ${fmtNum(sScale, 2)})` : '')]);
-      scaledAll.push(['Rendimento', formatRendimento(s.rendimento, sScale)]);
+      scaledAll.push([`${idx+1}. ${s.name}${sScale !== 1 ? ` (× ${fmtNum(sScale, 2)})` : ''}`]);
+      scaledAll.push(['Rendimento', sfRendimentoText(s, sScale)]);
       scaledAll.push([]);
       scaledAll.push(['Insumo', 'Quantidade', 'Unidade', 'Observação']);
       (s.ingredientes || []).forEach(i => {
         const f = formatIngQty(i, sScale);
         scaledAll.push([i.insumo_name, f.text || '', f.unit || '', i.observacao || '']);
       });
+      if (s.modo_preparo) {
+        scaledAll.push([]);
+        scaledAll.push(['Modo de preparo']);
+        scaledAll.push([s.modo_preparo]);
+      }
       scaledAll.push([]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scaledAll), 'Escalada');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(scaledAll), 'Receita Completa');
   }
   const suffix = scaleChanged ? `-esc${fmtNum(finalScale, 2)}x` : '';
   XLSX.writeFile(wb, `${slugify(dish.name)}${suffix}.xlsx`);
