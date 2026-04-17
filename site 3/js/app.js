@@ -1891,23 +1891,21 @@ function exportFichaPDF(dish, state) {
     }
     y += 10;
 
-    // --- 1. Lista de compras agregada ---
+    // --- 1. Lista de compras (só quantidades, sem preços — é PDF de produção) ---
     const shopping = buildShoppingList(dish, scales);
     if (shopping.length > 0) {
       docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
       docPdf.text('Lista de compras (total necessário)', margin, y); y += 5;
       docPdf.autoTable({
         startY: y, margin: { left: margin, right: margin },
-        head: [['Insumo', 'Quantidade total', 'Custo']],
+        head: [['Insumo', 'Quantidade total']],
         body: shopping.map(s => {
           const norm = normUnitForDisplay(s.qty, s.unit);
-          return [s.name, `${norm.text} ${norm.unit}`.trim(), fmtBRL(s.cost)];
+          return [s.name, `${norm.text} ${norm.unit}`.trim()];
         }),
-        foot: [['Total', '', fmtBRL(shopping.reduce((t, s) => t + s.cost, 0))]],
         theme: 'plain',
         headStyles: headStyle, bodyStyles: bodyStyle, alternateRowStyles: altRowStyle,
-        footStyles: { fontStyle: 'bold', fillColor: [240, 237, 227], fontSize: 9 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }
+        columnStyles: { 1: { halign: 'right' } }
       });
       y = docPdf.lastAutoTable.finalY + 10;
     }
