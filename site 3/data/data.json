@@ -206,7 +206,8 @@
               "qty_raw": "60.0",
               "unit": "kg",
               "observacao": "Deve estar Refriderado",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "recheio-de-frango-com-catupiry"
             },
             {
               "insumo_id": "gema",
@@ -590,7 +591,8 @@
               "qty_raw": "240.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "polenta-com-rabada"
             },
             {
               "insumo_id": "queijo-tulha",
@@ -923,7 +925,7 @@
         {
           "id": "montagem-em-camdas-gn",
           "name": "Montagem em Camadas (gn)",
-          "rendimento": "1,700 kg- 34 UND- DE 50 G",
+          "rendimento": "34 und",
           "ingredientes": [
             {
               "insumo_id": "camada-bovina-base",
@@ -932,7 +934,8 @@
               "qty_raw": "1.023",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "camada-bovina-base"
             },
             {
               "insumo_id": "camada-suina-topo",
@@ -941,7 +944,8 @@
               "qty_raw": "1.023",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "camada-suina-topo"
             }
           ],
           "modo_preparo": "Untar levemente a GN 1/1.\nBase: aplicar o acém moído, e pressionar muito bem Nivelar (sem ar)\nTopo: aplicar o blend suíno, e pressionar novamente para aderência entre camadas. Compactar usando plástico + outra GN ou peso e deixar descansar por 1hora no freezer. Assar por 30minutos a 180 °C. Retirar do Forno e levar para o Freezer por mínimo 4 horas (ideal 8–12h). Cortar e porcionar em cubos de 50 g\nManter padrão uniforme."
@@ -1002,17 +1006,17 @@
         {
           "id": "empanamento",
           "name": "Empanamento",
-          "rendimento": "",
+          "rendimento": "34 und",
           "ingredientes": [
             {
               "insumo_id": "bolinho-de-carne",
-              "insumo_name": "Bolinho de Carne",
+              "insumo_name": "Bolinho de Carne (cru, da Montagem)",
               "qty": 34.0,
               "qty_raw": "34.0",
               "unit": "und",
               "observacao": "",
               "is_qb": false,
-              "subref_id": "bolinho-de-carne"
+              "subref_id": "montagem-em-camdas-gn"
             },
             {
               "insumo_id": "ovo",
@@ -1074,7 +1078,8 @@
               "qty_raw": "2.0",
               "unit": "und",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "empanamento"
             },
             {
               "insumo_id": "maionese-de-mostarda",
@@ -1302,7 +1307,8 @@
               "qty_raw": "1.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "frango-cozido-e-desfiado"
             },
             {
               "insumo_id": "base-de-maionese",
@@ -1311,7 +1317,8 @@
               "qty_raw": "900.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "base-de-maionese"
             },
             {
               "insumo_id": "maca-verde",
@@ -1703,7 +1710,8 @@
               "qty_raw": "160.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "molho-de-moela-finalizado"
             },
             {
               "insumo_id": "caldo-misto",
@@ -1744,7 +1752,7 @@
         {
           "id": "massa-do-pastel",
           "name": "Massa do Pastel",
-          "rendimento": "1,400 kg-40 und",
+          "rendimento": "40 und",
           "ingredientes": [
             {
               "insumo_id": "polvilho-azedo",
@@ -1897,7 +1905,8 @@
               "qty_raw": "20.0",
               "unit": "kg",
               "observacao": "Refrigerado",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "costelinha-suina-desfiada"
             }
           ],
           "modo_preparo": "Em uma superfície levemente polvilhada ou entre plásticos, abra a massa com o rolo até atingir a espessura de 3 mm. Use o aro de 12 cm para cortar o disco perfeito.\nColoque os 20g de Costelinha exatamente no centro do disco. Mantenha as bordas (cerca de 1cm) totalmente limpas. Se cair gordura do recheio na borda, o pastel pode abrir durante a fritura. Dobre a massa em formato de meia-lua. Ao fechar, use os dedos para pressionar o ar para fora. O ar preso faz o pastel inflar e pode causar rompimentos. Utilize um garfo para selar a borda levemente. Como esta massa é elástica (pelo polvilho e queijo), não é necessário usar água para colar, mas a pressão deve ser firme. Disponha os pastéis em uma GN e leve ao freezer por, no mínimo, 30 minutos."
@@ -2007,7 +2016,8 @@
               "qty_raw": "1.7",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "quirera-de-milho-cozida"
             },
             {
               "insumo_id": "joelho-de-porco-defumado-cozido-e-desfiado",
@@ -2016,7 +2026,8 @@
               "qty_raw": "1.0",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "joelho-de-porco-defumado-cozido-e-desfiado"
             },
             {
               "insumo_id": "joelho-de-porco-defumado-cozido-e-desfiado",
@@ -2025,7 +2036,8 @@
               "qty_raw": "1.7",
               "unit": "kg",
               "observacao": "",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "joelho-de-porco-defumado-cozido-e-desfiado"
             },
             {
               "insumo_id": "cebola-branca",
@@ -2315,7 +2327,8 @@
               "qty_raw": "60.0",
               "unit": "kg",
               "observacao": "2und de 30g",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "salmoura-e-porcionamento-do-peixe"
             },
             {
               "insumo_id": "base-de-maionese",
@@ -2324,7 +2337,8 @@
               "qty_raw": "15.0",
               "unit": "kg",
               "observacao": "Aplicar na base da tortilha",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "base-de-maionese"
             },
             {
               "insumo_id": "vinagrete-de-banana-finalizado",
@@ -2507,7 +2521,8 @@
               "qty_raw": "450g",
               "unit": "kg",
               "observacao": "Pré-preparada",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "linguica"
             },
             {
               "insumo_id": "milho-verde",
@@ -2755,7 +2770,8 @@
               "qty_raw": "1.0",
               "unit": "und",
               "observacao": "Padrão 150g",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "marinada-do-coracao-de-frango"
             },
             {
               "insumo_id": "massa-de-tempura",
