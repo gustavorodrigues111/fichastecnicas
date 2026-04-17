@@ -1308,7 +1308,8 @@ function renderInsumos(cid) {
   }
   buildRows('');
   tbl.appendChild(tbody);
-  app.appendChild(tbl);
+  const tableWrap = el('div', { class: 'insumos-table-wrap' }, tbl);
+  app.appendChild(tableWrap);
   $('.insumos-search', header).addEventListener('input', e => buildRows(e.target.value));
 }
 

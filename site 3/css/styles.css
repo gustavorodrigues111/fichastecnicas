@@ -192,13 +192,13 @@ main { padding: 3rem 0 4rem; flex: 1; }
 .ficha-header .back-link:hover { color: #b8955e; }
 .ficha-header h1 { font-size: 3rem; margin-bottom: 0.5rem; }
 
-/* Gallery */
+/* Gallery — fotos compactas */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2.5rem;
-  max-width: 900px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 180px));
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -1156,13 +1156,14 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .ficha-header h1 { font-size: 1.8rem; }
   .ficha-header .back-link { font-size: 0.78rem; margin-bottom: 0.75rem; }
 
-  /* Gallery: single or two column depending on available space */
+  /* Gallery mobile: 2 colunas compactas, não ocupa a tela toda */
   .gallery {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    max-width: 280px;
   }
-  .gallery .photo { aspect-ratio: 16 / 10; }
+  .gallery .photo { aspect-ratio: 4 / 3; }
 
   /* View toggle — full width, 2 buttons flex */
   .view-toggle {
@@ -1204,86 +1205,17 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .ficha-body h2 { font-size: 1.6rem; margin-bottom: 1.25rem; }
   .ficha-meta-line { font-size: 0.72rem; letter-spacing: 0.1em; }
 
-  /* Ficha de custo mobile — layout compacto de card em grid */
-  .ficha-table thead { display: none; }
-  .ficha-table, .ficha-table tbody { display: block; width: 100%; }
-  .ficha-table tr {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.15rem 0.75rem;
-    align-items: baseline;
-    padding: 0.85rem 0.95rem;
-    border: 1px solid #ebe9e1;
-    background: #fff;
-    margin-bottom: 0.5rem;
+  /* Ficha de custo mobile — tabela compacta com scroll horizontal se necessário */
+  .ficha-section { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -1rem; padding: 0 1rem; }
+  .ficha-table {
+    min-width: 480px;
+    width: 100%;
+    font-size: 0.85rem;
   }
-  .ficha-table td {
-    display: block;
-    border: none !important;
-    padding: 0 !important;
-    text-align: left !important;
-    font-size: 0.82rem;
-  }
-  .ficha-table td::before { display: none; }
-  /* Nome (col 1) */
-  .ficha-table td:nth-child(1) {
-    grid-row: 1;
-    grid-column: 1;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.05rem;
-    color: #1a1a1a;
-    font-weight: 500;
-    line-height: 1.25;
-  }
-  /* 5 colunas: Insumo | Qtd | Unit | Preço | Custo */
-  /* Linha 2: Qtd + Unit + Preço em sequência compacta */
-  .ficha-table td:nth-child(2),
-  .ficha-table td:nth-child(3),
-  .ficha-table td:nth-child(4) {
-    grid-row: 2;
-    grid-column: 1;
-    display: inline;
-    color: #888;
-    font-size: 0.8rem;
-  }
-  .ficha-table td:nth-child(2)::after { content: ' '; }
-  .ficha-table td:nth-child(3)::after { content: ' · '; }
-  /* Custo (col 2) — destaque */
-  .ficha-table td:nth-child(5) {
-    grid-row: 1 / span 2;
-    grid-column: 2;
-    align-self: center;
-    font-weight: 600;
-    color: #1a1a1a;
-    font-size: 1rem;
-    text-align: right !important;
-    white-space: nowrap;
-  }
-  /* Tfoot subtotal */
-  .ficha-table tfoot { display: block; margin-top: 0.25rem; }
-  .ficha-table tfoot tr {
-    background: #1a1a1a;
-    color: #fff;
-    border-color: #1a1a1a;
-    grid-template-columns: 1fr auto;
-    padding: 0.7rem 0.95rem;
-  }
-  .ficha-table tfoot td {
-    color: #fff !important;
-    font-size: 0.85rem !important;
-    font-family: 'Inter', sans-serif !important;
-  }
-  .ficha-table tfoot td:first-child {
-    grid-row: 1; grid-column: 1;
-    font-family: 'Inter', sans-serif !important;
-    font-size: 0.85rem !important;
-    font-weight: 500 !important;
-  }
-  .ficha-table tfoot td:last-child {
-    grid-row: 1; grid-column: 2;
-    font-weight: 700 !important;
-    font-size: 1rem !important;
-  }
+  .ficha-table th { padding: 0.5rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.08em; }
+  .ficha-table td { padding: 0.55rem 0.5rem; vertical-align: top; }
+  .ficha-table td:first-child { font-weight: 500; }
+  .ficha-table tfoot td { padding: 0.6rem 0.5rem; font-size: 0.85rem; }
 
   /* Section headers */
   .ficha-section h3 { font-size: 0.85rem; }
@@ -1339,77 +1271,38 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .insumos-header h1 { font-size: 1.8rem; }
   .insumos-search { width: 100%; }
 
-  /* Insumos — card simples com preço em destaque */
-  .insumos-table thead { display: none; }
-  .insumos-table, .insumos-table tbody { display: block; width: 100%; }
-  .insumos-table { border: none; background: transparent; }
-  .insumos-table tr {
-    display: block;
+  /* Insumos mobile — formato tabela (com scroll horizontal se precisar) */
+  .insumos-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -1rem;
+    padding: 0 1rem 0.5rem;
+  }
+  .insumos-table {
+    min-width: 520px;
+    width: 100%;
     background: #fff;
     border: 1px solid #ebe9e1;
-    padding: 1rem 1.1rem;
-    margin-bottom: 0.6rem;
+    font-size: 0.85rem;
+  }
+  .insumos-table th {
+    padding: 0.55rem 0.55rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    background: #f7f5ee;
   }
   .insumos-table td {
-    display: block;
-    padding: 0 !important;
-    border: none !important;
+    padding: 0.5rem 0.55rem;
+    vertical-align: middle;
   }
-  .insumos-table td::before { display: none; }
-  /* Nome (destaque) */
-  .insumos-table td:nth-child(1) {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.2rem;
+  .insumos-table td:first-child {
     font-weight: 500;
     color: #1a1a1a;
-    margin-bottom: 0.65rem;
-    line-height: 1.2;
+    min-width: 160px;
   }
-  /* Unidade + Preço em linha */
-  .insumos-table td:nth-child(2),
-  .insumos-table td:nth-child(3) {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.35rem;
-  }
-  .insumos-table td:nth-child(2)::before {
-    content: 'Unid.';
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #999;
-    min-width: 62px;
-    display: inline;
-  }
-  .insumos-table td:nth-child(3)::before {
-    content: 'Preço';
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #999;
-    min-width: 62px;
-    display: inline;
-  }
-  .insumos-table input { font-size: 1rem; max-width: 100%; flex: 1; }
-  .insumos-table input.unit-input { max-width: 120px; }
-  .insumos-table input[type=number] { font-weight: 500; }
-  /* Usado em + Excluir numa linha */
-  .insumos-table td:nth-child(4) {
-    margin-top: 0.7rem;
-    padding-top: 0.5rem !important;
-    border-top: 1px dashed #f0ede3 !important;
-    font-size: 0.78rem;
-    color: #999;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .insumos-table td:nth-child(5) {
-    margin-top: 0;
-    padding-left: 0.5rem !important;
-    text-align: right;
-  }
+  .insumos-table input.unit-input { width: 55px; font-size: 0.9rem; padding: 0.3rem 0.4rem; }
+  .insumos-table input[type=number] { width: 85px; font-size: 0.9rem; padding: 0.3rem 0.4rem; font-weight: 500; }
+  .insumos-table .btn-small { padding: 0.3rem 0.55rem; font-size: 0.68rem; }
 
   /* Admin page */
   .admin-panel { padding: 1.25rem; }
