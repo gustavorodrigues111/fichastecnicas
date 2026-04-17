@@ -2170,6 +2170,84 @@ function renderInsumos(cid) {
   });
 }
 
+// Modal pra copiar sub-ficha de outra receita do mesmo restaurante
+function openCopySubfichaModal(targetDish, onCopy) {
+  const modal = el('div', { class: 'modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
+  );
+  const content = el('div', { class: 'modal-content modal-wide' });
+  content.appendChild(el('h2', {}, 'Copiar sub-ficha de outra ficha'));
+  content.appendChild(el('p', { class: 'modal-subtitle' },
+    'Selecione uma sub-ficha existente pra copiar pra esta ficha. ' +
+    'Ingredientes, rendimento, modo de preparo e variações serão copiados. ' +
+    'Referências a outras sub-fichas (subref) serão removidas porque elas não existem nesta ficha.'));
+
+  // Lista de fichas (exceto a atual) com sub-fichas navegáveis
+  const listWrap = el('div', { class: 'copy-sf-list' });
+  const searchInput = el('input', { type: 'search', placeholder: 'Buscar ficha ou sub-ficha...', class: 'copy-sf-search' });
+  content.appendChild(searchInput);
+
+  function renderList() {
+    listWrap.innerHTML = '';
+    const q = searchInput.value.toLowerCase().trim();
+    let totalShown = 0;
+    STATE.dishes.forEach(dish => {
+      if (dish.id === targetDish.id) return;
+      if (!dish.sub_fichas || dish.sub_fichas.length === 0) return;
+      const matchingSfs = dish.sub_fichas.filter(sf =>
+        !q ||
+        dish.name.toLowerCase().includes(q) ||
+        sf.name.toLowerCase().includes(q)
+      );
+      if (matchingSfs.length === 0) return;
+      const dishGroup = el('div', { class: 'copy-sf-dish' },
+        el('h4', { class: 'copy-sf-dish-name' }, dish.name)
+      );
+      matchingSfs.forEach(sf => {
+        const ingCount = (sf.ingredientes || []).length;
+        const rend = sf.rendimento || '—';
+        const btn = el('button', { class: 'copy-sf-item', onclick: () => {
+          const copy = JSON.parse(JSON.stringify(sf));
+          copy.id = uid();
+          // Prefixo no nome pra evitar duplicata idêntica
+          const existingNames = targetDish.sub_fichas.map(x => x.name);
+          if (existingNames.includes(copy.name)) {
+            copy.name = copy.name + ' (cópia)';
+          }
+          // Remove subref_id de ingredientes (não existem na ficha destino)
+          let subrefsCleared = 0;
+          (copy.ingredientes || []).forEach(ing => {
+            if (ing.subref_id) { delete ing.subref_id; subrefsCleared++; }
+          });
+          if (subrefsCleared > 0) {
+            toast(`${subrefsCleared} referência${subrefsCleared > 1 ? 's' : ''} a outras sub-fichas removida${subrefsCleared > 1 ? 's' : ''}`);
+          }
+          onCopy(copy);
+          modal.remove();
+        } },
+          el('div', { class: 'copy-sf-item-name' }, sf.name),
+          el('div', { class: 'copy-sf-item-meta' }, `${ingCount} ingredientes · rend. ${rend}`)
+        );
+        dishGroup.appendChild(btn);
+        totalShown++;
+      });
+      listWrap.appendChild(dishGroup);
+    });
+    if (totalShown === 0) {
+      listWrap.appendChild(el('p', { class: 'muted' }, q ? 'Nenhuma sub-ficha encontrada com essa busca.' : 'Não há outras fichas com sub-fichas neste restaurante.'));
+    }
+  }
+  renderList();
+  searchInput.addEventListener('input', renderList);
+  content.appendChild(listWrap);
+  content.appendChild(el('div', { class: 'modal-actions' },
+    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar')
+  ));
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  searchInput.focus();
+}
+
 // Modal de variações do insumo (ex: Cebola branca → brunoise FC 1,15, julienne FC 1,12)
 function openVariationsModal(cid, insumo) {
   const variations = JSON.parse(JSON.stringify(insumo.variations || []));
@@ -2551,10 +2629,19 @@ function renderAdminEdit(cid, dishId) {
       ));
       sfWrap.appendChild(box);
     });
-    sfWrap.appendChild(el('button', { class: 'btn', onclick: () => {
+    const sfActions = el('div', { class: 'sf-add-actions' });
+    sfActions.appendChild(el('button', { class: 'btn', onclick: () => {
       dish.sub_fichas.push({ id: uid(), name: `Preparação ${dish.sub_fichas.length + 1}`, rendimento: '', ingredientes: [], modo_preparo: '' });
       renderSubfichas();
     } }, '+ Adicionar sub-ficha'));
+    sfActions.appendChild(el('button', { class: 'btn btn-accent', onclick: () => {
+      openCopySubfichaModal(dish, (copied) => {
+        dish.sub_fichas.push(copied);
+        renderSubfichas();
+        toast('Sub-ficha copiada');
+      });
+    } }, '↗ Copiar de outra ficha'));
+    sfWrap.appendChild(sfActions);
   }
   renderSubfichas();
   panel.appendChild(sfWrap);
