@@ -1175,16 +1175,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
         });
         return input;
       })(),
-      el('span', { class: 'scale-unit' }, state.finalUnit || ''),
-      (() => {
-        const btn = el('button', { class: 'btn btn-small btn-ghost', onclick: () => {
-          state.finalTargetQty = originalFinal.qty;
-          updateUI();
-        } }, 'Resetar');
-        btn.style.display = 'none';
-        btn.id = 'scale-reset';
-        return btn;
-      })()
+      el('span', { class: 'scale-unit' }, state.finalUnit || '')
     )
   );
   app.appendChild(scaleBar);
@@ -1209,8 +1200,6 @@ function renderFicha(cid, dishId, initialSfId = null) {
     $$('.subficha-tabs button', tabs).forEach(b => b.classList.toggle('active', b.dataset.sf === state.activeSf));
     // Scale bar visible só no modo trabalho
     scaleBar.style.display = state.view === 'trabalho' ? '' : 'none';
-    const resetBtn = $('#scale-reset', scaleBar);
-    if (resetBtn) resetBtn.style.display = (state.finalTargetQty !== originalFinal.qty) ? '' : 'none';
     const sf = (dish.sub_fichas || []).find(s => s.id === state.activeSf) || (dish.sub_fichas || [])[0];
     body.innerHTML = '';
     if (state.view === 'trabalho') body.appendChild(renderFichaTrabalho(dish, sf, state));
