@@ -284,7 +284,7 @@ async function seedClienteFromJson(cid, clienteName) {
   for (const ins of seed.insumos) {
     const clean = { ...ins };
     delete clean.id;
-    if (existingPrices[ins.id] != null) clean.price = existingPrices[ins.id];
+    if (existingPrices[ins.id] != null && existingPrices[ins.id] > 0) clean.price = existingPrices[ins.id];
     await add('set', insumoDoc(cid, ins.id), clean);
   }
   await add('set', configDoc(cid, 'equipamentos'), { list: seed.equipamentos_disponiveis || [] });
