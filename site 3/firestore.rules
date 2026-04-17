@@ -36,6 +36,10 @@ service cloud.firestore {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
       return affected.hasOnly(['price', 'unit']);
     }
+    function onlyDishPricingFields() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['target_cmv']);
+    }
 
     // ---------- users collection ----------
     match /users/{uid} {
@@ -61,7 +65,9 @@ service cloud.firestore {
       // dishes subcollection
       match /dishes/{dishId} {
         allow read: if hasClienteAccess(cid);
-        allow write: if isStaffOf(cid);
+        allow create, delete: if isStaffOf(cid);
+        // Staff can update anything; cliente can only update target_cmv (pricing)
+        allow update: if isStaffOf(cid) || (isClienteUserOf(cid) && onlyDishPricingFields());
       }
 
       // insumos subcollection

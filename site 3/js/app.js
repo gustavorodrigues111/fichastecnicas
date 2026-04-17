@@ -1685,17 +1685,17 @@ function renderFichaCusto(dish, cid) {
     wrap.appendChild(section);
   });
 
+  // Display principal: custo por porção (destaque).
+  // Se rendimento > 1, mostra linha discreta com total e quantidade de porções.
   const total = el('div', { class: 'total-dish-cost' },
-    el('div', {}, el('span', { class: 'stat-label' }, 'Custo total do prato'),
-      el('span', { class: 'stat-value' }, fmtBRL(all.total))),
-    el('div', {}, el('span', { class: 'stat-label' }, 'Porções (aprox.)'),
-      el('span', { class: 'stat-value' }, fmtNum(all.portions, 0))),
     el('div', {}, el('span', { class: 'stat-label' }, 'Custo por porção'),
       el('span', { class: 'stat-value gold' }, fmtBRL(all.costPerPortion)))
   );
   wrap.appendChild(total);
-  wrap.appendChild(el('p', { class: 'cost-total-note muted' },
-    'O custo total é calculado pela sub-ficha final, que já incorpora proporcionalmente o que é consumido das sub-fichas anteriores. Os subtotais das sub-fichas intermediárias são informativos (custo do lote inteiro daquela preparação).'));
+  if (all.portions > 1) {
+    wrap.appendChild(el('p', { class: 'cost-total-note' },
+      `Produz ${fmtNum(all.portions, 0)} porções · total R$ ${fmtNum(all.total, 2)}`));
+  }
 
   // 3 campos bidirecionais: CMV / Markup / Preço de Venda
   // Edite qualquer um → os outros 2 se ajustam. Armazena target_cmv como fonte de verdade.
@@ -1705,10 +1705,15 @@ function renderFichaCusto(dish, cid) {
   const initialPrice = costPP > 0 ? costPP / (initialCmv / 100) : 0;
   const initialMarkup = costPP > 0 ? ((initialPrice / costPP) - 1) * 100 : 0;
 
-  const editable = canEditCliente(cid);
-  const cmvInput = el('input', { type: 'number', min: '1', max: '100', step: '0.5', value: initialCmv.toFixed(1) });
-  const markupInput = el('input', { type: 'number', min: '0', step: '1', value: initialMarkup.toFixed(0) });
-  const priceInput = el('input', { type: 'number', min: '0', step: '0.50', value: initialPrice.toFixed(2) });
+  const editable = canEditInsumoPrice(cid);
+  const parseDec = (s) => {
+    if (s == null) return NaN;
+    const v = String(s).replace(/\./g, '').replace(',', '.').trim();
+    return parseFloat(v);
+  };
+  const cmvInput = el('input', { type: 'text', inputmode: 'decimal', value: initialCmv.toFixed(1).replace('.', ',') });
+  const markupInput = el('input', { type: 'text', inputmode: 'decimal', value: initialMarkup.toFixed(0) });
+  const priceInput = el('input', { type: 'text', inputmode: 'decimal', value: initialPrice.toFixed(2).replace('.', ',') });
   if (!editable) { cmvInput.disabled = true; markupInput.disabled = true; priceInput.disabled = true; }
 
   costBox.appendChild(el('div', { class: 'stat' },
@@ -1725,39 +1730,39 @@ function renderFichaCusto(dish, cid) {
 
   cmvInput.addEventListener('input', () => {
     if (internalUpdate) return;
-    const cmv = parseFloat(cmvInput.value);
+    const cmv = parseDec(cmvInput.value);
     if (isNaN(cmv) || cmv <= 0) return;
     dish.target_cmv = cmv;
     const price = costPP / (cmv / 100);
     const markup = ((price / costPP) - 1) * 100;
     internalUpdate = true;
-    priceInput.value = price.toFixed(2);
+    priceInput.value = price.toFixed(2).replace('.', ',');
     markupInput.value = markup.toFixed(0);
     internalUpdate = false;
     save();
   });
   markupInput.addEventListener('input', () => {
     if (internalUpdate) return;
-    const markup = parseFloat(markupInput.value);
+    const markup = parseDec(markupInput.value);
     if (isNaN(markup) || markup < 0) return;
     const price = costPP * (1 + markup / 100);
     const cmv = price > 0 ? (costPP / price) * 100 : 0;
     dish.target_cmv = cmv;
     internalUpdate = true;
-    cmvInput.value = cmv.toFixed(1);
-    priceInput.value = price.toFixed(2);
+    cmvInput.value = cmv.toFixed(1).replace('.', ',');
+    priceInput.value = price.toFixed(2).replace('.', ',');
     internalUpdate = false;
     save();
   });
   priceInput.addEventListener('input', () => {
     if (internalUpdate) return;
-    const price = parseFloat(priceInput.value);
+    const price = parseDec(priceInput.value);
     if (isNaN(price) || price <= 0) return;
     const cmv = (costPP / price) * 100;
     const markup = ((price / costPP) - 1) * 100;
     dish.target_cmv = cmv;
     internalUpdate = true;
-    cmvInput.value = cmv.toFixed(1);
+    cmvInput.value = cmv.toFixed(1).replace('.', ',');
     markupInput.value = markup.toFixed(0);
     internalUpdate = false;
     save();
