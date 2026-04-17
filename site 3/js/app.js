@@ -249,7 +249,7 @@ async function loadClientesList() {
 
 // ---------- Sync de preços apenas (sem mexer em fichas ou outros campos) ----------
 async function syncPricesOnly(cid) {
-  if (!isAdmin && !isStaff()) { toast('Sem permissão'); return; }
+  if (!isMaster() && !isStaff()) { toast('Sem permissão'); return; }
   const msg = 'Atualizar preços dos insumos deste restaurante usando os valores do arquivo data.json?\n\n• SEGURO: só altera preços. Não mexe em fichas, não adiciona nem remove insumos.\n• Preços existentes > 0 são sobrescritos pelos do arquivo.';
   if (!confirm(msg)) return;
   try {
