@@ -198,28 +198,30 @@ function subscribeCliente(cid) {
   const maybeRender = () => {
     if (--pendingLoads <= 0) { STATE.loaded = true; route(); }
   };
+  // ⚠ Após o load inicial, não chamamos route() mais a cada snapshot.
+  // O STATE já é atualizado; re-renderizar perdia foco em inputs (preços, markup, etc).
   // Cliente doc
   STATE.unsubs.clienteDoc = onSnapshot(clienteDoc(cid), (snap) => {
     if (snap.exists()) STATE.currentCliente = { id: snap.id, ...snap.data() };
     else STATE.currentCliente = null;
-    if (pendingLoads > 0) maybeRender(); else route();
+    if (pendingLoads > 0) maybeRender();
   });
   // Dishes
   STATE.unsubs.dishes = onSnapshot(dishesCol(cid), (snap) => {
     STATE.dishes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     STATE.dishes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (pendingLoads > 0) maybeRender(); else route();
+    if (pendingLoads > 0) maybeRender();
   }, err => { console.error('dishes err', err); if (pendingLoads > 0) maybeRender(); });
   // Insumos
   STATE.unsubs.insumos = onSnapshot(insumosCol(cid), (snap) => {
     STATE.insumos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     STATE.insumos.sort((a, b) => (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()));
-    if (pendingLoads > 0) maybeRender(); else route();
+    if (pendingLoads > 0) maybeRender();
   }, err => { console.error('insumos err', err); if (pendingLoads > 0) maybeRender(); });
   // Equipamentos
   STATE.unsubs.config = onSnapshot(configDoc(cid, 'equipamentos'), (snap) => {
     STATE.equipamentos = snap.exists() ? (snap.data().list || []) : [];
-    if (pendingLoads > 0) maybeRender(); else route();
+    if (pendingLoads > 0) maybeRender();
   }, err => { console.error('config err', err); if (pendingLoads > 0) maybeRender(); });
 }
 
@@ -944,10 +946,18 @@ function dishCost(dish) {
   const total = finalResult ? finalResult.total : 0;
   const portions = parsePortions(finalSf ? finalSf.rendimento : '');
   const costPerPortion = portions > 0 ? total / portions : 0;
-  const markup = dish.markup || 300;
-  const suggestedPrice = costPerPortion * (1 + markup / 100);
-  const cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
-  return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv };
+  // Preço sugerido: se dish.target_cmv definido, usa CMV alvo; senão usa markup legado
+  let suggestedPrice, cmv, markup;
+  if (typeof dish.target_cmv === 'number' && dish.target_cmv > 0) {
+    cmv = dish.target_cmv;
+    suggestedPrice = costPerPortion / (cmv / 100);
+    markup = costPerPortion > 0 ? ((suggestedPrice / costPerPortion) - 1) * 100 : 0;
+  } else {
+    markup = dish.markup || 300;
+    suggestedPrice = costPerPortion * (1 + markup / 100);
+    cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
+  }
+  return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv, markup };
 }
 function parsePortions(rendStr) {
   if (!rendStr) return 1;
@@ -1279,23 +1289,29 @@ function renderFichaCusto(dish, currentSf, cid) {
   );
   wrap.appendChild(total);
 
+  // CMV alvo → preço sugerido, markup calculado
   const cost = el('div', { class: 'cost-summary' });
-  const markupInput = el('input', { type: 'number', min: '0', step: '5', value: String(dish.markup || 300) });
-  if (!canEditCliente(cid)) markupInput.disabled = true;
+  const currentCmv = dish.target_cmv || 30;  // padrão 30%
+  const cmvInput = el('input', { type: 'number', min: '1', max: '100', step: '1', value: String(currentCmv) });
+  if (!canEditCliente(cid)) cmvInput.disabled = true;
   cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'Markup (%)'), markupInput));
-  const priceSpan = el('span', { class: 'stat-value accent' }, fmtBRL(all.suggestedPrice));
+    el('span', { class: 'stat-label' }, 'CMV alvo (%)'), cmvInput));
+  // Preço calculado: price = cost / (cmv/100)
+  const computedPrice = currentCmv > 0 ? all.costPerPortion / (currentCmv / 100) : 0;
+  const computedMarkup = all.costPerPortion > 0 ? ((computedPrice / all.costPerPortion) - 1) * 100 : 0;
+  const priceSpan = el('span', { class: 'stat-value accent' }, fmtBRL(computedPrice));
   cost.appendChild(el('div', { class: 'stat' },
     el('span', { class: 'stat-label' }, 'Preço de venda sugerido'), priceSpan));
-  const cmvSpan = el('span', { class: 'stat-value' }, fmtNum(all.cmv, 1) + '%');
+  const markupSpan = el('span', { class: 'stat-value' }, fmtNum(computedMarkup, 0) + '%');
   cost.appendChild(el('div', { class: 'stat' },
-    el('span', { class: 'stat-label' }, 'CMV (food cost)'), cmvSpan));
-  markupInput.addEventListener('input', () => {
-    const newMarkup = parseFloat(markupInput.value) || 0;
-    dish.markup = newMarkup;
-    const newPrice = all.costPerPortion * (1 + newMarkup / 100);
+    el('span', { class: 'stat-label' }, 'Markup calculado'), markupSpan));
+  cmvInput.addEventListener('input', () => {
+    const newCmv = parseFloat(cmvInput.value) || 0;
+    dish.target_cmv = newCmv;
+    const newPrice = newCmv > 0 ? all.costPerPortion / (newCmv / 100) : 0;
+    const newMarkup = all.costPerPortion > 0 ? ((newPrice / all.costPerPortion) - 1) * 100 : 0;
     priceSpan.textContent = fmtBRL(newPrice);
-    cmvSpan.textContent = newPrice > 0 ? fmtNum(all.costPerPortion / newPrice * 100, 1) + '%' : '—';
+    markupSpan.textContent = fmtNum(newMarkup, 0) + '%';
     scheduleSave('dish-' + dish.id, () => saveDish(STATE.currentClienteId, dish));
   });
   wrap.appendChild(cost);

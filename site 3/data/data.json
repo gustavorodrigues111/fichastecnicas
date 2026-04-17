@@ -36,32 +36,103 @@
             {
               "insumo_id": "banha",
               "insumo_name": "Banha",
-              "qty": 2.0,
-              "qty_raw": "2.0",
-              "unit": "und",
+              "qty": 0.1,
+              "qty_raw": "0.100",
+              "unit": "kg",
               "observacao": "Gelada",
               "is_qb": false
             },
             {
               "insumo_id": "gema",
               "insumo_name": "Gema",
+              "qty": 2,
+              "qty_raw": "2",
+              "unit": "und",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
+              "qty": null,
+              "qty_raw": "Q.B",
+              "unit": "",
+              "observacao": "Adicionar aos poucos",
+              "is_qb": true
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 0.07,
+              "qty_raw": "0.070",
+              "unit": "l",
+              "observacao": "Gelada",
+              "is_qb": false
+            }
+          ],
+          "modo_preparo": "Em um bowl, misture a farinha de trigo e o sal. Adicione a manteiga e a banha geladas. Com as pontas dos dedos, misture os ingredientes até obter uma textura de farofa grossa, garantindo que ainda restem pequenos pedaços de gordura visíveis. Adicione as gemas e comece a incorporar. Acrescente a água gelada gradualmente, apenas o suficiente para a massa dar liga e soltar das mãos. Apenas pressione-a até que fique homogênea. O excesso de manuseio desenvolve o glúten e deixa a massa dura após assada. Envolva a massa em filme plástico e leve à refrigeração por, no mínimo, 1 hora antes de abrir. Esse descanso é vital para que a gordura volte a gelar e a massa não encolha no forno."
+        },
+        {
+          "id": "frango-cozido-e-desfiado-empada",
+          "name": "Frango Cozido e Desfiado",
+          "rendimento": "1,000 kg",
+          "ingredientes": [
+            {
+              "insumo_id": "peito-de-frango-cru",
+              "insumo_name": "Peito de Frango Cru",
+              "qty": 1.4,
+              "qty_raw": "1,4kg",
+              "unit": "kg",
+              "observacao": "Sem pele e sem osso",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "agua",
+              "insumo_name": "Água",
+              "qty": 2.0,
+              "qty_raw": "2kg",
+              "unit": "kg",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "cebola-branca",
+              "insumo_name": "Cebola Branca",
+              "qty": 0.1,
+              "qty_raw": "100g",
+              "unit": "kg",
+              "observacao": "Cortada em quatro partes sem casca",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "alho",
+              "insumo_name": "Alho",
+              "qty": 0.02,
+              "qty_raw": "20g",
+              "unit": "kg",
+              "observacao": "Amassado sem casca",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "louro",
+              "insumo_name": "Louro",
+              "qty": 2.0,
+              "qty_raw": "2folhas",
+              "unit": "folhas",
+              "observacao": "",
+              "is_qb": false
+            },
+            {
+              "insumo_id": "sal-refinado",
+              "insumo_name": "Sal Refinado",
               "qty": null,
               "qty_raw": "Q.B",
               "unit": "",
               "observacao": "",
               "is_qb": true
-            },
-            {
-              "insumo_id": "sal-refinado",
-              "insumo_name": "Sal Refinado",
-              "qty": 0.07,
-              "qty_raw": "70.0",
-              "unit": "l",
-              "observacao": "Adicionar aos poucos",
-              "is_qb": false
             }
           ],
-          "modo_preparo": "Em um bowl, misture a farinha de trigo e o sal. Adicione a manteiga e a banha geladas. Com as pontas dos dedos, misture os ingredientes até obter uma textura de farofa grossa, garantindo que ainda restem pequenos pedaços de gordura visíveis. Adicione as gemas e comece a incorporar. Acrescente a água gelada gradualmente, apenas o suficiente para a massa dar liga e soltar das mãos. Apenas pressione-a até que fique homogênea. O excesso de manuseio desenvolve o glúten e deixa a massa dura após assada. Envolva a massa em filme plástico e leve à refrigeração por, no mínimo, 1 hora antes de abrir. Esse descanso é vital para que a gordura volte a gelar e a massa não encolha no forno."
+          "modo_preparo": "Prepare a cebola em quartos, amasse os dentes de alho e separe as folhas de louro. Na panela de pressão, coloque o peito de frango, os aromáticos e o sal. Cubra com a água (garantindo o nível de 2 a 3 cm acima da carne). Tampe e leve ao fogo alto. Assim que a panela atingir a pressão, reduza para fogo médio e conte 20 minutos. Desligue o fogo e espere a pressão sair naturalmente. Retire o frango do líquido. Com o frango ainda morno, desfie e reserve"
         },
         {
           "id": "recheio-de-frango-com-catupiry",
@@ -75,7 +146,8 @@
               "qty_raw": "650.0",
               "unit": "kg",
               "observacao": "Desfiado Fino",
-              "is_qb": false
+              "is_qb": false,
+              "subref_id": "frango-cozido-e-desfiado-empada"
             },
             {
               "insumo_id": "cebola-branca",
