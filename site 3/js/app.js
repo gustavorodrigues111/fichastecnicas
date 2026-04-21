@@ -2513,10 +2513,20 @@ async function loadStockData(cid) {
 // =============== ROUTER ESTOQUE ===============
 async function renderEstoque(cid, subroute) {
   const app = $('#app');
-  app.innerHTML = '';
-  app.appendChild(renderClienteContext(cid));
   renderLoadingScreen();
-  await loadStockData(cid);
+  try {
+    await loadStockData(cid);
+  } catch (err) {
+    console.error('loadStockData failed:', err);
+    app.innerHTML = '';
+    app.appendChild(renderClienteContext(cid));
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('h2', {}, 'Erro ao carregar estoque'),
+      el('p', { class: 'muted' }, err.message || String(err)),
+      el('p', {}, 'Provável causa: regras do Firestore ainda não foram publicadas. Publique as novas regras no console Firebase (Firestore → Rules) e tente de novo.')
+    ));
+    return;
+  }
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
 
