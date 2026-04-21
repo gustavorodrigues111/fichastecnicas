@@ -1148,6 +1148,208 @@ tr.row-subproduto .num { color: #8a7050; }
   .estoque-subnav { overflow-x: auto; white-space: nowrap; flex-wrap: nowrap; }
 }
 
+/* ============ Contagem nova UX (por localização) ============ */
+.count-header { margin-bottom: 1.5rem; }
+.count-header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  margin: 0 0 0.3rem;
+  font-weight: 500;
+}
+.count-step-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  margin: 1.5rem 0 1rem;
+  font-weight: 500;
+}
+.location-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+.location-card {
+  background: #fff;
+  border: 2px solid #ebe9e1;
+  padding: 1.25rem 1rem;
+  cursor: pointer;
+  text-align: center;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+  transition: all 0.15s;
+}
+.location-card:hover {
+  border-color: #b8955e;
+  background: #fafaf7;
+  transform: translateY(-2px);
+}
+.location-card.started {
+  border-color: #d4b97b;
+  background: #faf7ed;
+}
+.location-card.done {
+  border-color: #8aa87a;
+  background: #f3f7ef;
+}
+.location-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.location-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+.location-progress {
+  font-size: 0.82rem;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+}
+.location-done-check {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.6rem;
+  background: #8aa87a;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* Tela de contagem de localização */
+.count-loc-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.2rem;
+  background: #1a1a1a;
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -1rem 1rem;
+}
+.count-loc-header h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem;
+  margin: 0;
+  flex: 1;
+  font-weight: 500;
+  color: #d4b97b;
+}
+.count-loc-header .muted { color: #aaa; font-size: 0.82rem; }
+.count-loc-header .btn {
+  background: #333;
+  color: #eee;
+  border: 1px solid #555;
+}
+.count-search-input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid #d8d5cb;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+  margin-bottom: 1rem;
+}
+.count-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 5rem;
+}
+.count-section-block {
+  background: #fff;
+  border: 1px solid #ebe9e1;
+  padding: 0.8rem 1rem;
+}
+.count-sec-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a6b40;
+  margin: 0 0 0.8rem;
+  font-weight: 500;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #f0ede3;
+}
+.count-item-card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 0.4rem;
+  border-bottom: 1px solid #f5f2e9;
+  transition: background 0.15s;
+}
+.count-item-card:last-child { border-bottom: none; }
+.count-item-card.filled {
+  background: #faf7ed;
+  border-left: 3px solid #b8955e;
+  padding-left: 0.6rem;
+  margin-left: -0.6rem;
+}
+.count-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.count-item-name {
+  font-size: 0.95rem;
+  color: #1a1a1a;
+  line-height: 1.3;
+}
+.count-item-unit {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: lowercase;
+}
+.count-item-input-wrap {
+  flex-shrink: 0;
+}
+.count-item-input {
+  width: 80px;
+  padding: 0.65rem 0.7rem;
+  border: 2px solid #d8d5cb;
+  background: #fff;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  box-sizing: border-box;
+}
+.count-item-input:focus {
+  border-color: #b8955e;
+  outline: none;
+  background: #fffef9;
+}
+.count-item-card.filled .count-item-input {
+  border-color: #b8955e;
+  background: #fff;
+}
+
+@media (max-width: 600px) {
+  .count-item-input { width: 90px; font-size: 1.1rem; padding: 0.75rem 0.6rem; }
+  .count-item-name { font-size: 0.92rem; }
+  .location-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+  .location-icon { font-size: 2rem; }
+  .location-card { padding: 1rem 0.5rem; }
+}
+
 /* ============ Variations modal ============ */
 .modal-wide .modal-content,
 .modal .modal-wide { max-width: 620px; }

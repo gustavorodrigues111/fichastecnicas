@@ -2587,184 +2587,289 @@ function renderStockTemplatesList(cid, app) {
 }
 
 // =============== FRONT: formulário de preenchimento ===============
+// Extrai lista de localizações únicas a partir das colunas "Contagem X" de todas as seções
+// Retorna [{ label: 'Bar', colName: 'Contagem Bar' }, { label: 'Estoque', colName: 'Contagem Estoque' }, ...]
+function extractLocations(template) {
+  const seen = new Map();
+  (template.sections || []).forEach(section => {
+    (section.columns || []).forEach(col => {
+      const c = String(col).trim();
+      const lower = c.toLowerCase();
+      if (lower.startsWith('contagem')) {
+        const label = c.replace(/^contagem\s*/i, '').trim() || 'Contagem';
+        if (!seen.has(label)) seen.set(label, { label, colName: c });
+      }
+    });
+  });
+  return [...seen.values()];
+}
+
+// Sorteia itens pra uma localização específica: retorna lista de { section, item, colIdx } onde a seção tem essa coluna
+function itemsForLocation(template, location) {
+  const out = [];
+  (template.sections || []).forEach(section => {
+    const colIdx = (section.columns || []).findIndex(c => String(c).trim().toLowerCase() === location.colName.toLowerCase());
+    if (colIdx < 0) return;
+    (section.items || []).forEach(item => {
+      out.push({ section, item, colIdx });
+    });
+  });
+  return out;
+}
+
 async function renderStockCountForm(cid, templateId, resumeCountId, app) {
   const template = STOCK_STATE.templates.find(t => t.id === templateId);
   if (!template) { app.appendChild(el('p', {}, 'Template não encontrado')); return; }
-  app.appendChild(el('a', { href: `#/c/${cid}/estoque`, class: 'back-link' }, '← Voltar'));
-  app.appendChild(el('h1', {}, template.name));
 
   // Estado local: values + obs
   const lsKey = `stock-draft-${cid}-${templateId}`;
   let state;
   if (resumeCountId) {
     const countDoc = STOCK_STATE.counts.find(c => c.id === resumeCountId);
-    state = { values: countDoc?.values || {}, obsAdicional: countDoc?.obsAdicional || '' };
+    state = { values: countDoc?.values || {}, obsAdicional: countDoc?.obsAdicional || '', currentLocation: null };
   } else {
     const saved = localStorage.getItem(lsKey);
-    state = saved ? JSON.parse(saved) : { values: {}, obsAdicional: '' };
+    state = saved ? JSON.parse(saved) : { values: {}, obsAdicional: '', currentLocation: null };
   }
   const persist = () => {
     if (!resumeCountId) localStorage.setItem(lsKey, JSON.stringify(state));
   };
 
-  // Barra de progresso
-  const totalItems = (template.sections || []).reduce((s, sec) => s + (sec.items?.length || 0), 0);
-  const progBar = el('div', { class: 'progress-bar' });
-  const progFill = el('div', { class: 'progress-fill' });
-  const progText = el('span', { class: 'progress-text' }, '');
-  progBar.appendChild(progFill);
-  progBar.appendChild(progText);
-  function updateProgress() {
+  const locations = extractLocations(template);
+  // Contagens de preenchimento por localização
+  function locProgress(loc) {
+    const items = itemsForLocation(template, loc);
     let filled = 0;
-    (template.sections || []).forEach(sec => {
-      (sec.items || []).forEach(item => {
-        const k = state.values[sec.id]?.[item.id];
-        if (k && Object.values(k).some(v => v !== '' && v != null)) filled++;
-      });
+    items.forEach(({ section, item, colIdx }) => {
+      const v = state.values?.[section.id]?.[item.id]?.[colIdx];
+      if (v !== '' && v != null) filled++;
     });
-    const pct = totalItems > 0 ? (filled / totalItems) * 100 : 0;
-    progFill.style.width = pct + '%';
-    progText.textContent = `${filled} de ${totalItems} itens preenchidos`;
+    return { filled, total: items.length };
   }
-  app.appendChild(progBar);
+  function totalProgress() {
+    let f = 0, t = 0;
+    locations.forEach(loc => { const p = locProgress(loc); f += p.filled; t += p.total; });
+    return { filled: f, total: t };
+  }
 
-  // Navegação entre seções (tabs)
-  const groups = [...new Set(template.sections.map(s => s.group).filter(Boolean))];
-  const groupNav = el('nav', { class: 'section-group-nav' });
-  groups.forEach((g, idx) => {
-    const btn = el('button', { class: 'chip-filter' + (idx === 0 ? ' active' : ''), 'data-group': g }, g);
-    groupNav.appendChild(btn);
-  });
-  if (groups.length > 0) app.appendChild(groupNav);
-
-  // Form seccionado
-  const form = el('form', { class: 'stock-count-form', onsubmit: (e) => e.preventDefault() });
-  const sectionEls = {};
-  (template.sections || []).forEach(section => {
-    const secEl = el('section', { class: 'stock-section', 'data-group': section.group || '' });
-    sectionEls[section.id] = secEl;
-    secEl.appendChild(el('header', { class: 'stock-sec-head' },
-      el('h2', {}, section.name),
-      section.team ? el('span', { class: 'muted' }, section.team) : null
+  function render() {
+    app.innerHTML = '';
+    app.appendChild(renderClienteContext(cid));
+    app.appendChild(el('nav', { class: 'estoque-subnav' },
+      el('a', { class: 'estoque-subtab active', href: `#/c/${cid}/estoque` }, '⚬ Preencher contagem'),
     ));
-    // Header row com colunas
-    const colsHead = el('div', { class: 'stock-row stock-row-head' });
-    colsHead.appendChild(el('div', { class: 'stock-cell-name' }, 'Item'));
-    section.columns.forEach(col => colsHead.appendChild(el('div', { class: 'stock-cell-input' }, col)));
-    secEl.appendChild(colsHead);
-    // Items
-    (section.items || []).forEach(item => {
-      const row = el('div', { class: 'stock-row' });
-      row.appendChild(el('div', { class: 'stock-cell-name' },
-        el('span', {}, item.name),
-        item.unit ? el('span', { class: 'muted unit-tag' }, item.unit) : null
-      ));
-      if (!state.values[section.id]) state.values[section.id] = {};
-      if (!state.values[section.id][item.id]) state.values[section.id][item.id] = {};
-      section.columns.forEach((col, idx) => {
-        const curVal = state.values[section.id][item.id][idx] ?? '';
-        const inp = el('input', { type: 'number', step: '0.01', inputmode: 'decimal', value: curVal, placeholder: col });
-        inp.addEventListener('input', () => {
-          state.values[section.id][item.id][idx] = inp.value;
-          persist();
-          updateProgress();
-        });
-        row.appendChild(el('div', { class: 'stock-cell-input' }, inp));
-      });
-      secEl.appendChild(row);
-    });
-    form.appendChild(secEl);
-  });
+    app.appendChild(el('a', { href: `#/c/${cid}/estoque`, class: 'back-link' }, '← Voltar'));
 
-  // Filtrar por grupo
-  groupNav.addEventListener('click', e => {
-    const btn = e.target.closest('[data-group]');
-    if (!btn) return;
-    $$('.chip-filter', groupNav).forEach(b => b.classList.toggle('active', b === btn));
-    const g = btn.dataset.group;
-    Object.values(sectionEls).forEach(s => {
-      s.style.display = (s.dataset.group === g) ? '' : 'none';
+    const tp = totalProgress();
+    // Header com nome e progresso
+    app.appendChild(el('div', { class: 'count-header' },
+      el('h1', {}, template.name),
+      el('p', { class: 'muted' }, resumeCountId ? 'Editando contagem enviada' : 'Rascunho salvo automaticamente no dispositivo'),
+      el('div', { class: 'progress-bar' },
+        (() => { const f = el('div', { class: 'progress-fill' }); f.style.width = (tp.total ? (tp.filled / tp.total * 100) : 0) + '%'; return f; })(),
+        el('span', { class: 'progress-text' }, `${tp.filled} de ${tp.total} itens preenchidos`))
+    ));
+
+    if (!state.currentLocation) {
+      // Tela de seleção de localização
+      app.appendChild(el('h2', { class: 'count-step-title' }, 'Onde você vai contar agora?'));
+      const locGrid = el('div', { class: 'location-grid' });
+      locations.forEach(loc => {
+        const p = locProgress(loc);
+        const pct = p.total > 0 ? (p.filled / p.total) * 100 : 0;
+        const done = pct === 100;
+        const started = p.filled > 0 && pct < 100;
+        const card = el('button', { class: 'location-card' + (done ? ' done' : '') + (started ? ' started' : ''), onclick: () => {
+          state.currentLocation = loc.label; persist(); render();
+        } });
+        card.appendChild(el('div', { class: 'location-icon' }, locationIcon(loc.label)));
+        card.appendChild(el('div', { class: 'location-name' }, loc.label));
+        card.appendChild(el('div', { class: 'location-progress' }, `${p.filled} / ${p.total}`));
+        if (done) card.appendChild(el('span', { class: 'location-done-check' }, '✓'));
+        locGrid.appendChild(card);
+      });
+      app.appendChild(locGrid);
+
+      // Observação final (só aparece aqui)
+      app.appendChild(el('div', { class: 'stock-obs-wrap' },
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Observações finais (opcional)'),
+          (() => { const ta = el('textarea', { class: 'stock-obs', placeholder: 'Se falta algum produto que não está na lista, escreva aqui...' });
+            ta.value = state.obsAdicional || '';
+            ta.addEventListener('input', () => { state.obsAdicional = ta.value; persist(); });
+            return ta; })()
+        )
+      ));
+
+      // Botão de envio
+      const canSend = tp.filled > 0;
+      app.appendChild(el('div', { class: 'stock-submit-bar' },
+        el('span', {}, canSend ? `${tp.filled} itens preenchidos` : 'Comece preenchendo alguma localização acima'),
+        el('button', {
+          class: 'btn btn-primary',
+          disabled: !canSend ? '' : null,
+          onclick: () => submitCount()
+        }, resumeCountId ? 'Salvar alterações' : 'Enviar contagem')
+      ));
+      return;
+    }
+
+    // Tela de preenchimento de uma localização específica
+    const currentLoc = locations.find(l => l.label === state.currentLocation);
+    if (!currentLoc) { state.currentLocation = null; render(); return; }
+    const items = itemsForLocation(template, currentLoc);
+    const p = locProgress(currentLoc);
+
+    app.appendChild(el('div', { class: 'count-loc-header' },
+      el('button', { class: 'btn btn-small', onclick: () => { state.currentLocation = null; persist(); render(); } }, '← Localizações'),
+      el('h2', {}, `Contando: ${currentLoc.label}`),
+      el('span', { class: 'muted' }, `${p.filled} de ${p.total} itens`)
+    ));
+
+    // Barra de busca dentro da localização
+    const searchInput = el('input', { type: 'search', placeholder: 'Buscar item nesta localização...', class: 'count-search-input' });
+    app.appendChild(searchInput);
+
+    // Agrupa items por seção dentro desta localização
+    const sectionMap = new Map();
+    items.forEach(({ section, item, colIdx }) => {
+      if (!sectionMap.has(section.id)) sectionMap.set(section.id, { section, items: [] });
+      sectionMap.get(section.id).items.push({ item, colIdx });
     });
-  });
-  // Start: show first group only
-  if (groups.length > 1) {
-    Object.values(sectionEls).forEach(s => {
-      s.style.display = (s.dataset.group === groups[0]) ? '' : 'none';
+
+    const list = el('div', { class: 'count-items-list' });
+    function renderItems(filter = '') {
+      list.innerHTML = '';
+      const f = filter.toLowerCase().trim();
+      let shown = 0;
+      sectionMap.forEach(({ section, items: sItems }) => {
+        const filtered = f ? sItems.filter(({ item }) => item.name.toLowerCase().includes(f)) : sItems;
+        if (filtered.length === 0) return;
+        const block = el('div', { class: 'count-section-block' });
+        block.appendChild(el('h3', { class: 'count-sec-label' }, section.name));
+        filtered.forEach(({ item, colIdx }) => {
+          if (!state.values[section.id]) state.values[section.id] = {};
+          if (!state.values[section.id][item.id]) state.values[section.id][item.id] = {};
+          const curVal = state.values[section.id][item.id][colIdx] ?? '';
+          const inp = el('input', {
+            type: 'text',
+            inputmode: 'decimal',
+            value: curVal,
+            placeholder: '0',
+            class: 'count-item-input'
+          });
+          inp.addEventListener('input', () => {
+            const cleaned = inp.value.replace(',', '.');
+            state.values[section.id][item.id][colIdx] = cleaned;
+            persist();
+          });
+          inp.addEventListener('focus', () => inp.select());
+          const card = el('div', { class: 'count-item-card' + (curVal !== '' && curVal != null ? ' filled' : '') },
+            el('div', { class: 'count-item-info' },
+              el('div', { class: 'count-item-name' }, item.name),
+              item.unit ? el('div', { class: 'count-item-unit' }, item.unit) : null
+            ),
+            el('div', { class: 'count-item-input-wrap' }, inp)
+          );
+          inp.addEventListener('input', () => {
+            if (inp.value !== '' && inp.value != null) card.classList.add('filled');
+            else card.classList.remove('filled');
+          });
+          block.appendChild(card);
+          shown++;
+        });
+        list.appendChild(block);
+      });
+      if (shown === 0) list.appendChild(el('p', { class: 'muted', style: 'text-align:center;padding:2rem;' }, 'Nenhum item encontrado'));
+    }
+    renderItems();
+    searchInput.addEventListener('input', () => renderItems(searchInput.value));
+    app.appendChild(list);
+
+    // Barra sticky: concluir localização → vai pra próxima incompleta ou pra tela de localizações
+    const nextLoc = locations.find(l => {
+      if (l.label === state.currentLocation) return false;
+      const pr = locProgress(l);
+      return pr.filled < pr.total;
     });
+    app.appendChild(el('div', { class: 'stock-submit-bar' },
+      el('span', { class: 'muted' }, 'Salvo automaticamente'),
+      nextLoc ? el('button', { class: 'btn btn-primary', onclick: () => {
+        state.currentLocation = nextLoc.label; persist(); render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } }, `✓ Ir pra ${nextLoc.label} →`) : el('button', { class: 'btn btn-primary', onclick: () => {
+        state.currentLocation = null; persist(); render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } }, '✓ Concluir — ver resumo')
+    ));
   }
 
-  app.appendChild(form);
-
-  // Campo observação adicional
-  const obsInput = el('textarea', { class: 'stock-obs', placeholder: 'Se falta algum produto na lista, informe aqui nome e quantidade a pedir...' });
-  obsInput.value = state.obsAdicional || '';
-  obsInput.addEventListener('input', () => { state.obsAdicional = obsInput.value; persist(); });
-  app.appendChild(el('div', { class: 'stock-obs-wrap' },
-    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Observações finais'), obsInput)
-  ));
-
-  // Botões de envio
-  const submitBar = el('div', { class: 'stock-submit-bar' },
-    el('span', { class: 'muted' }, resumeCountId ? 'Editando contagem enviada' : 'Rascunho salvo automaticamente localmente'),
-    el('button', { class: 'btn btn-primary', onclick: async () => {
-      if (!confirm(resumeCountId ? 'Salvar as alterações desta contagem?' : 'Enviar esta contagem agora?')) return;
-      try {
-        const payload = {
-          templateId: template.id,
-          templateName: template.name,
-          date: new Date().toISOString().slice(0, 10),
-          values: state.values,
-          obsAdicional: state.obsAdicional || '',
-          status: 'sent',
-          updatedAt: serverTimestamp()
-        };
-        if (!resumeCountId) {
-          payload.authorUid = STATE.user.uid;
-          payload.authorEmail = STATE.user.email;
-          payload.authorName = STATE.userDoc?.name || STATE.user.email;
-          payload.createdAt = serverTimestamp();
-          const newRef = doc(stockCountsCol(cid));
-          await setDoc(newRef, payload);
-          await addDoc(stockCountLogsCol(cid, newRef.id), {
-            timestamp: serverTimestamp(),
-            user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
-            action: 'submit',
-            note: 'Contagem enviada'
-          });
-          localStorage.removeItem(lsKey);
-          toast('Contagem enviada!');
-          location.hash = `#/c/${cid}/estoque`;
-        } else {
-          // Compute diff against previous
-          const prev = STOCK_STATE.counts.find(c => c.id === resumeCountId);
-          const changes = [];
-          (template.sections || []).forEach(sec => {
-            (sec.items || []).forEach(item => {
-              sec.columns.forEach((col, idx) => {
-                const before = prev?.values?.[sec.id]?.[item.id]?.[idx] ?? '';
-                const after = state.values?.[sec.id]?.[item.id]?.[idx] ?? '';
-                if (String(before) !== String(after)) {
-                  changes.push({ section: sec.name, item: item.name, column: col, before, after });
-                }
-              });
+  async function submitCount() {
+    if (!confirm(resumeCountId ? 'Salvar as alterações desta contagem?' : 'Enviar esta contagem agora?')) return;
+    try {
+      const payload = {
+        templateId: template.id,
+        templateName: template.name,
+        date: new Date().toISOString().slice(0, 10),
+        values: state.values,
+        obsAdicional: state.obsAdicional || '',
+        status: 'sent',
+        updatedAt: serverTimestamp()
+      };
+      if (!resumeCountId) {
+        payload.authorUid = STATE.user.uid;
+        payload.authorEmail = STATE.user.email;
+        payload.authorName = STATE.userDoc?.name || STATE.user.email;
+        payload.createdAt = serverTimestamp();
+        const newRef = doc(stockCountsCol(cid));
+        await setDoc(newRef, payload);
+        await addDoc(stockCountLogsCol(cid, newRef.id), {
+          timestamp: serverTimestamp(),
+          user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
+          action: 'submit',
+          note: 'Contagem enviada'
+        });
+        localStorage.removeItem(lsKey);
+        toast('Contagem enviada!');
+        location.hash = `#/c/${cid}/estoque`;
+      } else {
+        const prev = STOCK_STATE.counts.find(c => c.id === resumeCountId);
+        const changes = [];
+        (template.sections || []).forEach(sec => {
+          (sec.items || []).forEach(item => {
+            sec.columns.forEach((col, idx) => {
+              const before = prev?.values?.[sec.id]?.[item.id]?.[idx] ?? '';
+              const after = state.values?.[sec.id]?.[item.id]?.[idx] ?? '';
+              if (String(before) !== String(after)) {
+                changes.push({ section: sec.name, item: item.name, column: col, before, after });
+              }
             });
           });
-          await setDoc(stockCountDoc(cid, resumeCountId), payload, { merge: true });
-          await addDoc(stockCountLogsCol(cid, resumeCountId), {
-            timestamp: serverTimestamp(),
-            user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
-            action: 'edit',
-            note: changes.length > 0 ? `${changes.length} alteração${changes.length > 1 ? 'ões' : ''}` : 'edição',
-            changes
-          });
-          toast('Contagem atualizada!');
-          location.hash = `#/c/${cid}/estoque/contagens/${resumeCountId}`;
-        }
-      } catch (err) { console.error(err); toast('Erro: ' + err.message); }
-    } }, resumeCountId ? 'Salvar alterações' : 'Enviar contagem')
-  );
-  app.appendChild(submitBar);
-  updateProgress();
+        });
+        await setDoc(stockCountDoc(cid, resumeCountId), payload, { merge: true });
+        await addDoc(stockCountLogsCol(cid, resumeCountId), {
+          timestamp: serverTimestamp(),
+          user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
+          action: 'edit',
+          note: changes.length > 0 ? `${changes.length} alteração${changes.length > 1 ? 'ões' : ''}` : 'edição',
+          changes
+        });
+        toast('Contagem atualizada!');
+        location.hash = `#/c/${cid}/estoque/contagens/${resumeCountId}`;
+      }
+    } catch (err) { console.error(err); toast('Erro: ' + err.message); }
+  }
+
+  render();
+}
+
+function locationIcon(label) {
+  const l = label.toLowerCase();
+  if (l.includes('bar')) return '🍹';
+  if (l.includes('adega')) return '🍷';
+  if (l.includes('estoque')) return '📦';
+  if (l.includes('cozinha')) return '🍳';
+  if (l.includes('câmara') || l.includes('camara')) return '❄️';
+  return '▣';
 }
 
 // =============== BACK: lista de contagens recebidas ===============
