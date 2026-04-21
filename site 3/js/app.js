@@ -1774,12 +1774,9 @@ function renderClienteHome(cid) {
 
   if (STATE.dishes.length === 0) {
     const empty = el('div', { class: 'empty-state' },
-      el('p', {}, 'Esse cliente ainda não tem fichas cadastradas.'),
-      canEditCliente(cid) ? el('button', { class: 'btn btn-primary', onclick: () => {
-        if (confirm(`Importar dados iniciais (da planilha original) em "${STATE.currentCliente?.name || cid}"?`))
-          seedClienteFromJson(cid, STATE.currentCliente?.name).catch(e => toast('Erro: ' + e.message));
-      } }, 'Importar dados iniciais') : null,
-      canEditCliente(cid) ? el('a', { class: 'btn', href: `#/c/${cid}/admin/new` }, '+ Criar primeira ficha') : null,
+      el('p', {}, 'Esse restaurante ainda não tem fichas cadastradas.'),
+      canEditCliente(cid) ? el('a', { class: 'btn btn-primary', href: `#/c/${cid}/admin/new` }, '+ Criar primeira ficha') : null,
+      canEditCliente(cid) ? el('p', { class: 'muted', style: 'margin-top:1rem;font-size:0.85rem;' }, 'Você também pode importar de uma planilha Excel pela tela "Restaurantes".') : null,
     );
     app.appendChild(empty);
     return;
