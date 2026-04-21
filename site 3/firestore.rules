@@ -20,6 +20,15 @@ service cloud.firestore {
         && (userDoc().role == 'master'
             || (userDoc().clienteIds is list && userDoc().clienteIds.hasAny([cid])));
     }
+    // Equipe só lê cardápio/insumos se tiver a permissão
+    function canReadCardapio(cid) {
+      return hasClienteAccess(cid)
+        && (userDoc().role != 'equipe' || equipeHasPerm('can_view_cardapio'));
+    }
+    function canReadInsumos(cid) {
+      return hasClienteAccess(cid)
+        && (userDoc().role != 'equipe' || equipeHasPerm('can_view_insumos'));
+    }
     function isStaffOf(cid) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -31,6 +40,30 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && userDoc().role == 'cliente'
         && userDoc().clienteIds.hasAny([cid]);
+    }
+    function isEquipeOf(cid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'equipe'
+        && userDoc().clienteIds.hasAny([cid]);
+    }
+    function equipeHasPerm(perm) {
+      return userDoc().permissions != null && userDoc().permissions[perm] == true;
+    }
+    // Acesso a estoque (gestão): master/staff/cliente do restaurante; equipe com can_manage_contagem
+    function canManageStockOf(cid) {
+      return isStaffOf(cid) || isClienteUserOf(cid)
+        || (isEquipeOf(cid) && equipeHasPerm('can_manage_contagem'));
+    }
+    // Quem pode editar contagem já criada
+    function canEditStockCount(cid) {
+      return canManageStockOf(cid)
+        || (isEquipeOf(cid) && equipeHasPerm('can_edit_contagem'));
+    }
+    // Quem pode criar/editar templates
+    function canManageStockTemplates(cid) {
+      return isStaffOf(cid) || isClienteUserOf(cid)
+        || (isEquipeOf(cid) && equipeHasPerm('can_manage_templates'));
     }
     function onlyPriceFields() {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
@@ -64,7 +97,7 @@ service cloud.firestore {
 
       // dishes subcollection
       match /dishes/{dishId} {
-        allow read: if hasClienteAccess(cid);
+        allow read: if canReadCardapio(cid);
         allow create, delete: if isStaffOf(cid);
         // Staff can update anything; cliente can only update target_cmv (pricing)
         allow update: if isStaffOf(cid) || (isClienteUserOf(cid) && onlyDishPricingFields());
@@ -72,7 +105,7 @@ service cloud.firestore {
 
       // insumos subcollection
       match /insumos/{insumoId} {
-        allow read: if hasClienteAccess(cid);
+        allow read: if canReadInsumos(cid);
         allow create, delete: if isStaffOf(cid);
         // Staff can update anything; cliente can only update price/unit
         allow update: if isStaffOf(cid) || (isClienteUserOf(cid) && onlyPriceFields());
@@ -82,6 +115,34 @@ service cloud.firestore {
       match /config/{configId} {
         allow read: if hasClienteAccess(cid);
         allow write: if isStaffOf(cid);
+      }
+
+      // ------- Módulo de Estoque -------
+      // Templates de contagem
+      match /stock_templates/{tid} {
+        allow read: if hasClienteAccess(cid);
+        allow create, update, delete: if canManageStockTemplates(cid);
+      }
+      // Contagens enviadas
+      match /stock_counts/{countId} {
+        // Leitura: quem gere vê tudo; equipe só vê as que ela criou
+        allow read: if canManageStockOf(cid)
+          || (isEquipeOf(cid) && resource.data.authorUid == request.auth.uid);
+        // Criar: qualquer um com acesso ao cliente (incluindo equipe default)
+        allow create: if hasClienteAccess(cid)
+          && request.resource.data.authorUid == request.auth.uid;
+        // Editar: quem pode editar contagem
+        allow update: if canEditStockCount(cid);
+        // Deletar: só quem pode gerir
+        allow delete: if canManageStockOf(cid);
+
+        // Logs (subcoleção) — append-only
+        match /logs/{logId} {
+          allow read: if hasClienteAccess(cid);
+          allow create: if hasClienteAccess(cid)
+            && request.resource.data.user.uid == request.auth.uid;
+          allow update, delete: if false; // logs imutáveis
+        }
       }
     }
   }

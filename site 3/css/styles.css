@@ -830,6 +830,324 @@ tr.row-subproduto .num { color: #8a7050; }
 .prod-shopping-table td.num, .prod-shopping-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .prod-sources-cell { color: #888; font-size: 0.8rem; cursor: help; }
 
+/* ============ Módulo Estoque ============ */
+.estoque-subnav {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #ebe9e1;
+  flex-wrap: wrap;
+}
+.estoque-subtab {
+  padding: 0.7rem 1.1rem;
+  color: #6a6a6a;
+  text-decoration: none;
+  font-size: 0.88rem;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.estoque-subtab:hover { color: #b8955e; }
+.estoque-subtab.active {
+  color: #b8955e;
+  border-bottom-color: #b8955e;
+  font-weight: 500;
+}
+.template-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.template-card {
+  background: #fff;
+  border: 1px solid #ebe9e1;
+  padding: 1.25rem 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.template-card:hover {
+  border-color: #b8955e;
+  background: #fafaf7;
+  transform: translateY(-2px);
+}
+.template-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.35rem;
+  margin: 0;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+.template-card-action {
+  color: #b8955e;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+/* Progress bar (preenchimento) */
+.progress-bar {
+  width: 100%;
+  height: 22px;
+  background: #f0ede3;
+  position: relative;
+  margin: 0.5rem 0 1rem;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #b8955e 0%, #d4b97b 100%);
+  transition: width 0.3s;
+  width: 0%;
+}
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.78rem;
+  color: #4a3a20;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Section group filter chips */
+.section-group-nav {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+/* Stock count form */
+.stock-count-form { display: flex; flex-direction: column; gap: 1.5rem; }
+.stock-section {
+  background: #fff;
+  border: 1px solid #ebe9e1;
+  padding: 1rem 1.2rem;
+}
+.stock-sec-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid #f0ede3;
+  margin-bottom: 0.6rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.stock-sec-head h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  margin: 0;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+.stock-row {
+  display: grid;
+  grid-template-columns: 2fr repeat(auto-fit, minmax(80px, 1fr));
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f5f2e9;
+  align-items: center;
+}
+.stock-row:last-child { border-bottom: none; }
+.stock-row-head {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  font-weight: 500;
+  padding-bottom: 0.4rem;
+}
+.stock-cell-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  color: #333;
+}
+.stock-cell-name .unit-tag {
+  font-size: 0.72rem;
+  color: #888;
+}
+.unit-tag { margin-left: 0.35rem; }
+.stock-cell-input input {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid #d8d5cb;
+  background: #fff;
+  font-family: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.stock-cell-input input:focus {
+  border-color: #b8955e;
+  outline: none;
+}
+.stock-obs-wrap {
+  background: #fafaf7;
+  padding: 1rem 1.25rem;
+  border: 1px solid #ebe9e1;
+  margin: 1rem 0;
+}
+.stock-obs {
+  width: 100%;
+  min-height: 80px;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d8d5cb;
+  font-family: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.stock-submit-bar {
+  position: sticky;
+  bottom: 0;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  z-index: 20;
+  margin: 1rem -1rem 0;
+  flex-wrap: wrap;
+}
+.stock-submit-bar .muted { color: #999; }
+
+/* Logs */
+.stock-logs {
+  background: #fafaf7;
+  padding: 0.8rem 1rem;
+  border: 1px solid #ebe9e1;
+  margin: 1rem 0;
+}
+.stock-logs summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #6a6a6a;
+  font-weight: 500;
+}
+.stock-log-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0ede3;
+  display: flex;
+  gap: 0.8rem;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.stock-log-item:last-child { border-bottom: none; }
+.log-when { color: #888; min-width: 120px; }
+.log-who { color: #4a3a20; font-weight: 500; }
+.log-what { color: #666; }
+.log-changes {
+  flex-basis: 100%;
+  margin: 0.3rem 0 0 1.5rem;
+  padding: 0;
+  font-size: 0.78rem;
+  color: #8a6b40;
+  list-style: disc;
+}
+.log-changes li { padding: 0.1rem 0; }
+
+/* Stock filters */
+.stock-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.stock-filters select {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #d8d5cb;
+  font-family: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+}
+
+/* Permissions grid in user modal */
+.perm-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ebe9e1;
+}
+.perm-section h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.15rem;
+  margin: 0 0 0.3rem;
+  font-weight: 500;
+}
+.permissions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.perm-item {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.6rem 0.8rem;
+  background: #fafaf7;
+  border: 1px solid #ebe9e1;
+  cursor: pointer;
+  align-items: flex-start;
+  transition: all 0.15s;
+}
+.perm-item:hover {
+  background: #f3efe3;
+  border-color: #d4b97b;
+}
+.perm-item input {
+  margin-top: 0.2rem;
+  cursor: pointer;
+}
+.perm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.perm-text strong {
+  font-size: 0.9rem;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+.perm-desc {
+  font-size: 0.78rem;
+  color: #6a6a6a;
+}
+
+/* Mobile tweaks pro estoque */
+@media (max-width: 720px) {
+  .stock-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+    padding: 0.6rem 0;
+  }
+  .stock-row-head { display: none; }
+  .stock-cell-input input { padding: 0.5rem 0.6rem; text-align: left; }
+  .stock-cell-input::before {
+    content: attr(data-col);
+    display: block;
+    font-size: 0.72rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.2rem;
+  }
+  .stock-submit-bar { flex-direction: column; align-items: stretch; }
+  .stock-submit-bar .btn { width: 100%; }
+  .estoque-subnav { overflow-x: auto; white-space: nowrap; flex-wrap: nowrap; }
+}
+
 /* ============ Variations modal ============ */
 .modal-wide .modal-content,
 .modal .modal-wide { max-width: 620px; }

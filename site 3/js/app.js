@@ -4,8 +4,8 @@
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
-  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot,
-  getDoc, getDocs, writeBatch, collectionGroup, serverTimestamp
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc,
+  getDoc, getDocs, writeBatch, collectionGroup, serverTimestamp, query, where
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -157,9 +157,20 @@ function scheduleSave(key, fn, delay = 700) {
 const isMaster = () => STATE.userDoc && (STATE.userDoc.role === 'master' || STATE.user?.email === MASTER_EMAIL);
 const isStaff = () => STATE.userDoc && STATE.userDoc.role === 'staff';
 const isClienteUser = () => STATE.userDoc && STATE.userDoc.role === 'cliente';
+const isEquipe = () => STATE.userDoc && STATE.userDoc.role === 'equipe';
+const hasClientAccess = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
+// Permissões granulares do perfil equipe — cliente/staff/master sempre tem
+const equipePerm = (name) => !!(STATE.userDoc?.permissions && STATE.userDoc.permissions[name]);
 const canEditCliente = (cid) => isMaster() || (isStaff() && (STATE.userDoc.clienteIds || []).includes(cid));
 const canViewCliente = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
 const canEditInsumoPrice = (cid) => canEditCliente(cid) || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
+const canViewCardapio = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_cardapio'));
+const canViewInsumosTab = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_insumos'));
+const canViewProducao = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_producao'));
+const canCountStock = (cid) => hasClientAccess(cid); // todos que têm acesso ao cliente
+const canManageStock = (cid) => canEditCliente(cid) || (isClienteUser() && hasClientAccess(cid)) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_manage_contagem'));
+const canEditContagem = (cid) => canManageStock(cid) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_edit_contagem'));
+const canManageTemplates = (cid) => canEditCliente(cid) || (isClienteUser() && hasClientAccess(cid)) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_manage_templates'));
 const canManageUsers = () => isMaster();
 const canManageClientes = () => isMaster();
 
@@ -170,6 +181,12 @@ const insumosCol = (cid) => collection(db, 'clientes', cid, 'insumos');
 const insumoDoc = (cid, iid) => doc(db, 'clientes', cid, 'insumos', iid);
 const configDoc = (cid, name) => doc(db, 'clientes', cid, 'config', name);
 const clienteDoc = (cid) => doc(db, 'clientes', cid);
+// Stock module
+const stockTemplatesCol = (cid) => collection(db, 'clientes', cid, 'stock_templates');
+const stockTemplateDoc = (cid, tid) => doc(db, 'clientes', cid, 'stock_templates', tid);
+const stockCountsCol = (cid) => collection(db, 'clientes', cid, 'stock_counts');
+const stockCountDoc = (cid, countId) => doc(db, 'clientes', cid, 'stock_counts', countId);
+const stockCountLogsCol = (cid, countId) => collection(db, 'clientes', cid, 'stock_counts', countId, 'logs');
 
 // ---------- Firestore writes ----------
 async function saveDish(cid, dish) {
@@ -998,10 +1015,32 @@ async function route() {
     if (!STATE.loaded) { renderLoadingScreen(); return; }
 
     const rest = parts.slice(2);
-    if (rest.length === 0) { renderClienteHome(cid); return; }
-    if (rest[0] === 'ficha' && rest[1]) { renderFicha(cid, rest[1], rest[2] || null); return; }
-    if (rest[0] === 'insumos') { renderInsumos(cid); return; }
-    if (rest[0] === 'producao') { renderProducao(cid); return; }
+    if (rest.length === 0) {
+      // Se equipe sem permissão pra cardápio, manda pra primeira aba disponível
+      if (isEquipe() && !canViewCardapio(cid)) {
+        if (canCountStock(cid)) { location.hash = `#/c/${cid}/estoque`; return; }
+        if (canViewProducao(cid)) { location.hash = `#/c/${cid}/producao`; return; }
+        if (canViewInsumosTab(cid)) { location.hash = `#/c/${cid}/insumos`; return; }
+        renderNoAccess(); return;
+      }
+      renderClienteHome(cid); return;
+    }
+    if (rest[0] === 'ficha' && rest[1]) {
+      if (!canViewCardapio(cid)) { renderNoAccess(); return; }
+      renderFicha(cid, rest[1], rest[2] || null); return;
+    }
+    if (rest[0] === 'insumos') {
+      if (!canViewInsumosTab(cid)) { renderNoAccess(); return; }
+      renderInsumos(cid); return;
+    }
+    if (rest[0] === 'producao') {
+      if (!canViewProducao(cid)) { renderNoAccess(); return; }
+      renderProducao(cid); return;
+    }
+    if (rest[0] === 'estoque') {
+      if (!canCountStock(cid)) { renderNoAccess(); return; }
+      renderEstoque(cid, rest.slice(1)); return;
+    }
     if (rest[0] === 'admin') {
       if (!canEditCliente(cid)) { renderNoAccess(); return; }
       if (rest[1] === 'new') { renderAdminEdit(cid, null); return; }
@@ -1324,8 +1363,9 @@ function openEditUserModal(u) {
   const emailEl = el('div', { class: 'modal-read' }, el('span', { class: 'label-text' }, 'Email'), el('div', {}, u.email));
   const nameInput = el('input', { type: 'text', value: u.name || '' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Equipe'),
-    el('option', { value: 'cliente' }, 'Cliente'),
+    el('option', { value: 'staff' }, 'Staff (consultoria)'),
+    el('option', { value: 'cliente' }, 'Cliente (dono)'),
+    el('option', { value: 'equipe' }, 'Equipe (operacional do restaurante)'),
     el('option', { value: 'master' }, 'Master')
   );
   roleSelect.value = u.role || 'staff';
@@ -1336,6 +1376,37 @@ function openEditUserModal(u) {
     const input = el('input', { type: 'checkbox', value: c.id, id: 'edit-c-' + c.id });
     if (currentIds.has(c.id)) input.setAttribute('checked', '');
     clienteChecks.appendChild(el('label', { class: 'cliente-chip-option', for: 'edit-c-' + c.id }, input, document.createTextNode(c.name)));
+  });
+
+  // Permissões granulares (só aparece pra role equipe)
+  const permDefs = [
+    { key: 'can_view_cardapio', label: 'Ver cardápio/fichas', desc: 'Acessa a aba Cardápio e visualiza receitas' },
+    { key: 'can_view_insumos', label: 'Ver insumos com preços', desc: 'Acessa a aba Insumos e vê valores' },
+    { key: 'can_view_producao', label: 'Ver aba Produção', desc: 'Acessa o planejamento de produção' },
+    { key: 'can_manage_contagem', label: 'Receber/gerir contagens', desc: 'Vê todas as contagens, edita, exporta e gera pedidos de compra' },
+    { key: 'can_edit_contagem', label: 'Editar contagem enviada', desc: 'Pode alterar contagens já enviadas (toda mudança gera log)' },
+    { key: 'can_manage_templates', label: 'Criar/editar templates', desc: 'Cria e edita templates de contagem (e checklists futuros)' },
+  ];
+  const currentPerms = u.permissions || {};
+  const permChecks = {};
+  const permBox = el('div', { class: 'permissions-grid' });
+  permDefs.forEach(p => {
+    const chk = el('input', { type: 'checkbox', id: 'perm-' + p.key });
+    if (currentPerms[p.key]) chk.setAttribute('checked', '');
+    permChecks[p.key] = chk;
+    permBox.appendChild(el('label', { class: 'perm-item', for: 'perm-' + p.key }, chk,
+      el('div', { class: 'perm-text' },
+        el('strong', {}, p.label),
+        el('span', { class: 'perm-desc' }, p.desc))));
+  });
+  const permSection = el('div', { class: 'perm-section' },
+    el('h3', {}, 'Permissões extras'),
+    el('p', { class: 'muted' }, 'Só se aplica ao perfil Equipe. Cliente/Staff/Master já têm acesso total.'),
+    permBox
+  );
+  permSection.style.display = roleSelect.value === 'equipe' ? '' : 'none';
+  roleSelect.addEventListener('change', () => {
+    permSection.style.display = roleSelect.value === 'equipe' ? '' : 'none';
   });
 
   const modal = el('div', { class: 'modal', id: 'edit-user-modal' },
@@ -1351,16 +1422,24 @@ function openEditUserModal(u) {
         el('span', { class: 'label-text' }, 'Restaurantes autorizados'),
         clienteChecks
       ),
+      permSection,
       el('div', { class: 'modal-actions' },
         el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
         el('button', { class: 'btn btn-primary', onclick: async () => {
           const role = roleSelect.value;
           const ids = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
           if (role !== 'master' && ids.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+          const permissions = {};
+          if (role === 'equipe') {
+            permDefs.forEach(p => {
+              if (permChecks[p.key].checked) permissions[p.key] = true;
+            });
+          }
           try {
             await setDoc(doc(db, 'users', u.uid), {
               ...u, name: nameInput.value.trim() || u.email,
-              role, clienteIds: ids
+              role, clienteIds: ids,
+              permissions: role === 'equipe' ? permissions : {}
             }, { merge: true });
             toast('Atualizado');
             modal.remove();
@@ -1761,14 +1840,17 @@ function renderClienteContext(cid) {
   const isAdmin = hash.includes(`/c/${cid}/admin`);
   const isInsumos = hash.includes(`/c/${cid}/insumos`);
   const isProducao = hash.includes(`/c/${cid}/producao`);
-  const isCardapio = !isAdmin && !isInsumos && !isProducao;
+  const isEstoque = hash.includes(`/c/${cid}/estoque`);
+  const isCardapio = !isAdmin && !isInsumos && !isProducao && !isEstoque;
   const tabs = el('nav', { class: 'cliente-tabs' },
-    el('a', { class: 'cliente-tab' + (isCardapio ? ' active' : ''), href: `#/c/${cid}` },
-      el('span', { class: 'tab-icon' }, '◉'), 'Cardápio'),
-    el('a', { class: 'cliente-tab' + (isProducao ? ' active' : ''), href: `#/c/${cid}/producao` },
-      el('span', { class: 'tab-icon' }, '▲'), 'Produção'),
-    el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
-      el('span', { class: 'tab-icon' }, '◎'), 'Insumos'),
+    canViewCardapio(cid) ? el('a', { class: 'cliente-tab' + (isCardapio ? ' active' : ''), href: `#/c/${cid}` },
+      el('span', { class: 'tab-icon' }, '◉'), 'Cardápio') : null,
+    canViewProducao(cid) ? el('a', { class: 'cliente-tab' + (isProducao ? ' active' : ''), href: `#/c/${cid}/producao` },
+      el('span', { class: 'tab-icon' }, '▲'), 'Produção') : null,
+    canCountStock(cid) ? el('a', { class: 'cliente-tab' + (isEstoque ? ' active' : ''), href: `#/c/${cid}/estoque` },
+      el('span', { class: 'tab-icon' }, '▣'), 'Estoque') : null,
+    canViewInsumosTab(cid) ? el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
+      el('span', { class: 'tab-icon' }, '◎'), 'Insumos') : null,
     canEditCliente(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
       el('span', { class: 'tab-icon' }, '⚙'), 'Gerenciar') : null,
   );
@@ -2205,6 +2287,906 @@ function categorizeInsumo(ins) {
 // Estado do plano de produção (sessão apenas, não persistido)
 const PROD_PLAN = { items: [] };
 // item: { dishId, targetQty, targetUnit, excludedSfIds: Set<string> }
+
+// ============================================================================
+// ============================ MÓDULO DE ESTOQUE =============================
+// ============================================================================
+// Estrutura de dados:
+// template = { id, type: 'stock_count', name, active, sections: [{ id, name, group, team, columns: ['Pedido','Contagem Bar','Contagem Estoque'], items: [{ id, name, unit }] }] }
+// count = { id, templateId, templateName, date, authorUid, authorEmail, authorName, status: 'sent'|'draft', values: { [sectionId]: { [itemId]: { [colKey]: value } } }, obsAdicional, createdAt, updatedAt }
+// log = { id, timestamp, user: {uid, email, name}, action: 'submit'|'edit'|'reopen', note }
+
+// Seed template do Bar Sororoca
+const SOROROCA_TEMPLATE = {
+  type: 'stock_count',
+  name: 'Pedidos Bar Sororoca',
+  active: true,
+  description: 'Contagem de vinhos + insumos do bar',
+  sections: [
+    // Vinhos — só contagem
+    { id: 's-barrinhas', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Barrinhas', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'boas-quintas-morgado', name: 'Boas Quintas, Morgado de Bucelas', unit: 'und' }]},
+    { id: 's-berkeman', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Berkeman', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'matias-riccitelli-kung', name: 'Matias Riccitelli, Kung Fu Pet Nat', unit: 'und' }]},
+    { id: 's-diasa', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Diasa', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'vina-alta-esencial', name: 'Viña Alta, Esencial Naranjo', unit: 'und' }]},
+    { id: 's-europa', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Europa', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'domaine-les-malandes', name: 'Domaine Les Malandes, Chablis', unit: 'und' },
+      { id: 'barbadillo-tamarix', name: 'Barbadillo, Tamarix', unit: 'und' },
+      { id: 'andi-weigand-white', name: 'Andi Weigand, White', unit: 'und' }]},
+    { id: 's-grapy', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Grapy', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'castelo-dalba-branco', name: "Castelo D'Alba Branco, Rui Roboredo Madeira", unit: 'und' },
+      { id: 'els-nanos-blanc', name: 'Els Nanos Blanc del Coster, Joseph Foraster', unit: 'und' },
+      { id: 'les-gallinetes-tinto', name: 'Les Gallinetes Tinto, Joseph Foraster', unit: 'und' }]},
+    { id: 's-tanyno', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Tanyno', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'calcarius-chablis', name: 'Calcarius Chablis', unit: 'und' }]},
+    { id: 's-uva', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Uva', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'meinklang-burgenland', name: 'Meinklang, Burgenland Weiss', unit: 'und' }]},
+    { id: 's-vm', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos VM', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'arniston-bay', name: 'Arniston Bay', unit: 'und' },
+      { id: 'busy-bee', name: 'Busy Bee', unit: 'und' },
+      { id: 'chenin-les-athletes', name: 'Chenin Les Athletes du Vin', unit: 'und' },
+      { id: 'heiderer-meyer', name: 'Heiderer Meyer', unit: 'und' },
+      { id: 'henri-kieffer-riesling', name: 'Henri Kieffer & Fils, Riesling', unit: 'und' }]},
+    { id: 's-world-wine', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos World Wine', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'gerard-berthrand-papilou', name: 'Gerard Berthrand, Papilou', unit: 'und' },
+      { id: 'portal-calcada-patusco', name: 'Portal da Calçada, Patusco', unit: 'und' }]},
+    { id: 's-zahil', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Vinhos Zahil', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'la-guita-manzanilla', name: 'La Guita Manzanilla', unit: 'und' }]},
+    { id: 's-mega-sake', group: 'Pedidos Vinhos Sororoca', team: 'Equipe do Salão', name: 'Mega Sakê', columns: ['Contagem Adega', 'Contagem Estoque'], items: [
+      { id: 'sake-niida-shizenshu', name: 'Sake Niida Shizenshu Kan Atsurae Kimoto Junmai', unit: 'und' }]},
+    // Insumos do bar — pedido + contagem
+    { id: 's-agro-bonfim', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Agro Bonfim', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'amora', name: 'Amora', unit: 'bandeja' },
+      { id: 'caju', name: 'Caju', unit: 'bandeja' },
+      { id: 'jabuticaba', name: 'Jabuticaba', unit: 'kg' },
+      { id: 'kiwi', name: 'Kiwi', unit: 'und' },
+      { id: 'laranja-bahia', name: 'Laranja Bahia', unit: 'kg' },
+      { id: 'limao-cravo', name: 'Limão Cravo', unit: 'kg' },
+      { id: 'limao-siciliano', name: 'Limão Siciliano', unit: 'kg' },
+      { id: 'limao-tahiti', name: 'Limão Tahiti', unit: 'kg' },
+      { id: 'manga', name: 'Manga', unit: 'und' },
+      { id: 'maracuja', name: 'Maracujá', unit: 'kg' },
+      { id: 'melao', name: 'Melão', unit: 'und' },
+      { id: 'seriguela-bonfim', name: 'Seriguela', unit: 'kg' },
+      { id: 'tangerina', name: 'Tangerina', unit: 'kg' }]},
+    { id: 's-alibec', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Alibec', columns: ['Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'amendoim-torrado', name: 'Amendoim torrado sem sal e sem pele', unit: 'und' }]},
+    { id: 's-matury', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Matury', columns: ['Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'cajuina-1l', name: 'Cajuina orgânica 1L', unit: 'und' },
+      { id: 'cajuina-310', name: 'Cajuina orgânica 310ml', unit: 'und' }]},
+    { id: 's-singlefin', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Singlefin', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'bergamoncello', name: 'Bergamoncello', unit: 'und' },
+      { id: 'singlefin-gin', name: 'Singlefin Gin', unit: 'und' },
+      { id: 'gin-ocean', name: 'Gin Ocean', unit: 'und' },
+      { id: 'gin-refil', name: 'Gin Refil', unit: 'und' }]},
+    { id: 's-fg7', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'FG7 Bebidas', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'aperol', name: 'Aperol', unit: 'und' },
+      { id: 'bitter-angostura', name: 'Bitter Angostura', unit: 'und' },
+      { id: 'campari', name: 'Campari', unit: 'und' },
+      { id: 'cinzano-rosso', name: 'Cinzano Rosso', unit: 'und' },
+      { id: 'licor-43', name: 'Licor 43 Diego Zamora 750ml', unit: 'und' },
+      { id: 'licor-cointreau', name: 'Licor Cointreau 700ml', unit: 'und' },
+      { id: 'licor-tia-maria', name: 'Licor de Café Tia Maria 750ml', unit: 'und' },
+      { id: 'licor-frangelico', name: 'Licor Frangelico 750ml', unit: 'und' },
+      { id: 'noilly-prat', name: 'Noilly Prat', unit: 'und' },
+      { id: 'rum-havana-3', name: 'Rum Havana 3 750ml', unit: 'und' },
+      { id: 'rum-havana-7', name: 'Rum Havana 7 750ml', unit: 'und' },
+      { id: 'salton-brut', name: 'Salton Brut', unit: 'und' },
+      { id: 'suco-tomate-raiola', name: 'Suco de Tomate Raiola 1L', unit: 'und' },
+      { id: 'tequila-jimador', name: 'Tequila El Jimador branca 750ml', unit: 'und' },
+      { id: 'vodka-absolut', name: 'Vodka Absolut 1L', unit: 'und' },
+      { id: 'vodka-smirnoff', name: 'Vodka Smirnoff 998ml', unit: 'und' },
+      { id: 'whisky-dewars', name: "Whisky Dewar's", unit: 'und' },
+      { id: 'whisky-glenlivet', name: 'Whisky Glenlivet', unit: 'und' },
+      { id: 'whisky-jack-daniels', name: "Whisky Jack Daniel's 1L", unit: 'und' },
+      { id: 'whisky-jim-beam', name: 'Whisky Jim Beam', unit: 'und' },
+      { id: 'whisky-makers-mark', name: "Whisky Maker's Mark", unit: 'und' },
+      { id: 'whisky-old-parr', name: 'Whisky Old Parr', unit: 'und' }]},
+    { id: 's-heineken', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Heineken', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'agua-tonica-vys', name: 'Água tônica Vys', unit: 'und' },
+      { id: 'agua-tonica-vys-zero', name: 'Água tônica Vys zero', unit: 'und' },
+      { id: 'baer-mate', name: 'Baer mate', unit: 'und' },
+      { id: 'agua-sem-gas-mamba', name: 'Água sem gás Mamba', unit: 'und' },
+      { id: 'agua-com-gas-mamba', name: 'Água com gás Mamba', unit: 'und' },
+      { id: 'heineken-ln', name: 'Heineken Long Neck', unit: 'und' },
+      { id: 'heineken-zero-ln', name: 'Heineken Zero Long Neck', unit: 'und' },
+      { id: 'lagunitas-ipa', name: 'Lagunitas IPA', unit: 'und' },
+      { id: 'praya-classica', name: 'Praya Clássica', unit: 'und' },
+      { id: 'praya-sem-gluten', name: 'Praya Lager sem Glúten', unit: 'und' }]},
+    { id: 's-lobozo', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Bebidas Lobozó', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'cachaca-lobozo-branca', name: 'Cachaça Lobozó Branca', unit: 'und' },
+      { id: 'cachaca-lobozo-envelhecida', name: 'Cachaça Lobozó Envelhecida', unit: 'und' }]},
+    { id: 's-remanso-peixe', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Remanso do Peixe', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'cachaca-jambu-remanso', name: 'Cachaça de Jambu Remanso', unit: 'und' }]},
+    { id: 's-princesa-isabel', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Princesa Isabel', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'cachaca-jiquitaia-branca', name: 'Cachaça Jiquitaia branca', unit: 'und' }]},
+    { id: 's-aptk', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'APTK', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'vermouth-circollo', name: 'Vermouth Circollo', unit: 'caixa 6 und' }]},
+    { id: 's-eden-coco', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Eden coco', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'agua-de-coco', name: 'Água de coco', unit: 'cx 15 und' }]},
+    { id: 's-bicudo', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Bicudo', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'seriguela-bicudo', name: 'Seriguela', unit: 'kg' },
+      { id: 'graviola', name: 'Graviola', unit: 'kg' },
+      { id: 'cupuacu', name: 'Cupuaçu', unit: 'kg' },
+      { id: 'cambuci', name: 'Cambuci', unit: 'kg' }]},
+    { id: 's-escola-sorvete', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Escola do Sorvete', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'baunilha-500ml', name: 'Baunilha', unit: '500ml' }]},
+    { id: 's-especiais', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Especiais', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'tabasco', name: 'Tabasco', unit: 'und' },
+      { id: 'mate-tostado', name: 'Mate Tostado', unit: 'und' },
+      { id: 'azeitona-asaro', name: 'Azeitona Asaro', unit: 'und' },
+      { id: 'tucupi-preto', name: 'Tucupi preto', unit: 'und' },
+      { id: 'flor-de-sal-cimsal', name: 'Flor de sal Cimsal', unit: 'und' }]},
+    { id: 's-icy-code', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Icy Code', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'gelo-translucido', name: 'Gelo translúcido', unit: 'pacote' }]},
+    { id: 's-gelo-top', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Gelo Top', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'gelo-5kg', name: 'Gelo 5 KG', unit: 'pacote' }]},
+    { id: 's-combu', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Combu', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'polpa-cupuacu', name: 'Polpa de cupuaçu integral para sobremesa', unit: 'kg' },
+      { id: 'polpa-bacuri', name: 'Polpa de Bacuri', unit: 'kg' }]},
+    { id: 's-terra-serra', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Terra da Serra', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'molho-ingles-5l', name: 'Molho inglês 5L', unit: 'gl' }]},
+    { id: 's-tocaya', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Tocaya', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'cafe-graos', name: 'Café em grãos', unit: 'kg' }]},
+    { id: 's-sobremesas', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Sobremesas', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'torta-chocolate-castanha', name: 'Torta de chocolate com castanha', unit: 'und' },
+      { id: 'pave-cupuacu', name: 'Pavê de Cupuaçu', unit: 'und' }]},
+    { id: 's-mega-g', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Mega G', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'biscoito-champagne', name: 'Biscoito champagne', unit: 'pct' },
+      { id: 'cacau-em-po', name: 'Cacau em pó', unit: 'kg' },
+      { id: 'creme-de-leite', name: 'Creme de leite', unit: '200g' },
+      { id: 'gelatina-em-po', name: 'Gelatina em pó incolor', unit: 'sache' },
+      { id: 'leite', name: 'Leite', unit: 'l' },
+      { id: 'leite-condensado', name: 'Leite condensado', unit: 'lata' },
+      { id: 'po-cafe-funcionario', name: 'Pó de café funcionário', unit: 'kg' },
+      { id: 'oleo-coco', name: 'Óleo de coco', unit: 'und' }]},
+    { id: 's-copos', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Copos', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'americano-grande', name: 'Americano Grande', unit: 'und' },
+      { id: 'americano-medio', name: 'Americano Médio', unit: 'und' },
+      { id: 'americano-pequeno', name: 'Americano Pequeno', unit: 'und' },
+      { id: 'americano-dose', name: 'Americano Dose', unit: 'und' },
+      { id: 'rabo-de-peixe', name: 'Rabo de Peixe', unit: 'und' },
+      { id: 'caipirinha', name: 'Caipirinha', unit: 'und' },
+      { id: 'dry-martini', name: 'Dry Martini', unit: 'und' },
+      { id: 'copo-longo-coqueiro', name: 'Copo Longo coqueiro', unit: 'und' },
+      { id: 'garrafa-de-suco', name: 'Garrafa de suco', unit: 'und' },
+      { id: 'copo-barriquinha', name: 'Copo Barriquinha', unit: 'und' }]},
+    { id: 's-descartaveis', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Descartáveis', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'palito-caipirinha-18', name: 'Palito caipirinha golf 18cm', unit: 'pct 50un' },
+      { id: 'palito-batidinha-15', name: 'Palito batidinha golf 15cm', unit: 'pct 50un' },
+      { id: 'tampa-garrafa-suco', name: 'Tampa garrafa de suco alumínio long neck 27mm dourada', unit: '100 und' },
+      { id: 'copo-descartavel-300', name: 'Copo descartável com tampa 300ml papel', unit: 'pct' }]},
+    { id: 's-utensilios', group: 'Pedidos Insumos Bar Sororoca', team: 'Equipe do Bar', name: 'Utensílios', columns: ['Pedido', 'Contagem Bar', 'Contagem Estoque'], items: [
+      { id: 'medidor-vinho', name: 'Medidor de Vinho', unit: 'und' },
+      { id: 'peneira-pequena', name: 'Peneira Pequena', unit: 'und' },
+      { id: 'abridor-vinho', name: 'Abridor de vinho', unit: 'und' },
+      { id: 'palito-drink-inox', name: 'Palito para drink em inox', unit: 'und' }]},
+  ]
+};
+
+async function seedSororocaTemplate(cid) {
+  const ref = doc(stockTemplatesCol(cid), 'sororoca-bar-v1');
+  const existing = await getDoc(ref);
+  if (existing.exists()) { toast('Template já existe'); return; }
+  await setDoc(ref, { ...SOROROCA_TEMPLATE, createdAt: serverTimestamp() });
+  toast('Template Sororoca criado');
+}
+
+// Chave única pra cada campo da contagem
+function valueKey(sectionId, itemId, colIdx) {
+  return `${sectionId}::${itemId}::${colIdx}`;
+}
+
+// Cache em memória dos templates e contagens do cliente atual
+const STOCK_STATE = { templates: [], counts: [], currentCid: null };
+
+async function loadStockData(cid) {
+  if (STOCK_STATE.currentCid !== cid) {
+    STOCK_STATE.templates = [];
+    STOCK_STATE.counts = [];
+    STOCK_STATE.currentCid = cid;
+  }
+  // Templates: todos com acesso ao cliente podem ler
+  const tSnap = await getDocs(stockTemplatesCol(cid));
+  STOCK_STATE.templates = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Counts: equipe sem can_manage_contagem só lê as próprias (filtro por authorUid)
+  try {
+    let cSnap;
+    if (isEquipe() && !equipePerm('can_manage_contagem')) {
+      cSnap = await getDocs(query(stockCountsCol(cid), where('authorUid', '==', STATE.user.uid)));
+    } else {
+      cSnap = await getDocs(stockCountsCol(cid));
+    }
+    STOCK_STATE.counts = cSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => {
+        const aT = a.createdAt?.toMillis?.() || a.createdAt || 0;
+        const bT = b.createdAt?.toMillis?.() || b.createdAt || 0;
+        return bT - aT;
+      });
+  } catch (err) {
+    console.warn('stock counts load:', err);
+    STOCK_STATE.counts = [];
+  }
+}
+
+// =============== ROUTER ESTOQUE ===============
+async function renderEstoque(cid, subroute) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  renderLoadingScreen();
+  await loadStockData(cid);
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+
+  const sub = subroute[0] || '';
+  // Sub-aba no header
+  const subNav = el('nav', { class: 'estoque-subnav' },
+    el('a', { class: 'estoque-subtab' + (!sub ? ' active' : ''), href: `#/c/${cid}/estoque` }, '⚬ Preencher contagem'),
+    canManageStock(cid) ? el('a', { class: 'estoque-subtab' + (sub === 'contagens' ? ' active' : ''), href: `#/c/${cid}/estoque/contagens` }, '◨ Contagens recebidas') : null,
+    canManageTemplates(cid) ? el('a', { class: 'estoque-subtab' + (sub === 'templates' ? ' active' : ''), href: `#/c/${cid}/estoque/templates` }, '✎ Templates') : null,
+  );
+  app.appendChild(subNav);
+
+  if (!sub) { renderStockTemplatesList(cid, app); return; }
+  if (sub === 'preencher' && subroute[1]) { renderStockCountForm(cid, subroute[1], subroute[2], app); return; }
+  if (sub === 'contagens') {
+    if (!canManageStock(cid)) { app.appendChild(renderNoAccess()); return; }
+    if (subroute[1]) return renderStockCountDetail(cid, subroute[1], app);
+    return renderStockCountsList(cid, app);
+  }
+  if (sub === 'templates') {
+    if (!canManageTemplates(cid)) { app.appendChild(renderNoAccess()); return; }
+    if (subroute[1] === 'novo') return renderStockTemplateEdit(cid, null, app);
+    if (subroute[1] === 'editar' && subroute[2]) return renderStockTemplateEdit(cid, subroute[2], app);
+    return renderStockTemplatesAdminList(cid, app);
+  }
+  app.appendChild(el('p', { class: 'muted' }, 'Rota inválida'));
+}
+
+// =============== FRONT: lista de templates pra preencher ===============
+function renderStockTemplatesList(cid, app) {
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Preencher contagem'),
+      el('p', {}, 'Escolha um template pra começar a contagem. Salva automaticamente enquanto você preenche.')
+    )
+  ));
+  const activeTemplates = STOCK_STATE.templates.filter(t => t.active !== false);
+  if (activeTemplates.length === 0) {
+    const empty = el('div', { class: 'empty-state' },
+      el('p', {}, 'Nenhum template de contagem cadastrado.'),
+    );
+    if (canManageTemplates(cid)) {
+      empty.appendChild(el('a', { class: 'btn btn-primary', href: `#/c/${cid}/estoque/templates/novo` }, '+ Criar template'));
+      empty.appendChild(el('button', { class: 'btn', onclick: async () => {
+        try { await seedSororocaTemplate(cid); renderEstoque(cid, []); } catch (e) { toast('Erro: ' + e.message); }
+      } }, '↻ Seed Sororoca'));
+    }
+    app.appendChild(empty);
+    return;
+  }
+  const grid = el('div', { class: 'template-cards-grid' });
+  activeTemplates.forEach(t => {
+    const itemCount = (t.sections || []).reduce((s, sec) => s + (sec.items?.length || 0), 0);
+    grid.appendChild(el('a', { class: 'template-card', href: `#/c/${cid}/estoque/preencher/${t.id}` },
+      el('h3', {}, t.name),
+      el('p', { class: 'muted' }, t.description || `${(t.sections || []).length} seções · ${itemCount} itens`),
+      el('span', { class: 'template-card-action' }, 'Iniciar contagem →')
+    ));
+  });
+  app.appendChild(grid);
+}
+
+// =============== FRONT: formulário de preenchimento ===============
+async function renderStockCountForm(cid, templateId, resumeCountId, app) {
+  const template = STOCK_STATE.templates.find(t => t.id === templateId);
+  if (!template) { app.appendChild(el('p', {}, 'Template não encontrado')); return; }
+  app.appendChild(el('a', { href: `#/c/${cid}/estoque`, class: 'back-link' }, '← Voltar'));
+  app.appendChild(el('h1', {}, template.name));
+
+  // Estado local: values + obs
+  const lsKey = `stock-draft-${cid}-${templateId}`;
+  let state;
+  if (resumeCountId) {
+    const countDoc = STOCK_STATE.counts.find(c => c.id === resumeCountId);
+    state = { values: countDoc?.values || {}, obsAdicional: countDoc?.obsAdicional || '' };
+  } else {
+    const saved = localStorage.getItem(lsKey);
+    state = saved ? JSON.parse(saved) : { values: {}, obsAdicional: '' };
+  }
+  const persist = () => {
+    if (!resumeCountId) localStorage.setItem(lsKey, JSON.stringify(state));
+  };
+
+  // Barra de progresso
+  const totalItems = (template.sections || []).reduce((s, sec) => s + (sec.items?.length || 0), 0);
+  const progBar = el('div', { class: 'progress-bar' });
+  const progFill = el('div', { class: 'progress-fill' });
+  const progText = el('span', { class: 'progress-text' }, '');
+  progBar.appendChild(progFill);
+  progBar.appendChild(progText);
+  function updateProgress() {
+    let filled = 0;
+    (template.sections || []).forEach(sec => {
+      (sec.items || []).forEach(item => {
+        const k = state.values[sec.id]?.[item.id];
+        if (k && Object.values(k).some(v => v !== '' && v != null)) filled++;
+      });
+    });
+    const pct = totalItems > 0 ? (filled / totalItems) * 100 : 0;
+    progFill.style.width = pct + '%';
+    progText.textContent = `${filled} de ${totalItems} itens preenchidos`;
+  }
+  app.appendChild(progBar);
+
+  // Navegação entre seções (tabs)
+  const groups = [...new Set(template.sections.map(s => s.group).filter(Boolean))];
+  const groupNav = el('nav', { class: 'section-group-nav' });
+  groups.forEach((g, idx) => {
+    const btn = el('button', { class: 'chip-filter' + (idx === 0 ? ' active' : ''), 'data-group': g }, g);
+    groupNav.appendChild(btn);
+  });
+  if (groups.length > 0) app.appendChild(groupNav);
+
+  // Form seccionado
+  const form = el('form', { class: 'stock-count-form', onsubmit: (e) => e.preventDefault() });
+  const sectionEls = {};
+  (template.sections || []).forEach(section => {
+    const secEl = el('section', { class: 'stock-section', 'data-group': section.group || '' });
+    sectionEls[section.id] = secEl;
+    secEl.appendChild(el('header', { class: 'stock-sec-head' },
+      el('h2', {}, section.name),
+      section.team ? el('span', { class: 'muted' }, section.team) : null
+    ));
+    // Header row com colunas
+    const colsHead = el('div', { class: 'stock-row stock-row-head' });
+    colsHead.appendChild(el('div', { class: 'stock-cell-name' }, 'Item'));
+    section.columns.forEach(col => colsHead.appendChild(el('div', { class: 'stock-cell-input' }, col)));
+    secEl.appendChild(colsHead);
+    // Items
+    (section.items || []).forEach(item => {
+      const row = el('div', { class: 'stock-row' });
+      row.appendChild(el('div', { class: 'stock-cell-name' },
+        el('span', {}, item.name),
+        item.unit ? el('span', { class: 'muted unit-tag' }, item.unit) : null
+      ));
+      if (!state.values[section.id]) state.values[section.id] = {};
+      if (!state.values[section.id][item.id]) state.values[section.id][item.id] = {};
+      section.columns.forEach((col, idx) => {
+        const curVal = state.values[section.id][item.id][idx] ?? '';
+        const inp = el('input', { type: 'number', step: '0.01', inputmode: 'decimal', value: curVal, placeholder: col });
+        inp.addEventListener('input', () => {
+          state.values[section.id][item.id][idx] = inp.value;
+          persist();
+          updateProgress();
+        });
+        row.appendChild(el('div', { class: 'stock-cell-input' }, inp));
+      });
+      secEl.appendChild(row);
+    });
+    form.appendChild(secEl);
+  });
+
+  // Filtrar por grupo
+  groupNav.addEventListener('click', e => {
+    const btn = e.target.closest('[data-group]');
+    if (!btn) return;
+    $$('.chip-filter', groupNav).forEach(b => b.classList.toggle('active', b === btn));
+    const g = btn.dataset.group;
+    Object.values(sectionEls).forEach(s => {
+      s.style.display = (s.dataset.group === g) ? '' : 'none';
+    });
+  });
+  // Start: show first group only
+  if (groups.length > 1) {
+    Object.values(sectionEls).forEach(s => {
+      s.style.display = (s.dataset.group === groups[0]) ? '' : 'none';
+    });
+  }
+
+  app.appendChild(form);
+
+  // Campo observação adicional
+  const obsInput = el('textarea', { class: 'stock-obs', placeholder: 'Se falta algum produto na lista, informe aqui nome e quantidade a pedir...' });
+  obsInput.value = state.obsAdicional || '';
+  obsInput.addEventListener('input', () => { state.obsAdicional = obsInput.value; persist(); });
+  app.appendChild(el('div', { class: 'stock-obs-wrap' },
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Observações finais'), obsInput)
+  ));
+
+  // Botões de envio
+  const submitBar = el('div', { class: 'stock-submit-bar' },
+    el('span', { class: 'muted' }, resumeCountId ? 'Editando contagem enviada' : 'Rascunho salvo automaticamente localmente'),
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      if (!confirm(resumeCountId ? 'Salvar as alterações desta contagem?' : 'Enviar esta contagem agora?')) return;
+      try {
+        const payload = {
+          templateId: template.id,
+          templateName: template.name,
+          date: new Date().toISOString().slice(0, 10),
+          values: state.values,
+          obsAdicional: state.obsAdicional || '',
+          status: 'sent',
+          updatedAt: serverTimestamp()
+        };
+        if (!resumeCountId) {
+          payload.authorUid = STATE.user.uid;
+          payload.authorEmail = STATE.user.email;
+          payload.authorName = STATE.userDoc?.name || STATE.user.email;
+          payload.createdAt = serverTimestamp();
+          const newRef = doc(stockCountsCol(cid));
+          await setDoc(newRef, payload);
+          await addDoc(stockCountLogsCol(cid, newRef.id), {
+            timestamp: serverTimestamp(),
+            user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
+            action: 'submit',
+            note: 'Contagem enviada'
+          });
+          localStorage.removeItem(lsKey);
+          toast('Contagem enviada!');
+          location.hash = `#/c/${cid}/estoque`;
+        } else {
+          // Compute diff against previous
+          const prev = STOCK_STATE.counts.find(c => c.id === resumeCountId);
+          const changes = [];
+          (template.sections || []).forEach(sec => {
+            (sec.items || []).forEach(item => {
+              sec.columns.forEach((col, idx) => {
+                const before = prev?.values?.[sec.id]?.[item.id]?.[idx] ?? '';
+                const after = state.values?.[sec.id]?.[item.id]?.[idx] ?? '';
+                if (String(before) !== String(after)) {
+                  changes.push({ section: sec.name, item: item.name, column: col, before, after });
+                }
+              });
+            });
+          });
+          await setDoc(stockCountDoc(cid, resumeCountId), payload, { merge: true });
+          await addDoc(stockCountLogsCol(cid, resumeCountId), {
+            timestamp: serverTimestamp(),
+            user: { uid: STATE.user.uid, email: STATE.user.email, name: STATE.userDoc?.name || '' },
+            action: 'edit',
+            note: changes.length > 0 ? `${changes.length} alteração${changes.length > 1 ? 'ões' : ''}` : 'edição',
+            changes
+          });
+          toast('Contagem atualizada!');
+          location.hash = `#/c/${cid}/estoque/contagens/${resumeCountId}`;
+        }
+      } catch (err) { console.error(err); toast('Erro: ' + err.message); }
+    } }, resumeCountId ? 'Salvar alterações' : 'Enviar contagem')
+  );
+  app.appendChild(submitBar);
+  updateProgress();
+}
+
+// =============== BACK: lista de contagens recebidas ===============
+function renderStockCountsList(cid, app) {
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Contagens recebidas'),
+      el('p', {}, 'Todas as contagens enviadas pelos templates ativos.')
+    )
+  ));
+  // Filtros
+  const filter = { templateId: 'all', dateFrom: '', dateTo: '' };
+  const filterBar = el('div', { class: 'stock-filters' });
+  const tplSel = el('select', {});
+  tplSel.appendChild(el('option', { value: 'all' }, 'Todos os templates'));
+  STOCK_STATE.templates.forEach(t => tplSel.appendChild(el('option', { value: t.id }, t.name)));
+  tplSel.addEventListener('change', () => { filter.templateId = tplSel.value; renderRows(); });
+  filterBar.appendChild(tplSel);
+  app.appendChild(filterBar);
+
+  const tbl = el('table', { class: 'insumos-table' },
+    el('thead', {}, el('tr', {},
+      el('th', {}, 'Data'),
+      el('th', {}, 'Template'),
+      el('th', {}, 'Autor'),
+      el('th', {}, 'Preenchido'),
+      el('th', {}, '')
+    ))
+  );
+  const tbody = el('tbody', {});
+  tbl.appendChild(tbody);
+
+  function renderRows() {
+    tbody.innerHTML = '';
+    let counts = STOCK_STATE.counts;
+    if (filter.templateId !== 'all') counts = counts.filter(c => c.templateId === filter.templateId);
+    if (counts.length === 0) {
+      tbody.appendChild(el('tr', {}, el('td', { colspan: '5', class: 'muted', style: 'text-align:center;padding:2rem;' }, 'Nenhuma contagem ainda')));
+      return;
+    }
+    counts.forEach(c => {
+      const template = STOCK_STATE.templates.find(t => t.id === c.templateId);
+      const total = template ? (template.sections || []).reduce((s, sec) => s + (sec.items?.length || 0), 0) : 0;
+      let filled = 0;
+      (template?.sections || []).forEach(sec => {
+        (sec.items || []).forEach(item => {
+          const k = c.values?.[sec.id]?.[item.id];
+          if (k && Object.values(k).some(v => v !== '' && v != null)) filled++;
+        });
+      });
+      const dt = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.date || Date.now());
+      tbody.appendChild(el('tr', {},
+        el('td', {}, dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })),
+        el('td', {}, c.templateName || c.templateId),
+        el('td', {}, c.authorName || c.authorEmail || '—'),
+        el('td', {}, `${filled} / ${total}`),
+        el('td', {},
+          el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/estoque/contagens/${c.id}` }, 'Abrir')
+        )
+      ));
+    });
+  }
+  renderRows();
+  app.appendChild(el('div', { class: 'insumos-table-wrap' }, tbl));
+}
+
+// =============== BACK: detalhe/edição de contagem ===============
+async function renderStockCountDetail(cid, countId, app) {
+  const count = STOCK_STATE.counts.find(c => c.id === countId);
+  if (!count) { app.appendChild(el('p', {}, 'Contagem não encontrada')); return; }
+  const template = STOCK_STATE.templates.find(t => t.id === count.templateId);
+  if (!template) { app.appendChild(el('p', {}, 'Template não encontrado')); return; }
+  const canEdit = canEditContagem(cid);
+  const canManage = canManageStock(cid);
+
+  app.appendChild(el('a', { href: `#/c/${cid}/estoque/contagens`, class: 'back-link' }, '← Voltar'));
+  const dt = count.createdAt?.toDate ? count.createdAt.toDate() : new Date(count.date || Date.now());
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, count.templateName),
+      el('p', {}, `Enviada por ${count.authorName || count.authorEmail} em ${dt.toLocaleString('pt-BR')}`)
+    ),
+    el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
+      canEdit ? el('a', { class: 'btn btn-primary', href: `#/c/${cid}/estoque/preencher/${count.templateId}/${count.id}` }, '✎ Editar') : null,
+      canManage ? el('button', { class: 'btn', onclick: () => exportContagemPDF(cid, count, template) }, '↓ PDF Contagem') : null,
+      canManage ? el('button', { class: 'btn btn-accent', onclick: () => exportPedidoPDF(cid, count, template) }, '↓ PDF Pedido') : null,
+      canManage ? el('button', { class: 'btn', onclick: () => exportContagemXLSX(cid, count, template) }, '↓ Excel') : null,
+    )
+  ));
+
+  // Logs
+  try {
+    const logsSnap = await getDocs(stockCountLogsCol(cid, countId));
+    const logs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
+      const aT = a.timestamp?.toMillis?.() || 0;
+      const bT = b.timestamp?.toMillis?.() || 0;
+      return bT - aT;
+    });
+    if (logs.length > 0) {
+      const logDetails = el('details', { class: 'stock-logs' },
+        el('summary', {}, `Histórico de edições (${logs.length})`),
+        ...logs.map(l => {
+          const t = l.timestamp?.toDate ? l.timestamp.toDate() : new Date();
+          return el('div', { class: 'stock-log-item' },
+            el('span', { class: 'log-when' }, t.toLocaleString('pt-BR')),
+            el('span', { class: 'log-who' }, l.user?.name || l.user?.email || '—'),
+            el('span', { class: 'log-what' }, `${l.action}: ${l.note || ''}`),
+            l.changes && l.changes.length > 0 ? el('ul', { class: 'log-changes' },
+              ...l.changes.slice(0, 10).map(ch => el('li', {}, `${ch.section} / ${ch.item} — ${ch.column}: "${ch.before}" → "${ch.after}"`))
+            ) : null
+          );
+        })
+      );
+      app.appendChild(logDetails);
+    }
+  } catch (err) { console.warn('logs load', err); }
+
+  // Tabela de dados (por seção)
+  (template.sections || []).forEach(section => {
+    const sec = el('section', { class: 'stock-section' });
+    sec.appendChild(el('header', { class: 'stock-sec-head' },
+      el('h2', {}, section.name),
+      section.team ? el('span', { class: 'muted' }, section.team) : null
+    ));
+    const tbl = el('table', { class: 'insumos-table' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'Item'),
+        ...section.columns.map(c => el('th', {}, c))
+      ))
+    );
+    const tbody = el('tbody', {});
+    (section.items || []).forEach(item => {
+      const row = el('tr', {});
+      row.appendChild(el('td', {}, item.name, item.unit ? el('span', { class: 'muted unit-tag' }, item.unit) : null));
+      section.columns.forEach((col, idx) => {
+        const val = count.values?.[section.id]?.[item.id]?.[idx] ?? '';
+        row.appendChild(el('td', { class: 'num' }, val === '' ? '—' : val));
+      });
+      tbody.appendChild(row);
+    });
+    tbl.appendChild(tbody);
+    sec.appendChild(tbl);
+    app.appendChild(sec);
+  });
+  if (count.obsAdicional) {
+    app.appendChild(el('div', { class: 'info-box' },
+      el('strong', {}, 'Observação adicional:'),
+      el('p', {}, count.obsAdicional)
+    ));
+  }
+}
+
+// =============== EXPORTS ===============
+function exportContagemPDF(cid, count, template) {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15;
+  let y = margin;
+  const pageWidth = docPdf.internal.pageSize.getWidth();
+  const cliente = STATE.currentCliente;
+  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
+  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
+  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
+  docPdf.text(count.templateName || 'Contagem', pageWidth / 2, y, { align: 'center' }); y += 7;
+  const dt = count.createdAt?.toDate ? count.createdAt.toDate() : new Date();
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
+  docPdf.text(`${dt.toLocaleDateString('pt-BR')} — ${count.authorName || count.authorEmail}`, pageWidth / 2, y, { align: 'center' }); y += 10;
+
+  (template.sections || []).forEach(section => {
+    if (y > 250) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(30);
+    docPdf.text(section.name, margin, y); y += 5;
+    docPdf.autoTable({
+      startY: y, margin: { left: margin, right: margin },
+      head: [['Item', ...section.columns]],
+      body: (section.items || []).map(item => [
+        item.name + (item.unit ? ` (${item.unit})` : ''),
+        ...section.columns.map((col, idx) => count.values?.[section.id]?.[item.id]?.[idx] ?? '—')
+      ]),
+      theme: 'plain', styles: { fontSize: 9 },
+      headStyles: { fillColor: [247, 245, 238], fontStyle: 'bold', fontSize: 8 }
+    });
+    y = docPdf.lastAutoTable.finalY + 6;
+  });
+  if (count.obsAdicional) {
+    if (y > 250) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'bold').setFontSize(11); docPdf.text('Observações:', margin, y); y += 5;
+    docPdf.setFont('helvetica', 'normal').setFontSize(10); docPdf.text(docPdf.splitTextToSize(count.obsAdicional, pageWidth - margin * 2), margin, y);
+  }
+  docPdf.save(`contagem-${dt.toISOString().slice(0, 10)}.pdf`);
+  toast('PDF gerado');
+}
+
+function exportPedidoPDF(cid, count, template) {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  const margin = 15;
+  let y = margin;
+  const pageWidth = docPdf.internal.pageSize.getWidth();
+  const cliente = STATE.currentCliente;
+  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
+  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
+  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
+  docPdf.text('Pedido de Compra', pageWidth / 2, y, { align: 'center' }); y += 7;
+  const dt = count.createdAt?.toDate ? count.createdAt.toDate() : new Date();
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
+  docPdf.text(`Baseado na contagem de ${dt.toLocaleDateString('pt-BR')}`, pageWidth / 2, y, { align: 'center' }); y += 10;
+
+  // Um pedido por fornecedor (seção), considerando a coluna "Pedido" se existir
+  (template.sections || []).forEach(section => {
+    const pedidoIdx = section.columns.findIndex(c => c.toLowerCase().includes('pedido'));
+    if (pedidoIdx < 0) return; // seção sem coluna de pedido
+    const rows = (section.items || []).map(item => {
+      const qty = count.values?.[section.id]?.[item.id]?.[pedidoIdx] ?? '';
+      if (qty === '' || qty == null || parseFloat(qty) === 0) return null;
+      return [item.name, qty, item.unit || ''];
+    }).filter(Boolean);
+    if (rows.length === 0) return;
+    if (y > 240) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(30);
+    docPdf.text(section.name, margin, y); y += 5;
+    docPdf.autoTable({
+      startY: y, margin: { left: margin, right: margin },
+      head: [['Item', 'Qty', 'Unidade']],
+      body: rows,
+      theme: 'grid', styles: { fontSize: 9 },
+      headStyles: { fillColor: [60, 60, 60], textColor: [255, 255, 255], fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'right' } }
+    });
+    y = docPdf.lastAutoTable.finalY + 8;
+  });
+
+  const finalY = Math.max(y, 250);
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(80);
+  docPdf.text('Aprovado por: ____________________', margin, finalY);
+  docPdf.text('Data/hora: ____________________', pageWidth - margin - 70, finalY);
+  docPdf.save(`pedido-${dt.toISOString().slice(0, 10)}.pdf`);
+  toast('PDF gerado');
+}
+
+function exportContagemXLSX(cid, count, template) {
+  const XLSX = window.XLSX;
+  const wb = XLSX.utils.book_new();
+  // Resumo
+  const resumo = [[count.templateName], [`Autor: ${count.authorName || count.authorEmail}`], [`Data: ${count.date || ''}`], []];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumo), 'Resumo');
+  // Uma aba por seção (ou por grupo, simplificado: uma aba 'Contagem completa' com tudo)
+  const contagemData = [['Seção', 'Item', 'Unidade', ...(new Set((template.sections || []).flatMap(s => s.columns)))]];
+  // Abordagem mais simples: uma coluna por coluna de seção
+  const allColsSet = new Set();
+  (template.sections || []).forEach(s => s.columns.forEach(c => allColsSet.add(c)));
+  const allCols = [...allColsSet];
+  const data = [['Seção', 'Item', 'Unidade', ...allCols]];
+  (template.sections || []).forEach(section => {
+    (section.items || []).forEach(item => {
+      const rowVals = allCols.map(col => {
+        const idx = section.columns.indexOf(col);
+        if (idx < 0) return '';
+        return count.values?.[section.id]?.[item.id]?.[idx] ?? '';
+      });
+      data.push([section.name, item.name, item.unit || '', ...rowVals]);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Contagem');
+  // Pedido
+  const pedidoData = [['Pedido de Compra'], [`Data: ${count.date || ''}`], [], ['Fornecedor', 'Item', 'Qty', 'Unidade']];
+  (template.sections || []).forEach(section => {
+    const pedidoIdx = section.columns.findIndex(c => c.toLowerCase().includes('pedido'));
+    if (pedidoIdx < 0) return;
+    (section.items || []).forEach(item => {
+      const qty = count.values?.[section.id]?.[item.id]?.[pedidoIdx] ?? '';
+      if (qty === '' || qty == null || parseFloat(qty) === 0) return;
+      pedidoData.push([section.name, item.name, qty, item.unit || '']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pedidoData), 'Pedido de Compra');
+  if (count.obsAdicional) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Observação adicional'], [count.obsAdicional]]), 'Observação');
+  }
+  const dt = count.createdAt?.toDate ? count.createdAt.toDate() : new Date();
+  XLSX.writeFile(wb, `contagem-${dt.toISOString().slice(0, 10)}.xlsx`);
+  toast('Excel gerado');
+}
+
+// =============== TEMPLATES: lista admin ===============
+function renderStockTemplatesAdminList(cid, app) {
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Templates de contagem'),
+      el('p', {}, 'Crie e gerencie templates de contagem.')
+    ),
+    el('div', { style: 'display:flex;gap:0.5rem;' },
+      el('button', { class: 'btn', onclick: async () => {
+        if (!confirm('Criar o template inicial do Bar Sororoca?')) return;
+        try { await seedSororocaTemplate(cid); renderEstoque(cid, ['templates']); } catch (e) { toast('Erro: ' + e.message); }
+      } }, '↻ Seed Sororoca'),
+      el('a', { class: 'btn btn-primary', href: `#/c/${cid}/estoque/templates/novo` }, '+ Novo template')
+    )
+  ));
+  if (STOCK_STATE.templates.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' }, el('p', {}, 'Nenhum template cadastrado.')));
+    return;
+  }
+  const list = el('div', { class: 'dish-admin-list' });
+  STOCK_STATE.templates.forEach(t => {
+    const itemCount = (t.sections || []).reduce((s, sec) => s + (sec.items?.length || 0), 0);
+    list.appendChild(el('div', { class: 'dish-admin-item' },
+      el('div', { class: 'info' },
+        el('h4', {}, t.name, t.active === false ? el('span', { class: 'muted' }, ' (inativo)') : null),
+        el('p', {}, `${(t.sections || []).length} seções · ${itemCount} itens`)
+      ),
+      el('div', { class: 'dish-admin-actions' },
+        el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/estoque/templates/editar/${t.id}` }, 'Editar'),
+        el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+          if (!confirm(`Excluir "${t.name}"?`)) return;
+          try { await deleteDoc(stockTemplateDoc(cid, t.id)); toast('Excluído'); renderEstoque(cid, ['templates']); } catch (e) { toast('Erro: ' + e.message); }
+        } }, 'Excluir')
+      )
+    ));
+  });
+  app.appendChild(list);
+}
+
+// =============== TEMPLATES: editor ===============
+function renderStockTemplateEdit(cid, templateId, app) {
+  let template;
+  if (templateId) {
+    template = JSON.parse(JSON.stringify(STOCK_STATE.templates.find(t => t.id === templateId) || {}));
+    if (!template.id) { app.appendChild(el('p', {}, 'Template não encontrado')); return; }
+  } else {
+    template = { type: 'stock_count', name: '', active: true, sections: [] };
+  }
+  app.appendChild(el('a', { href: `#/c/${cid}/estoque/templates`, class: 'back-link' }, '← Voltar'));
+  app.appendChild(el('h1', {}, templateId ? 'Editar template' : 'Novo template'));
+  const panel = el('div', { class: 'admin-panel' });
+  panel.appendChild(el('div', { class: 'form-grid' },
+    (() => { const i = el('input', { type: 'text', value: template.name || '', placeholder: 'Ex: Contagem semanal do bar' });
+      i.addEventListener('input', () => template.name = i.value);
+      return el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome do template'), i); })(),
+    (() => { const i = el('input', { type: 'checkbox' });
+      if (template.active !== false) i.setAttribute('checked', '');
+      i.addEventListener('change', () => template.active = i.checked);
+      return el('label', { class: 'field field-inline' }, i, el('span', { class: 'label-text', style: 'margin-left:0.5rem;' }, 'Ativo (aparece pra equipe preencher)')); })()
+  ));
+
+  panel.appendChild(el('h2', {}, 'Seções'));
+  const secWrap = el('div', {});
+  function renderSecs() {
+    secWrap.innerHTML = '';
+    (template.sections || []).forEach((section, sIdx) => {
+      if (!section.id) section.id = 'sec-' + uid();
+      if (!section.columns) section.columns = ['Pedido', 'Contagem', 'Estoque'];
+      if (!section.items) section.items = [];
+      const box = el('details', { class: 'subficha-editor', open: '' });
+      box.appendChild(el('summary', { class: 'subficha-editor-summary' },
+        el('span', { class: 'sf-editor-num' }, String(sIdx + 1).padStart(2, '0')),
+        el('span', { class: 'sf-editor-name' }, section.name || '(nova seção)'),
+        el('span', { class: 'sf-editor-meta' }, `${(section.items || []).length} itens`),
+        el('span', { class: 'sf-editor-chev' }, '▾'),
+        el('span', { class: 'sf-editor-actions', onclick: e => e.stopPropagation() },
+          el('button', { class: 'btn btn-small btn-danger', onclick: (e) => { e.preventDefault(); if (confirm('Excluir seção?')) { template.sections.splice(sIdx, 1); renderSecs(); } } }, '×')
+        )
+      ));
+      const sForm = el('div', { class: 'form-grid' },
+        (() => { const i = el('input', { type: 'text', value: section.name || '', placeholder: 'Ex: Vinhos Europa' });
+          i.addEventListener('input', () => section.name = i.value);
+          return el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome da seção (fornecedor)'), i); })(),
+        (() => { const i = el('input', { type: 'text', value: section.group || '', placeholder: 'Ex: Pedidos Vinhos' });
+          i.addEventListener('input', () => section.group = i.value);
+          return el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Grupo (opcional)'), i); })(),
+        (() => { const i = el('input', { type: 'text', value: section.team || '', placeholder: 'Ex: Equipe do Salão' });
+          i.addEventListener('input', () => section.team = i.value);
+          return el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Time (opcional)'), i); })(),
+        (() => { const i = el('input', { type: 'text', value: section.columns.join(', '), placeholder: 'Pedido, Contagem Bar, Contagem Estoque' });
+          i.addEventListener('input', () => section.columns = i.value.split(',').map(s => s.trim()).filter(Boolean));
+          return el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Colunas (separadas por vírgula)'), i); })()
+      );
+      box.appendChild(sForm);
+      box.appendChild(el('h4', {}, 'Itens'));
+      const itemsList = el('div', {});
+      function renderItems() {
+        itemsList.innerHTML = '';
+        section.items.forEach((item, iIdx) => {
+          if (!item.id) item.id = 'it-' + uid();
+          const row = el('div', { class: 'ingredient-row', style: 'grid-template-columns: 3fr 1fr auto;' });
+          const n = el('input', { type: 'text', value: item.name || '', placeholder: 'Nome do item' });
+          n.addEventListener('input', () => item.name = n.value);
+          row.appendChild(n);
+          const u = el('input', { type: 'text', value: item.unit || '', placeholder: 'Unidade' });
+          u.addEventListener('input', () => item.unit = u.value);
+          row.appendChild(u);
+          row.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: () => { section.items.splice(iIdx, 1); renderItems(); } }, '×'));
+          itemsList.appendChild(row);
+        });
+        itemsList.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
+          section.items.push({ id: 'it-' + uid(), name: '', unit: '' });
+          renderItems();
+        } }, '+ Adicionar item'));
+      }
+      renderItems();
+      box.appendChild(itemsList);
+      secWrap.appendChild(box);
+    });
+    secWrap.appendChild(el('button', { class: 'btn', onclick: () => {
+      template.sections.push({ id: 'sec-' + uid(), name: 'Nova seção', group: '', team: '', columns: ['Pedido', 'Contagem', 'Estoque'], items: [] });
+      renderSecs();
+    } }, '+ Adicionar seção'));
+  }
+  renderSecs();
+  panel.appendChild(secWrap);
+
+  panel.appendChild(el('div', { class: 'ficha-actions' },
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      if (!template.name.trim()) { alert('Nome obrigatório'); return; }
+      try {
+        const id = templateId || ('tpl-' + uid());
+        template.id = id;
+        const payload = { ...template, updatedAt: serverTimestamp() };
+        if (!templateId) payload.createdAt = serverTimestamp();
+        delete payload.id;
+        await setDoc(stockTemplateDoc(cid, id), payload, { merge: true });
+        toast('Template salvo');
+        location.hash = `#/c/${cid}/estoque/templates`;
+      } catch (err) { toast('Erro: ' + err.message); }
+    } }, 'Salvar template'),
+    el('a', { class: 'btn', href: `#/c/${cid}/estoque/templates` }, 'Cancelar')
+  ));
+  app.appendChild(panel);
+}
 
 function renderProducao(cid) {
   const app = $('#app');
