@@ -2588,27 +2588,52 @@ label.field textarea { min-height: 90px; resize: vertical; }
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 1.5rem 1.5rem;
-  display: block;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.12);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.18);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.1s;
+  position: relative;
+  z-index: 1;
+}
+.cliente-card > h3,
+.cliente-card > p {
+  pointer-events: none;
 }
 @media (hover: hover) {
   .cliente-card:hover {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-bg);
   }
+  .cliente-card:hover .cliente-card-arrow { color: var(--accent); transform: translateX(3px); }
 }
 .cliente-card:active { background: var(--bg2); }
+.cliente-card-inner { flex: 1; min-width: 0; }
 .cliente-card h3 {
-  font-size: 1.2rem;
-  margin: 0 0 0.25rem 0;
+  font-size: 1.15rem;
+  margin: 0 0 0.2rem 0;
   font-weight: 600;
+  pointer-events: none;
 }
-.cliente-card p { margin: 0; font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace; }
+.cliente-card p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  pointer-events: none;
+}
+.cliente-card-arrow {
+  margin-left: auto;
+  color: var(--text4);
+  font-size: 1.1rem;
+  transition: color 0.15s, transform 0.2s;
+  pointer-events: none;
+  flex-shrink: 0;
+}
 
 /* ============ Credito de consultoria ============ */
 .consultor-credit {

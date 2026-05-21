@@ -1490,10 +1490,18 @@ async function renderClientesList() {
 
   const grid = el('div', { class: 'cliente-grid' });
   STATE.clientes.forEach(c => {
-    const card = el('a', { class: 'cliente-card', href: `#/c/${c.id}` },
+    const targetHash = `#/c/${c.id}`;
+    const card = el('a', { class: 'cliente-card', href: targetHash, role: 'button' },
       el('h3', {}, c.name || c.id),
-      el('p', { class: 'muted' }, c.slug || c.id)
+      el('p', { class: 'muted' }, c.slug || c.id),
+      el('span', { class: 'cliente-card-arrow', 'aria-hidden': 'true' }, '→')
     );
+    // Fallback de navegação caso o tap nativo no <a> falhe (Safari mobile com :hover sticky)
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (location.hash !== targetHash) location.hash = targetHash;
+      else route();
+    });
     grid.appendChild(card);
   });
   app.appendChild(grid);
