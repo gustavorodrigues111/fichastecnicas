@@ -1290,6 +1290,14 @@ function parseHash() {
 }
 
 async function route() {
+  // Hashes que são âncoras de scroll (não rotas): sf-XYZ, top, etc.
+  // Não dispara render — só scroll pro elemento.
+  const rawHash = location.hash.slice(1);
+  if (rawHash.startsWith('sf-')) {
+    const target = document.getElementById(rawHash);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   const parts = parseHash();
   $$('.site-nav a').forEach(a => a.classList.remove('active'));
 
@@ -2556,14 +2564,22 @@ function renderFicha(cid, dishId, initialSfId = null) {
   app.appendChild(scaleBar);
 
   // Quick-nav anchors — ordem invertida: prato final primeiro, preparações depois
+  // IMPORTANTE: usa click handler com scrollIntoView em vez de href="#sf-X" porque
+  // o router escuta hashchange e jogaria o user pra rota base (bug anterior).
   const quickNav = el('nav', { class: 'sf-quicknav' });
   const subFichasReversed = [...(dish.sub_fichas || [])].reverse();
   subFichasReversed.forEach((sf) => {
     const originalIdx = dish.sub_fichas.indexOf(sf);
     const isFinal = originalIdx === dish.sub_fichas.length - 1;
-    quickNav.appendChild(el('a', { href: `#sf-${sf.id}`, class: isFinal ? 'is-final' : '' },
+    const link = el('a', { href: '#', class: isFinal ? 'is-final' : '' },
       `${originalIdx + 1}. ${sf.name}`
-    ));
+    );
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.getElementById(`sf-${sf.id}`);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    quickNav.appendChild(link);
   });
   app.appendChild(quickNav);
 
