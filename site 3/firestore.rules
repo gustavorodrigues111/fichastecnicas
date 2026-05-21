@@ -154,6 +154,16 @@ service cloud.firestore {
         allow write: if isStaffOf(cid);
       }
 
+      // ---------- production_plans (histórico de planejamentos finalizados) ----------
+      match /production_plans/{planId} {
+        // Leitura: qualquer pessoa do cliente vê o histórico
+        allow read: if hasClienteAccess(cid);
+        // Criação: master/staff, cliente (dono), cliente_admin
+        allow create: if isStaffOf(cid) || isClienteOwnerOf(cid) || isClienteAdminOf(cid);
+        // Update/delete: só staff/master (histórico imutável pros perfis do cliente)
+        allow update, delete: if isStaffOf(cid);
+      }
+
       // ---------- estoque (legado — mantido caso reative) ----------
       match /stock_templates/{tid} {
         allow read: if hasClienteAccess(cid);

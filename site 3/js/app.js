@@ -1383,6 +1383,8 @@ async function route() {
     }
     if (rest[0] === 'producao') {
       if (!canViewProducao(cid)) { renderNoAccess(); return; }
+      if (rest[1] === 'historico') { renderProducaoHistorico(cid); return; }
+      if (rest[1] === 'plano' && rest[2]) { renderProducaoDetalhe(cid, rest[2]); return; }
       renderProducao(cid); return;
     }
     if (rest[0] === 'estoque') {
@@ -2946,9 +2948,61 @@ function categorizeInsumo(ins) {
 }
 
 // ---------- Views: Produção ----------
-// Estado do plano de produção (sessão apenas, não persistido)
-const PROD_PLAN = { items: [] };
+// Estado do plano de produção (sessão apenas; ao finalizar é persistido em production_plans)
+const PROD_PLAN = {
+  items: [],
+  status: 'draft',       // 'draft' | 'finalized'
+  finalizedAt: null,
+  finalizedBy: null,
+  planId: null
+};
 // item: { dishId, targetQty, targetUnit, excludedSfIds: Set<string> }
+
+function prodPlanReset() {
+  PROD_PLAN.items = [];
+  PROD_PLAN.status = 'draft';
+  PROD_PLAN.finalizedAt = null;
+  PROD_PLAN.finalizedBy = null;
+  PROD_PLAN.planId = null;
+}
+
+function prodPlanIsLocked() {
+  return PROD_PLAN.status === 'finalized';
+}
+
+// Constrói o snapshot que vai pro Firestore quando finaliza
+function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
+  return {
+    cid,
+    createdAt: PROD_PLAN.createdAt || new Date().toISOString(),
+    finalizedAt: new Date().toISOString(),
+    finalizedBy: STATE.user?.uid || null,
+    finalizedByName: STATE.userDoc?.name || STATE.user?.email || '',
+    status: 'finalized',
+    totalCost: Number(totalCost) || 0,
+    totalPortions: Number(totalPortions) || 0,
+    items: PROD_PLAN.items.map(it => {
+      const d = STATE.dishes.find(x => x.id === it.dishId);
+      return {
+        dishId: it.dishId,
+        dishName: d?.name || it.dishId,
+        targetQty: Number(it.targetQty) || 0,
+        targetUnit: it.targetUnit || '',
+        excludedSfIds: Array.from(it.excludedSfIds || new Set())
+      };
+    })
+  };
+}
+
+async function prodPlanFinalize(cid, totalCost, totalPortions) {
+  const snapshot = prodPlanBuildSnapshot(cid, totalCost, totalPortions);
+  const ref = await addDoc(collection(db, 'clientes', cid, 'production_plans'), snapshot);
+  PROD_PLAN.status = 'finalized';
+  PROD_PLAN.finalizedAt = snapshot.finalizedAt;
+  PROD_PLAN.finalizedBy = snapshot.finalizedByName;
+  PROD_PLAN.planId = ref.id;
+  return ref.id;
+}
 
 // ============================================================================
 // ============================ MÓDULO DE ESTOQUE =============================
@@ -3970,13 +4024,24 @@ function renderProducao(cid) {
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
 
+  const locked = prodPlanIsLocked();
+
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
-      el('h1', {}, 'Plano de produção'),
-      el('p', {}, `Selecione os pratos e quantidades para o dia. Lista de compras e requisição de estoque são geradas automaticamente.`)
+      el('h1', {}, locked ? 'Planejamento finalizado' : 'Plano de produção'),
+      el('p', {}, locked
+        ? `Finalizado em ${new Date(PROD_PLAN.finalizedAt).toLocaleString('pt-BR')}${PROD_PLAN.finalizedBy ? ' por ' + PROD_PLAN.finalizedBy : ''}. Você pode baixar os relatórios ou iniciar um novo planejamento.`
+        : `Selecione os pratos e quantidades para o dia. Ao finalizar, o plano é salvo no histórico e os relatórios são liberados pra download.`)
     ),
-    el('div', {},
-      el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
+    el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
+      el('a', { class: 'btn', href: `#/c/${cid}/producao/historico` }, '↺ Histórico'),
+      locked
+        ? el('button', { class: 'btn btn-primary', onclick: () => {
+            if (!confirm('Iniciar um novo planejamento? O plano atual já foi salvo no histórico.')) return;
+            prodPlanReset();
+            renderProducao(cid);
+          } }, '+ Novo planejamento')
+        : el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
     )
   ));
 
@@ -4027,30 +4092,33 @@ function renderProducao(cid) {
         ),
         el('div', { class: 'prod-item-controls' },
           (() => {
-            // Garante que a unidade-alvo é sempre a unidade da ficha final cadastrada
             item.targetUnit = origRend.unit || item.targetUnit || '';
-            // Stepper: −10 | input | +10  com −1/+1 em long press (opcional via shift+click)
             const stepper = el('div', { class: 'prod-qty-stepper' });
             const minusBtn = el('button', { class: 'qty-step-btn', title: 'Diminuir 10 (Shift+click: 1)', type: 'button' }, '−10');
             const qtyInput = el('input', { type: 'text', inputmode: 'numeric', value: item.targetQty || '', class: 'prod-qty-input', placeholder: '0' });
             const plusBtn = el('button', { class: 'qty-step-btn', title: 'Aumentar 10 (Shift+click: 1)', type: 'button' }, '+10');
-            qtyInput.addEventListener('input', () => {
-              const cleaned = qtyInput.value.replace(/[^0-9.]/g, '');
-              if (cleaned !== qtyInput.value) qtyInput.value = cleaned;
-              const v = parseFloat(cleaned);
-              item.targetQty = isNaN(v) ? 0 : v;
-            });
-            qtyInput.addEventListener('change', () => recompute());
-            qtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qtyInput.blur(); } });
-            function bump(delta) {
-              const cur = Number(item.targetQty) || 0;
-              const next = Math.max(0, cur + delta);
-              item.targetQty = next;
-              qtyInput.value = next || '';
-              recompute();
+            if (prodPlanIsLocked()) {
+              minusBtn.disabled = true; plusBtn.disabled = true; qtyInput.readOnly = true;
+              stepper.classList.add('is-locked');
+            } else {
+              qtyInput.addEventListener('input', () => {
+                const cleaned = qtyInput.value.replace(/[^0-9.]/g, '');
+                if (cleaned !== qtyInput.value) qtyInput.value = cleaned;
+                const v = parseFloat(cleaned);
+                item.targetQty = isNaN(v) ? 0 : v;
+              });
+              qtyInput.addEventListener('change', () => recompute());
+              qtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qtyInput.blur(); } });
+              function bump(delta) {
+                const cur = Number(item.targetQty) || 0;
+                const next = Math.max(0, cur + delta);
+                item.targetQty = next;
+                qtyInput.value = next || '';
+                recompute();
+              }
+              minusBtn.addEventListener('click', (e) => bump(e.shiftKey ? -1 : -10));
+              plusBtn.addEventListener('click', (e) => bump(e.shiftKey ? 1 : 10));
             }
-            minusBtn.addEventListener('click', (e) => bump(e.shiftKey ? -1 : -10));
-            plusBtn.addEventListener('click', (e) => bump(e.shiftKey ? 1 : 10));
             stepper.appendChild(minusBtn);
             stepper.appendChild(qtyInput);
             stepper.appendChild(plusBtn);
@@ -4059,9 +4127,11 @@ function renderProducao(cid) {
           el('span', { class: 'prod-unit-fixed' }, origRend.unit || ''),
           el('span', { class: 'prod-scale muted' }, scale > 0 ? `${fmtNum(scale, 2)}×` : '—'),
           el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)),
-          el('button', { class: 'btn btn-small btn-danger', title: 'Remover do plano', onclick: () => {
-            PROD_PLAN.items.splice(itemIdx, 1); recompute();
-          } }, '×')
+          prodPlanIsLocked()
+            ? null
+            : el('button', { class: 'btn btn-small btn-danger', title: 'Remover do plano', onclick: () => {
+                PROD_PLAN.items.splice(itemIdx, 1); recompute();
+              } }, '×')
         )
       );
       itemCard.appendChild(head);
@@ -4078,6 +4148,7 @@ function renderProducao(cid) {
         const checked = !item.excludedSfIds.has(sf.id);
         const chk = el('input', { type: 'checkbox' });
         if (checked) chk.setAttribute('checked', '');
+        if (prodPlanIsLocked()) chk.disabled = true;
         chk.addEventListener('change', () => {
           if (chk.checked) item.excludedSfIds.delete(sf.id);
           else item.excludedSfIds.add(sf.id);
@@ -4098,8 +4169,11 @@ function renderProducao(cid) {
       }
     });
 
-    // Resumo
-    summary.appendChild(el('div', { class: 'prod-summary-card' },
+    // Resumo + ações finais
+    const isLocked = prodPlanIsLocked();
+    const canFinalize = !isLocked && PROD_PLAN.items.length > 0
+      && PROD_PLAN.items.every(it => Number(it.targetQty) > 0);
+    const summaryCard = el('div', { class: 'prod-summary-card' },
       el('div', { class: 'prod-sum-row' },
         el('span', { class: 'muted' }, 'Custo total estimado'),
         el('strong', {}, fmtBRL(totalCost))
@@ -4107,13 +4181,51 @@ function renderProducao(cid) {
       totalPortions > 0 ? el('div', { class: 'prod-sum-row' },
         el('span', { class: 'muted' }, 'Porções'),
         el('strong', {}, fmtNum(totalPortions, 0))
-      ) : null,
-      el('div', { class: 'prod-actions' },
-        el('button', { class: 'btn btn-small', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'),
-        el('button', { class: 'btn btn-small', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'),
-        el('button', { class: 'btn btn-small', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel')
-      )
-    ));
+      ) : null
+    );
+    const actions = el('div', { class: 'prod-actions' });
+    if (isLocked) {
+      // Plano finalizado — relatórios liberados
+      actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
+      actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
+      actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
+    } else {
+      // Plano em rascunho — botão de finalizar (downloads ficam bloqueados)
+      const finalizeBtn = el('button', { class: 'btn btn-primary' }, '✓ Finalizar planejamento');
+      if (!canFinalize) {
+        finalizeBtn.disabled = true;
+        finalizeBtn.title = PROD_PLAN.items.length === 0
+          ? 'Adicione pelo menos um prato com quantidade > 0'
+          : 'Defina a quantidade de produção de todos os pratos';
+      } else {
+        finalizeBtn.addEventListener('click', async () => {
+          const msg = `Finalizar o plano com ${PROD_PLAN.items.length} prato(s)?\n\n` +
+            `Após finalizar:\n` +
+            `• O plano é salvo no histórico do restaurante\n` +
+            `• Os relatórios (PDF Produção, PDF Requisição, Excel) ficam liberados\n` +
+            `• A edição fica bloqueada — você precisa iniciar um novo planejamento pra editar`;
+          if (!confirm(msg)) return;
+          finalizeBtn.disabled = true;
+          finalizeBtn.textContent = 'Salvando…';
+          try {
+            await prodPlanFinalize(cid, totalCost, totalPortions);
+            toast('Planejamento finalizado');
+            renderProducao(cid);
+          } catch (err) {
+            finalizeBtn.disabled = false;
+            finalizeBtn.textContent = '✓ Finalizar planejamento';
+            alert('Erro ao finalizar: ' + (err.message || err.code));
+          }
+        });
+      }
+      actions.appendChild(finalizeBtn);
+      const lockedHint = el('span', { class: 'prod-finalize-hint' },
+        'Relatórios PDF e Excel serão liberados após finalizar.'
+      );
+      actions.appendChild(lockedHint);
+    }
+    summaryCard.appendChild(actions);
+    summary.appendChild(summaryCard);
 
     // Sub-fichas a produzir (agrupadas por prato)
     subfichasOut.appendChild(el('h2', { class: 'prod-section-title' }, 'Sub-fichas a produzir'));
@@ -4229,6 +4341,110 @@ function renderProducao(cid) {
   container.appendChild(shoppingOut);
   app.appendChild(container);
   recompute();
+}
+
+// Lista os planos finalizados do restaurante
+async function renderProducaoHistorico(cid) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  app.appendChild(el('a', { href: `#/c/${cid}/producao`, class: 'back-link' }, '← Voltar ao planejamento'));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Histórico de planejamentos'),
+      el('p', {}, 'Planos de produção finalizados deste restaurante. Cada um pode ser visualizado e re-baixado.')
+    )
+  ));
+  renderLoadingScreen();
+  let plans = [];
+  try {
+    const snap = await getDocs(collection(db, 'clientes', cid, 'production_plans'));
+    plans = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.finalizedAt || '').localeCompare(a.finalizedAt || ''));
+  } catch (err) {
+    app.innerHTML = '';
+    app.appendChild(renderClienteContext(cid));
+    app.appendChild(el('a', { href: `#/c/${cid}/producao`, class: 'back-link' }, '← Voltar ao planejamento'));
+    app.appendChild(el('p', { class: 'muted' }, 'Erro ao carregar: ' + (err.message || err.code)));
+    return;
+  }
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  app.appendChild(el('a', { href: `#/c/${cid}/producao`, class: 'back-link' }, '← Voltar ao planejamento'));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Histórico de planejamentos'),
+      el('p', {}, `${plans.length} plano(s) finalizado(s) neste restaurante.`)
+    )
+  ));
+  if (plans.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' }, el('p', { class: 'muted' }, 'Nenhum planejamento finalizado ainda.')));
+    return;
+  }
+  const grid = el('div', { class: 'historico-grid' });
+  plans.forEach(p => {
+    const d = new Date(p.finalizedAt);
+    const card = el('a', { class: 'historico-card', href: `#/c/${cid}/producao/plano/${p.id}` },
+      el('div', { class: 'historico-card-date' },
+        el('span', { class: 'historico-date-day' }, d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })),
+        el('span', { class: 'historico-date-time' }, d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+      ),
+      el('div', { class: 'historico-card-body' },
+        el('div', { class: 'historico-card-stats' },
+          el('span', {}, `${(p.items || []).length} prato(s)`),
+          p.totalPortions > 0 ? el('span', {}, `${fmtNum(p.totalPortions, 0)} porções`) : null,
+          el('span', { class: 'historico-cost' }, fmtBRL(p.totalCost || 0))
+        ),
+        el('div', { class: 'historico-card-items' },
+          (p.items || []).slice(0, 3).map(it => it.dishName).join(' · ') +
+          ((p.items || []).length > 3 ? ` +${p.items.length - 3}` : '')
+        ),
+        p.finalizedByName ? el('div', { class: 'historico-card-author' }, 'por ' + p.finalizedByName) : null
+      ),
+      el('span', { class: 'historico-card-arrow' }, '→')
+    );
+    grid.appendChild(card);
+  });
+  app.appendChild(grid);
+}
+
+// Detalhe de 1 plano finalizado — restaura o estado em memória pra poder baixar relatórios
+async function renderProducaoDetalhe(cid, planId) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  renderLoadingScreen();
+  let plan;
+  try {
+    const ref = doc(db, 'clientes', cid, 'production_plans', planId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      app.innerHTML = '';
+      app.appendChild(renderClienteContext(cid));
+      app.appendChild(el('a', { href: `#/c/${cid}/producao/historico`, class: 'back-link' }, '← Voltar ao histórico'));
+      app.appendChild(el('p', { class: 'muted' }, 'Plano não encontrado.'));
+      return;
+    }
+    plan = { id: snap.id, ...snap.data() };
+  } catch (err) {
+    app.innerHTML = '';
+    app.appendChild(renderClienteContext(cid));
+    app.appendChild(el('p', { class: 'muted' }, 'Erro: ' + (err.message || err.code)));
+    return;
+  }
+  // Restaura o PROD_PLAN em memória pra usar os exports atuais
+  PROD_PLAN.items = (plan.items || []).map(it => ({
+    dishId: it.dishId,
+    targetQty: it.targetQty,
+    targetUnit: it.targetUnit,
+    excludedSfIds: new Set(it.excludedSfIds || [])
+  }));
+  PROD_PLAN.status = 'finalized';
+  PROD_PLAN.finalizedAt = plan.finalizedAt;
+  PROD_PLAN.finalizedBy = plan.finalizedByName;
+  PROD_PLAN.planId = plan.id;
+  // Reusa a tela de produção (já trata o modo locked)
+  renderProducao(cid);
 }
 
 function openAddDishToPlanModal(cid) {
