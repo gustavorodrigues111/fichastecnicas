@@ -3741,7 +3741,7 @@ function renderProducao(cid) {
       ) : null,
       el('div', { class: 'prod-actions' },
         el('button', { class: 'btn btn-small', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'),
-        el('button', { class: 'btn btn-small', onclick: () => exportRequisicaoPDF(cid) }, '↓ PDF Requisição'),
+        el('button', { class: 'btn btn-small', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'),
         el('button', { class: 'btn btn-small', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel')
       )
     ));
@@ -3842,7 +3842,7 @@ function renderProducao(cid) {
           const isReut = !!insumo.reutilizavel;
           const fc = isReut ? 1 : (ing.fc || 1);
           const key = ing.insumo_id;
-          if (!agg[key]) agg[key] = { name: insumo.name, unit: insumo.unit, qty: 0, cost: 0, isReutilizavel: isReut, sources: [] };
+          if (!agg[key]) agg[key] = { insumo_id: ing.insumo_id, name: insumo.name, unit: insumo.unit, qty: 0, cost: 0, isReutilizavel: isReut, sources: [] };
           const addedQty = qn * sfScale * fc;
           agg[key].qty += addedQty;
           agg[key].cost += isReut ? 0 : (qn * pn * sfScale * fc);
@@ -4057,8 +4057,73 @@ function exportProducaoPDF(cid) {
   toast('PDF gerado');
 }
 
-// PDF de Requisição: lista única pro estoquista entregar os insumos
-function exportRequisicaoPDF(cid) {
+// Modal: o usuário escolhe opções antes de gerar o PDF de Requisição
+function openRequisicaoOptionsModal(cid) {
+  const existing = $('#req-options-modal');
+  if (existing) existing.remove();
+
+  const groupCatChk = el('input', { type: 'checkbox' });
+  const groupReutChk = el('input', { type: 'checkbox' });
+  const withTimeChk = el('input', { type: 'checkbox' });
+  const timeInput = el('input', { type: 'time', value: '09:00', disabled: '', class: 'req-time-input' });
+  withTimeChk.addEventListener('change', () => {
+    if (withTimeChk.checked) timeInput.removeAttribute('disabled');
+    else timeInput.setAttribute('disabled', '');
+  });
+
+  const modal = el('div', { class: 'modal', id: 'req-options-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content' },
+      el('h2', {}, 'Opções da Requisição'),
+      el('p', { class: 'modal-subtitle' }, 'Personalize antes de gerar o PDF pro estoque.'),
+      el('div', { class: 'req-options' },
+        el('label', { class: 'req-opt' }, groupCatChk,
+          el('div', {},
+            el('strong', {}, 'Ordenar por categoria'),
+            el('span', { class: 'muted' }, 'Agrupa insumos por tipo (carnes, vegetais, grãos, líquidos, etc.) — facilita pra quem busca no estoque.')
+          )
+        ),
+        el('label', { class: 'req-opt' }, groupReutChk,
+          el('div', {},
+            el('strong', {}, 'Reutilizáveis em seção separada'),
+            el('span', { class: 'muted' }, 'Move insumos marcados como "rateio" (papel-toalha, descartáveis, etc.) pra uma tabela separada no fim.')
+          )
+        ),
+        el('label', { class: 'req-opt' }, withTimeChk,
+          el('div', {},
+            el('strong', {}, 'Hora estimada de retirada'),
+            el('span', { class: 'muted' }, 'Inclui no cabeçalho a hora prevista pra entrega dos insumos no preparo.'),
+            el('div', { style: 'margin-top:0.4rem;' }, timeInput)
+          )
+        )
+      ),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: () => {
+          const options = {
+            groupByCategory: groupCatChk.checked,
+            separateReutilizaveis: groupReutChk.checked,
+            withPickupTime: withTimeChk.checked,
+            pickupTime: timeInput.value
+          };
+          modal.remove();
+          exportRequisicaoPDF(cid, options);
+        } }, '↓ Gerar PDF')
+      )
+    )
+  );
+  document.body.appendChild(modal);
+}
+
+// Label legível das categorias de insumo
+function categoryLabel(catId) {
+  const c = INSUMO_CATEGORIES.find(x => x.id === catId);
+  return c ? c.label : 'Outros';
+}
+
+// PDF de Requisição: lista pro estoquista entregar os insumos
+function exportRequisicaoPDF(cid, options) {
+  options = options || {};
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 15;
@@ -4073,7 +4138,11 @@ function exportRequisicaoPDF(cid) {
   docPdf.text('Requisição de Estoque', pageWidth / 2, y, { align: 'center' }); y += 8;
   docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(80);
   docPdf.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
-  docPdf.text('Solicitante: ____________________', pageWidth - margin - 70, y); y += 8;
+  docPdf.text('Solicitante: ____________________', pageWidth - margin - 70, y); y += 6;
+  if (options.withPickupTime && options.pickupTime) {
+    docPdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(40);
+    docPdf.text(`⏰ Retirar até: ${options.pickupTime}`, margin, y); y += 6;
+  } else { y += 2; }
 
   // ── Resumo da produção (pra estoquista entender o pedido) ──
   const resumo = buildProdResumoLines();
@@ -4087,43 +4156,81 @@ function exportRequisicaoPDF(cid) {
     y += 4;
   }
 
-  // ── Tabela de insumos (ordenada alfabeticamente) ──
-  const shopping = (window.__prodBuildShopping ? window.__prodBuildShopping() : [])
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const shoppingRaw = (window.__prodBuildShopping ? window.__prodBuildShopping() : []);
 
-  if (shopping.length === 0) {
+  if (shoppingRaw.length === 0) {
     docPdf.setFont('helvetica', 'normal').setFontSize(11).setTextColor(80);
     docPdf.text('Nenhum insumo a solicitar.', margin, y);
     docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
     return;
   }
 
-  docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
-  docPdf.text(`Insumos solicitados (${shopping.length})`, margin, y); y += 4;
+  // Separa reutilizáveis se solicitado
+  const normais = options.separateReutilizaveis ? shoppingRaw.filter(r => !r.isReutilizavel) : shoppingRaw.slice();
+  const reut = options.separateReutilizaveis ? shoppingRaw.filter(r => r.isReutilizavel) : [];
 
-  docPdf.autoTable({
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['#', 'Insumo', 'Qtd solic.', 'Un.', 'Qtd retirada', 'Visto']],
-    body: shopping.map((r, i) => {
-      const norm = normUnitForDisplay(r.qty, r.unit);
-      const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
-      return [String(i + 1), label, norm.text, norm.unit, '', ''];
-    }),
-    theme: 'grid',
-    headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
-    bodyStyles: { fontSize: 9, minCellHeight: 9 },
-    columnStyles: {
-      0: { cellWidth: 10, halign: 'center', textColor: [130, 130, 130] },
-      2: { cellWidth: 22, halign: 'right' },
-      3: { cellWidth: 14 },
-      4: { cellWidth: 26, halign: 'right' },
-      5: { cellWidth: 26 }
-    }
-  });
+  function renderTable(title, rows, startN) {
+    if (rows.length === 0) return startN;
+    if (y > 250) { docPdf.addPage(); y = margin; }
+    docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
+    docPdf.text(`${title} (${rows.length})`, margin, y); y += 4;
+    docPdf.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [['#', 'Insumo', 'Qtd solic.', 'Un.', 'Qtd retirada', 'Visto']],
+      body: rows.map((r, i) => {
+        const norm = normUnitForDisplay(r.qty, r.unit);
+        const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
+        return [String(startN + i), label, norm.text, norm.unit, '', ''];
+      }),
+      theme: 'grid',
+      headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 9, minCellHeight: 9 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center', textColor: [130, 130, 130] },
+        2: { cellWidth: 22, halign: 'right' },
+        3: { cellWidth: 14 },
+        4: { cellWidth: 26, halign: 'right' },
+        5: { cellWidth: 26 }
+      },
+      didDrawPage: (data) => { y = data.cursor.y; }
+    });
+    y = docPdf.lastAutoTable.finalY + 6;
+    return startN + rows.length;
+  }
 
-  const finalY = docPdf.lastAutoTable.finalY + 15;
+  let counter = 1;
+  if (options.groupByCategory) {
+    // Agrupa normais por categoria
+    const byCat = {};
+    normais.forEach(r => {
+      const cat = categorizeInsumo({ name: r.name });
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push(r);
+    });
+    // Ordem fixa das categorias (alfabética por label, "outros" no fim)
+    const catIds = Object.keys(byCat).sort((a, b) => {
+      if (a === 'outros') return 1;
+      if (b === 'outros') return -1;
+      return categoryLabel(a).localeCompare(categoryLabel(b), 'pt-BR');
+    });
+    catIds.forEach(catId => {
+      const rows = byCat[catId].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      counter = renderTable(categoryLabel(catId), rows, counter);
+    });
+  } else {
+    const sorted = normais.slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    counter = renderTable('Insumos solicitados', sorted, counter);
+  }
+
+  if (reut.length > 0) {
+    const sorted = reut.slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    counter = renderTable('Reutilizáveis / rateio', sorted, counter);
+  }
+
+  // Footer
+  if (y > 260) { docPdf.addPage(); y = margin; }
+  const finalY = y + 8;
   docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(80);
   docPdf.text('Aprovado por: ____________________', margin, finalY);
   docPdf.text('Estoquista: ____________________', pageWidth - margin - 70, finalY);

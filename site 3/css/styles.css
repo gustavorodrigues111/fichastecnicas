@@ -2093,6 +2093,38 @@ label.field textarea { min-height: 90px; resize: vertical; }
   color: #5a5a5a;
   margin-top: 2px;
 }
+
+/* Modal de opções da requisição */
+.req-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.req-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #e0ddd2;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+  transition: background 0.15s, border-color 0.15s;
+}
+.req-opt:hover { background: #faf7f0; border-color: #c9a766; }
+.req-opt input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
+.req-opt strong { display: block; color: #2a2a2a; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.req-opt .muted { font-size: 0.82rem; line-height: 1.4; color: #6a6a6a; }
+.req-time-input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d8d5cb;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+}
+.req-time-input:disabled { background: #f0eee5; color: #aaa; cursor: not-allowed; }
 @keyframes dirtyPulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(212, 166, 71, 0.25); }
   50% { box-shadow: 0 0 0 6px rgba(212, 166, 71, 0.12); }
