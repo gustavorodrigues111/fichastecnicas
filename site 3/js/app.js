@@ -3507,11 +3507,14 @@ function renderProducao(cid) {
           (() => {
             // Garante que a unidade-alvo é sempre a unidade da ficha final cadastrada
             item.targetUnit = origRend.unit || item.targetUnit || '';
-            const qtyInput = el('input', { type: 'text', inputmode: 'decimal', value: item.targetQty ? String(item.targetQty).replace('.', ',') : '', class: 'prod-qty-input', placeholder: '0' });
+            const qtyInput = el('input', { type: 'text', inputmode: 'numeric', value: item.targetQty || '', class: 'prod-qty-input', placeholder: '0' });
             // Atualiza estado em cada keystroke, mas só faz o recompute pesado no blur/change
             // (recompute destrói o input e perderia o foco)
             qtyInput.addEventListener('input', () => {
-              const v = parseFloat(qtyInput.value.replace(',', '.'));
+              // Aceita só dígitos e ponto (sem vírgula)
+              const cleaned = qtyInput.value.replace(/[^0-9.]/g, '');
+              if (cleaned !== qtyInput.value) qtyInput.value = cleaned;
+              const v = parseFloat(cleaned);
               item.targetQty = isNaN(v) ? 0 : v;
             });
             qtyInput.addEventListener('change', () => recompute());
@@ -3742,103 +3745,225 @@ function openAddDishToPlanModal(cid) {
   searchInput.focus();
 }
 
+// Helper: monta resumo de pratos × quantidades pro topo dos PDFs
+function buildProdResumoLines() {
+  return PROD_PLAN.items
+    .filter(it => it.targetQty > 0)
+    .map(it => {
+      const d = STATE.dishes.find(x => x.id === it.dishId);
+      if (!d) return null;
+      return { name: d.name, qty: it.targetQty, unit: it.targetUnit };
+    })
+    .filter(Boolean);
+}
+
+// PDF de Produção: roteiro detalhado pra equipe de cozinha
+// Para cada prato → ordem das sub-fichas → ingredientes escalados + modo de preparo
 function exportProducaoPDF(cid) {
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 15;
-  let y = margin;
   const pageWidth = docPdf.internal.pageSize.getWidth();
+  const pageHeight = docPdf.internal.pageSize.getHeight();
   const cliente = STATE.currentCliente;
+  let y = margin;
+
+  function ensureSpace(needed) {
+    if (y + needed > pageHeight - margin) { docPdf.addPage(); y = margin; }
+  }
+
+  // ── Cabeçalho ──
   docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
   docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
-  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
-  docPdf.text('Plano de Produção', pageWidth / 2, y, { align: 'center' }); y += 7;
-  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
-  docPdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth / 2, y, { align: 'center' }); y += 10;
+  docPdf.setFont('times', 'normal').setFontSize(20).setTextColor(20);
+  docPdf.text('Roteiro de Produção', pageWidth / 2, y, { align: 'center' }); y += 7;
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(110);
+  docPdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth / 2, y, { align: 'center' }); y += 8;
 
-  // Pratos
-  PROD_PLAN.items.forEach(item => {
+  // ── Resumo do plano ──
+  const resumo = buildProdResumoLines();
+  if (resumo.length === 0) {
+    docPdf.setFont('helvetica', 'normal').setFontSize(11).setTextColor(80);
+    docPdf.text('Nenhum prato no plano. Defina quantidades antes de gerar o PDF.', margin, y);
+    docPdf.save(`producao-${new Date().toISOString().slice(0, 10)}.pdf`);
+    return;
+  }
+  docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
+  docPdf.text('Pratos planejados', margin, y); y += 5;
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(50);
+  resumo.forEach(r => {
+    ensureSpace(5);
+    docPdf.text(`• ${r.name} — ${fmtNum(r.qty, 0)} ${r.unit}`, margin + 2, y); y += 5;
+  });
+  y += 4;
+
+  // ── Roteiro por prato ──
+  PROD_PLAN.items.forEach((item, itemIdx) => {
+    if (!(item.targetQty > 0)) return;
     const dish = STATE.dishes.find(d => d.id === item.dishId);
     if (!dish) return;
     const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
     const origRend = getSfRendimento(finalSf);
     let scale = 1;
-    if (item.targetQty > 0 && origRend.qty > 0) {
+    if (origRend.qty > 0) {
       const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
       scale = qConv / origRend.qty;
     }
     const scales = computeCascadeScales(dish, scale * origRend.qty);
-    if (y > 240) { docPdf.addPage(); y = margin; }
-    docPdf.setFont('times', 'bold').setFontSize(13).setTextColor(20);
-    docPdf.text(`${dish.name} — ${fmtNum(item.targetQty, 2)} ${item.targetUnit}`, margin, y); y += 6;
     const activeSfs = dish.sub_fichas.filter(sf => !item.excludedSfIds.has(sf.id));
-    activeSfs.forEach(sf => {
+    if (activeSfs.length === 0) return;
+
+    // Page break entre pratos (mas não antes do primeiro)
+    if (itemIdx > 0) { docPdf.addPage(); y = margin; }
+    else ensureSpace(20);
+
+    // Cabeçalho do prato
+    docPdf.setDrawColor(180).setLineWidth(0.3);
+    docPdf.line(margin, y, pageWidth - margin, y); y += 5;
+    docPdf.setFont('times', 'bold').setFontSize(15).setTextColor(20);
+    docPdf.text(dish.name.toUpperCase(), margin, y); y += 5;
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(90);
+    docPdf.text(`${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, margin, y); y += 4;
+    docPdf.line(margin, y, pageWidth - margin, y); y += 6;
+
+    // Cada sub-ficha na ordem
+    activeSfs.forEach((sf, sfIdx) => {
       const sfScale = scales[sf.id] || 1;
       const sfR = getSfRendimento(sf);
       const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
-      docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(50);
-      docPdf.text(`• ${sf.name} — ${sn.text} ${sn.unit}`, margin + 3, y); y += 4.5;
-      if (y > 270) { docPdf.addPage(); y = margin; }
+      const isFinal = dish.sub_fichas.indexOf(sf) === dish.sub_fichas.length - 1;
+
+      ensureSpace(22);
+      docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(40);
+      const label = isFinal ? `MONTAGEM FINAL — ${sf.name}` : `PREPARAÇÃO ${String(sfIdx + 1).padStart(2, '0')} — ${sf.name}`;
+      docPdf.text(label, margin, y); y += 5;
+      docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(110);
+      docPdf.text(`Rendimento: ${sn.text} ${sn.unit}`.trim(), margin, y); y += 5;
+
+      // Tabela de ingredientes (sem custo — equipe não precisa)
+      const ingRows = (sf.ingredientes || []).map(ing => {
+        const f = formatIngQty(ing, sfScale);
+        let nameLabel = ing.insumo_name || '';
+        // Marca subref pra equipe saber que é um preparo, não item de estoque
+        let subSf = null;
+        const sfIdxInDish = dish.sub_fichas.findIndex(s => s.id === sf.id);
+        if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
+        if (!subSf && sfIdxInDish > 0) subSf = detectSubref(dish, sfIdxInDish, ing.insumo_name);
+        if (subSf) nameLabel = `↪ ${nameLabel} (preparo)`;
+        else if (ing.variation_name) nameLabel = `${nameLabel} — ${ing.variation_name}`;
+        return [nameLabel, f.text, f.unit, ing.observacao || ''];
+      });
+      if (ingRows.length > 0) {
+        docPdf.autoTable({
+          startY: y,
+          margin: { left: margin, right: margin },
+          head: [['Ingrediente', 'Qtd', 'Un.', 'Obs.']],
+          body: ingRows,
+          theme: 'grid',
+          headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
+          bodyStyles: { fontSize: 9, cellPadding: 1.5 },
+          columnStyles: { 1: { halign: 'right', cellWidth: 22 }, 2: { cellWidth: 14 }, 3: { cellWidth: 50, textColor: [100, 100, 100] } }
+        });
+        y = docPdf.lastAutoTable.finalY + 4;
+      }
+
+      // Modo de preparo
+      if (sf.modo_preparo && sf.modo_preparo.trim()) {
+        ensureSpace(12);
+        docPdf.setFont('times', 'bold').setFontSize(10).setTextColor(40);
+        docPdf.text('Modo de preparo', margin, y); y += 4;
+        docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(60);
+        const textWidth = pageWidth - 2 * margin;
+        const lines = docPdf.splitTextToSize(sf.modo_preparo, textWidth);
+        lines.forEach(line => {
+          ensureSpace(4.5);
+          docPdf.text(line, margin, y); y += 4.2;
+        });
+        y += 2;
+      } else {
+        y += 1;
+      }
+      y += 3;
     });
-    y += 3;
   });
 
-  // Lista de compras
-  const shopping = window.__prodBuildShopping ? window.__prodBuildShopping() : [];
-  if (shopping.length > 0) {
-    if (y > 220) { docPdf.addPage(); y = margin; }
-    docPdf.setFont('times', 'normal').setFontSize(14).setTextColor(20);
-    docPdf.text('Lista de compras consolidada', margin, y); y += 5;
-    docPdf.autoTable({
-      startY: y, margin: { left: margin, right: margin },
-      head: [['Insumo', 'Qtd total']],
-      body: shopping.map(r => {
-        const norm = normUnitForDisplay(r.qty, r.unit);
-        const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
-        return [label, `${norm.text} ${norm.unit}`.trim()];
-      }),
-      theme: 'plain',
-      headStyles: { fillColor: [247, 245, 238], textColor: [80, 80, 80], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: { 1: { halign: 'right' } }
-    });
-  }
-  docPdf.save(`producao-${new Date().toISOString().slice(0, 10)}.pdf`);
+  docPdf.save(`roteiro-producao-${new Date().toISOString().slice(0, 10)}.pdf`);
   toast('PDF gerado');
 }
 
+// PDF de Requisição: lista única pro estoquista entregar os insumos
 function exportRequisicaoPDF(cid) {
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const margin = 15;
-  let y = margin;
   const pageWidth = docPdf.internal.pageSize.getWidth();
   const cliente = STATE.currentCliente;
+  let y = margin;
+
+  // ── Cabeçalho ──
   docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
   docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
-  docPdf.setFont('times', 'normal').setFontSize(18).setTextColor(20);
-  docPdf.text('Requisição de Estoque', pageWidth / 2, y, { align: 'center' }); y += 7;
-  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(100);
+  docPdf.setFont('times', 'normal').setFontSize(20).setTextColor(20);
+  docPdf.text('Requisição de Estoque', pageWidth / 2, y, { align: 'center' }); y += 8;
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(80);
   docPdf.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
-  docPdf.text(`Responsável: ____________________`, pageWidth - margin - 70, y); y += 8;
+  docPdf.text('Solicitante: ____________________', pageWidth - margin - 70, y); y += 8;
 
-  const shopping = window.__prodBuildShopping ? window.__prodBuildShopping() : [];
+  // ── Resumo da produção (pra estoquista entender o pedido) ──
+  const resumo = buildProdResumoLines();
+  if (resumo.length > 0) {
+    docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
+    docPdf.text('Para a produção de:', margin, y); y += 5;
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(60);
+    resumo.forEach(r => {
+      docPdf.text(`• ${r.name} — ${fmtNum(r.qty, 0)} ${r.unit}`, margin + 2, y); y += 4.5;
+    });
+    y += 4;
+  }
+
+  // ── Tabela de insumos (ordenada alfabeticamente) ──
+  const shopping = (window.__prodBuildShopping ? window.__prodBuildShopping() : [])
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+  if (shopping.length === 0) {
+    docPdf.setFont('helvetica', 'normal').setFontSize(11).setTextColor(80);
+    docPdf.text('Nenhum insumo a solicitar.', margin, y);
+    docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
+    return;
+  }
+
+  docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
+  docPdf.text(`Insumos solicitados (${shopping.length})`, margin, y); y += 4;
+
   docPdf.autoTable({
-    startY: y, margin: { left: margin, right: margin },
-    head: [['Insumo', 'Qtd solicitada', 'Unidade', 'Qtd retirada', 'Assinatura']],
-    body: shopping.map(r => {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [['#', 'Insumo', 'Qtd solic.', 'Un.', 'Qtd retirada', 'Visto']],
+    body: shopping.map((r, i) => {
       const norm = normUnitForDisplay(r.qty, r.unit);
-      return [r.name, norm.text, norm.unit, '', ''];
+      const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
+      return [String(i + 1), label, norm.text, norm.unit, '', ''];
     }),
     theme: 'grid',
-    headStyles: { fillColor: [247, 245, 238], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
+    headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
     bodyStyles: { fontSize: 9, minCellHeight: 9 },
-    columnStyles: { 1: { halign: 'right' }, 3: { halign: 'right' }, 4: { cellWidth: 40 } }
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center', textColor: [130, 130, 130] },
+      2: { cellWidth: 22, halign: 'right' },
+      3: { cellWidth: 14 },
+      4: { cellWidth: 26, halign: 'right' },
+      5: { cellWidth: 26 }
+    }
   });
+
   const finalY = docPdf.lastAutoTable.finalY + 15;
   docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(80);
   docPdf.text('Aprovado por: ____________________', margin, finalY);
-  docPdf.text('Data/hora: ____________________', pageWidth - margin - 70, finalY);
+  docPdf.text('Estoquista: ____________________', pageWidth - margin - 70, finalY);
+  docPdf.setFontSize(8).setTextColor(120);
+  docPdf.text(`Data/hora da retirada: ____________________`, margin, finalY + 6);
+
   docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
   toast('PDF gerado');
 }
