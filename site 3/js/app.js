@@ -174,6 +174,95 @@ const canManageTemplates = (cid) => canEditCliente(cid) || (isClienteUser() && h
 const canManageUsers = () => isMaster();
 const canManageClientes = () => isMaster();
 
+// ---------- Trial / assinatura ----------
+const TRIAL_DEFAULT_DAYS = 180; // 6 meses
+function getTrialStatus(cliente) {
+  if (!cliente) return { paid: false, started: false, isBlocked: false };
+  if (cliente.subscription_active === true) {
+    return { paid: true, started: true, isBlocked: false };
+  }
+  if (!cliente.trial_started_at) {
+    return { paid: false, started: false, isBlocked: true };
+  }
+  const startedMs = new Date(cliente.trial_started_at).getTime();
+  if (isNaN(startedMs)) return { paid: false, started: false, isBlocked: true };
+  const days = (typeof cliente.trial_days === 'number' && cliente.trial_days > 0) ? cliente.trial_days : TRIAL_DEFAULT_DAYS;
+  const endsMs = startedMs + days * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const daysLeft = Math.ceil((endsMs - now) / (24 * 60 * 60 * 1000));
+  return {
+    paid: false,
+    started: true,
+    isBlocked: now > endsMs,
+    daysLeft,
+    daysTotal: days,
+    startedAt: cliente.trial_started_at,
+    endsAt: new Date(endsMs).toISOString()
+  };
+}
+function trialGate(cid) {
+  if (isMaster() || isStaff()) return false;
+  const cliente = STATE.currentCliente;
+  if (!cliente || cliente.id !== cid) return false;
+  const status = getTrialStatus(cliente);
+  if (status.paid) return false;
+  if (!status.started) { renderTrialNotStarted(cliente); return true; }
+  if (status.isBlocked) { renderTrialExpired(cliente, status); return true; }
+  return false;
+}
+function renderTrialBanner(cid) {
+  const cliente = STATE.currentCliente;
+  if (!cliente || cliente.id !== cid) return null;
+  const status = getTrialStatus(cliente);
+  if (status.paid) return null;
+  if (!status.started) {
+    if (!(isMaster() || isStaff())) return null;
+    return el('div', { class: 'trial-banner trial-banner-warning' },
+      'Avaliação não iniciada para este restaurante. ',
+      el('a', { href: `#/c/${cid}/admin` }, 'Configurar →')
+    );
+  }
+  if (status.daysLeft > 30) return null;
+  const isCritical = status.daysLeft <= 1;
+  const isUrgent = status.daysLeft <= 7;
+  const cls = 'trial-banner ' + (isCritical ? 'trial-banner-critical' : (isUrgent ? 'trial-banner-urgent' : 'trial-banner-warning'));
+  let msg;
+  if (status.daysLeft <= 0) msg = 'Avaliação termina hoje';
+  else if (status.daysLeft === 1) msg = 'Avaliação termina amanhã';
+  else msg = `Faltam ${status.daysLeft} dias na avaliação`;
+  return el('div', { class: cls }, msg);
+}
+function renderTrialNotStarted(cliente) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'trial-block' },
+    el('div', { class: 'trial-block-card' },
+      el('h1', {}, 'Acesso ainda não liberado'),
+      el('p', {}, 'O período de avaliação deste restaurante ainda não foi iniciado.'),
+      cliente.consultor_name ? el('p', { class: 'muted' }, 'Entre em contato com ',
+        el('strong', {}, cliente.consultor_name),
+        cliente.consultor_info ? ' · ' + cliente.consultor_info : ''
+      ) : null,
+      el('button', { class: 'btn', onclick: doLogout }, 'Sair')
+    )
+  ));
+}
+function renderTrialExpired(cliente, status) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'trial-block' },
+    el('div', { class: 'trial-block-card' },
+      el('h1', {}, 'Avaliação encerrada'),
+      el('p', {}, `Sua avaliação gratuita de ${status.daysTotal} dias chegou ao fim.`),
+      el('p', {}, 'Para continuar usando o sistema, entre em contato para ativar sua assinatura.'),
+      cliente.consultor_name ? el('p', { class: 'consultor-line' }, el('strong', {}, cliente.consultor_name),
+        cliente.consultor_info ? ' · ' + cliente.consultor_info : ''
+      ) : null,
+      el('button', { class: 'btn', onclick: doLogout }, 'Sair')
+    )
+  ));
+}
+
 // ---------- Firestore paths ----------
 const dishesCol = (cid) => collection(db, 'clientes', cid, 'dishes');
 const dishDoc = (cid, did) => doc(db, 'clientes', cid, 'dishes', did);
@@ -366,15 +455,19 @@ function openEditClienteModal(cliente) {
         showToggle,
         el('span', { style: 'font-size:0.9rem;color:#4a4a4a;' }, 'Exibir info da consultoria no site e exports')
       ),
+      buildTrialBlock(cliente),
       el('div', { class: 'modal-actions' },
         el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
         el('button', { class: 'btn btn-primary', onclick: async () => {
+          const trialBlock = modal.querySelector('.trial-block-fields');
+          const trialValues = trialBlock && typeof trialBlock.__getValues === 'function' ? trialBlock.__getValues() : {};
           const updated = {
             ...cliente,
             name: nameInput.value.trim() || cliente.name,
             consultor_name: consultorNameInput.value.trim(),
             consultor_info: consultorInfoInput.value.trim(),
-            show_consultor: showToggle.checked
+            show_consultor: showToggle.checked,
+            ...trialValues
           };
           try {
             await saveCliente(updated);
@@ -387,6 +480,45 @@ function openEditClienteModal(cliente) {
     )
   );
   document.body.appendChild(modal);
+}
+
+// Bloco editável de trial/assinatura no modal de cliente (master)
+function buildTrialBlock(cliente) {
+  const wrap = el('div', { class: 'trial-block-fields' });
+  wrap.appendChild(el('h3', { style: 'margin-top:1.5rem;margin-bottom:0.5rem;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:#888;font-family:Inter,sans-serif;font-weight:500;' }, 'Assinatura'));
+  const status = getTrialStatus(cliente);
+  let statusLine;
+  if (status.paid) statusLine = el('span', { style: 'color:#177c4a;font-weight:600;' }, '● Assinatura ativa (sem expiração)');
+  else if (!status.started) statusLine = el('span', { style: 'color:#888;' }, '○ Avaliação não iniciada');
+  else if (status.isBlocked) statusLine = el('span', { style: 'color:#b1272e;font-weight:600;' }, `✕ Avaliação expirada em ${new Date(status.endsAt).toLocaleDateString('pt-BR')}`);
+  else statusLine = el('span', { style: 'color:#8a6b40;font-weight:600;' }, `● Em avaliação · ${status.daysLeft} dia(s) restantes (até ${new Date(status.endsAt).toLocaleDateString('pt-BR')})`);
+  wrap.appendChild(el('p', { class: 'muted', style: 'font-size:0.9rem;margin-bottom:0.75rem;' }, statusLine));
+
+  const daysInput = el('input', { type: 'number', min: '1', step: '1', value: (typeof cliente.trial_days === 'number' && cliente.trial_days > 0) ? cliente.trial_days : TRIAL_DEFAULT_DAYS });
+  const subToggle = el('input', { type: 'checkbox' });
+  if (cliente.subscription_active === true) subToggle.setAttribute('checked', '');
+  const startedInput = el('input', { type: 'date', value: cliente.trial_started_at ? new Date(cliente.trial_started_at).toISOString().slice(0, 10) : '' });
+
+  wrap.appendChild(el('div', { class: 'form-grid' },
+    el('label', { class: 'field' },
+      el('span', { class: 'label-text' }, 'Duração da avaliação (dias)'), daysInput),
+    el('label', { class: 'field' },
+      el('span', { class: 'label-text' }, 'Avaliação iniciada em'), startedInput)
+  ));
+  wrap.appendChild(el('div', { style: 'display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;' },
+    el('button', { class: 'btn btn-small', onclick: (e) => { e.preventDefault(); startedInput.value = new Date().toISOString().slice(0, 10); } }, 'Iniciar hoje'),
+    el('button', { class: 'btn btn-small btn-danger', onclick: (e) => { e.preventDefault(); if (confirm('Resetar avaliação? O cliente será bloqueado até você reiniciar.')) { startedInput.value = ''; subToggle.checked = false; } } }, 'Resetar')
+  ));
+  wrap.appendChild(el('label', { class: 'field', style: 'display:flex;flex-direction:row;align-items:center;gap:0.6rem;margin-top:0.75rem;' },
+    subToggle,
+    el('span', { style: 'font-size:0.9rem;color:#4a4a4a;' }, 'Assinatura ativa (pago — libera sem expiração)')
+  ));
+  wrap.__getValues = () => ({
+    trial_days: parseInt(daysInput.value, 10) || TRIAL_DEFAULT_DAYS,
+    trial_started_at: startedInput.value ? new Date(startedInput.value + 'T12:00:00').toISOString() : null,
+    subscription_active: subToggle.checked
+  });
+  return wrap;
 }
 
 // ---------- Modal unificado para escolher tipo de atualização ----------
@@ -1014,11 +1146,13 @@ async function route() {
     // Wait for loaded
     if (!STATE.loaded) { renderLoadingScreen(); return; }
 
+    // Trial gate: bloqueia cliente fora do master/staff se trial expirado ou não iniciado
+    if (trialGate(cid)) return;
+
     const rest = parts.slice(2);
     if (rest.length === 0) {
       // Se equipe sem permissão pra cardápio, manda pra primeira aba disponível
       if (isEquipe() && !canViewCardapio(cid)) {
-        if (canCountStock(cid)) { location.hash = `#/c/${cid}/estoque`; return; }
         if (canViewProducao(cid)) { location.hash = `#/c/${cid}/producao`; return; }
         if (canViewInsumosTab(cid)) { location.hash = `#/c/${cid}/insumos`; return; }
         renderNoAccess(); return;
@@ -1038,8 +1172,9 @@ async function route() {
       renderProducao(cid); return;
     }
     if (rest[0] === 'estoque') {
-      if (!canCountStock(cid)) { renderNoAccess(); return; }
-      renderEstoque(cid, rest.slice(1)); return;
+      // Aba Estoque desativada — redireciona pro cardápio
+      location.hash = `#/c/${cid}`;
+      return;
     }
     if (rest[0] === 'admin') {
       if (!canEditCliente(cid)) { renderNoAccess(); return; }
@@ -1179,9 +1314,15 @@ async function renderClientesAdmin() {
 
   const grid = el('div', { class: 'cliente-admin-grid' });
   STATE.clientes.forEach(c => {
+    const tStatus = getTrialStatus(c);
+    let badge = null;
+    if (tStatus.paid) badge = el('span', { class: 'cliente-trial-badge paid' }, '● Pago');
+    else if (!tStatus.started) badge = el('span', { class: 'cliente-trial-badge not-started' }, '○ Não iniciado');
+    else if (tStatus.isBlocked) badge = el('span', { class: 'cliente-trial-badge expired' }, '✕ Expirado');
+    else badge = el('span', { class: 'cliente-trial-badge active' }, `● ${tStatus.daysLeft}d`);
     const card = el('article', { class: 'cliente-admin-card' },
       el('div', { class: 'cc-head' },
-        el('h4', { class: 'cc-name' }, c.name),
+        el('h4', { class: 'cc-name' }, c.name, ' ', badge),
         el('span', { class: 'cc-id' }, c.id)
       ),
       el('div', { class: 'cc-actions' },
@@ -1833,20 +1974,20 @@ function renderClienteContext(cid) {
   if (isMaster() || isStaff()) {
     wrap.appendChild(el('a', { href: '#/clientes', class: 'cliente-back' }, '← Todos os restaurantes'));
   }
+  // Banner de trial (se aplicável)
+  const trialBanner = renderTrialBanner(cid);
+  if (trialBanner) wrap.appendChild(trialBanner);
   // Tabs com active state baseado na rota atual
   const hash = location.hash.slice(1) || '/';
   const isAdmin = hash.includes(`/c/${cid}/admin`);
   const isInsumos = hash.includes(`/c/${cid}/insumos`);
   const isProducao = hash.includes(`/c/${cid}/producao`);
-  const isEstoque = hash.includes(`/c/${cid}/estoque`);
-  const isCardapio = !isAdmin && !isInsumos && !isProducao && !isEstoque;
+  const isCardapio = !isAdmin && !isInsumos && !isProducao;
   const tabs = el('nav', { class: 'cliente-tabs' },
     canViewCardapio(cid) ? el('a', { class: 'cliente-tab' + (isCardapio ? ' active' : ''), href: `#/c/${cid}` },
       el('span', { class: 'tab-icon' }, '◉'), 'Cardápio') : null,
     canViewProducao(cid) ? el('a', { class: 'cliente-tab' + (isProducao ? ' active' : ''), href: `#/c/${cid}/producao` },
       el('span', { class: 'tab-icon' }, '▲'), 'Produção') : null,
-    canCountStock(cid) ? el('a', { class: 'cliente-tab' + (isEstoque ? ' active' : ''), href: `#/c/${cid}/estoque` },
-      el('span', { class: 'tab-icon' }, '▣'), 'Estoque') : null,
     canViewInsumosTab(cid) ? el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
       el('span', { class: 'tab-icon' }, '◎'), 'Insumos') : null,
     canEditCliente(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
@@ -4250,7 +4391,7 @@ function renderAdminEdit(cid, dishId) {
       );
       box.appendChild(summary);
       box.appendChild(el('div', { class: 'form-grid' },
-          fieldInput('Nome da preparação', 'text', sf.name, v => sf.name = v),
+          fieldSubfichaNameInput(dish, sf),
           fieldInput('Rendimento (quantidade)', 'number', sf.rendimento_qty ?? '', v => {
             const n = parseFloat(v);
             sf.rendimento_qty = isNaN(n) ? null : n;
@@ -4605,6 +4746,56 @@ async function saveDishAction(cid, dish, originalId) {
     toast('Salvo');
     location.hash = `#/c/${cid}/ficha/${dish.id}`;
   } catch (err) { console.error(err); toast('Erro: ' + err.message); }
+}
+
+// Input específico para nome de sub-ficha — alerta quando rename vai quebrar vínculos por nome
+function fieldSubfichaNameInput(dish, sf, onAfterMigrate) {
+  const wrap = el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome da preparação'));
+  const input = el('input', { type: 'text', value: sf.name ?? '' });
+  const hint = el('div', { class: 'rename-hint', style: 'display:none;' });
+  let originalName = sf.name || '';
+  function checkRefs() {
+    const newName = sf.name || '';
+    if (nrm(newName) === nrm(originalName)) { hint.style.display = 'none'; return; }
+    const sfIdx = dish.sub_fichas.findIndex(s => s.id === sf.id);
+    if (sfIdx < 0) { hint.style.display = 'none'; return; }
+    const matches = [];
+    const oldClean = nrm(originalName);
+    if (oldClean.length < 4) { hint.style.display = 'none'; return; }
+    for (let j = sfIdx + 1; j < dish.sub_fichas.length; j++) {
+      const consumer = dish.sub_fichas[j];
+      for (const ing of consumer.ingredientes || []) {
+        if (ing.subref_id) continue;
+        const ingClean = nrm(ing.insumo_name);
+        if (ingClean.length < 4) continue;
+        if (oldClean === ingClean) { matches.push({ consumer, ing }); continue; }
+        if (oldClean.includes(ingClean) || ingClean.includes(oldClean)) {
+          const ratio = Math.min(oldClean.length, ingClean.length) / Math.max(oldClean.length, ingClean.length);
+          if (ratio > 0.55) matches.push({ consumer, ing });
+        }
+      }
+    }
+    if (matches.length === 0) { hint.style.display = 'none'; return; }
+    hint.innerHTML = '';
+    hint.style.display = '';
+    hint.appendChild(el('span', { class: 'rename-hint-text' },
+      `⚠ ${matches.length} ingrediente(s) em outras preparações vinculam aqui pelo nome antigo "${originalName}". Renomear sem migrar vai quebrar o vínculo.`
+    ));
+    const btn = el('button', { class: 'btn btn-small btn-accent', onclick: (e) => {
+      e.preventDefault();
+      matches.forEach(({ ing }) => { ing.subref_id = sf.id; });
+      toast(`${matches.length} vínculo(s) convertido(s) para manual`);
+      hint.style.display = 'none';
+      originalName = sf.name;
+      if (typeof onAfterMigrate === 'function') onAfterMigrate();
+    } }, `Vincular manualmente (${matches.length})`);
+    hint.appendChild(btn);
+  }
+  input.addEventListener('input', () => { sf.name = input.value; });
+  input.addEventListener('blur', checkRefs);
+  wrap.appendChild(input);
+  wrap.appendChild(hint);
+  return wrap;
 }
 
 function fieldInput(label, type, value, onChange) {

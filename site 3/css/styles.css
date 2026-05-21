@@ -1918,6 +1918,77 @@ label.field textarea { min-height: 90px; resize: vertical; }
   background: #f7f3e8;
 }
 .ingredient-row .subref-select option[value=""] { color: #aaa; }
+
+/* ─── Trial / Assinatura ─── */
+.trial-banner {
+  padding: 0.55rem 1rem;
+  margin: 0 0 0.75rem 0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.trial-banner a {
+  color: inherit;
+  text-decoration: underline;
+  margin-left: 0.4rem;
+  font-weight: 600;
+}
+.trial-banner-warning { background: #fef6e0; color: #8a6b40; border: 1px solid #e9d3a0; }
+.trial-banner-urgent { background: #fde9d0; color: #a64f10; border: 1px solid #f0b67c; }
+.trial-banner-critical { background: #fbd8d5; color: #a31e1e; border: 1px solid #ed9892; }
+
+.trial-block {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.trial-block-card {
+  background: #fff;
+  border: 1px solid #e0ddd2;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  max-width: 480px;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+}
+.trial-block-card h1 { font-size: 1.4rem; margin-bottom: 1rem; color: #2a2a2a; }
+.trial-block-card p { margin-bottom: 0.8rem; color: #4a4a4a; line-height: 1.55; }
+.trial-block-card p.consultor-line { margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #efece4; font-size: 0.95rem; }
+.trial-block-card .btn { margin-top: 1.2rem; }
+
+/* badge na lista de clientes (admin) */
+.cliente-trial-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-left: 0.5rem;
+}
+.cliente-trial-badge.paid { background: #d8efe0; color: #177c4a; }
+.cliente-trial-badge.active { background: #fef6e0; color: #8a6b40; }
+.cliente-trial-badge.expired { background: #fbd8d5; color: #a31e1e; }
+.cliente-trial-badge.not-started { background: #efece4; color: #8a8a8a; }
+
+/* aviso de rename de sub-ficha */
+.rename-hint {
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  background: #fef6e0;
+  border: 1px solid #e9d3a0;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+}
+.rename-hint-text { color: #8a6b40; flex: 1; min-width: 200px; line-height: 1.4; }
 .ingredient-row .var-select:invalid, .ingredient-row .var-select option[value=""] {
   color: #aaa;
 }
