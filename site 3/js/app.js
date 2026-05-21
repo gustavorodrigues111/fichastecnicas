@@ -1589,7 +1589,7 @@ function getSfRendimento(sf) {
   if (typeof sf.rendimento_qty === 'number' && sf.rendimento_qty > 0) {
     return { qty: sf.rendimento_qty, unit: (sf.rendimento_unit || '').toLowerCase().trim() };
   }
-  return getSfRendimento(sf);
+  return parseRendimentoQty(sf.rendimento);
 }
 function sfRendimentoText(sf, scale = 1) {
   const r = getSfRendimento(sf);
