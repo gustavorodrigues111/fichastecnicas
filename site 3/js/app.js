@@ -1727,20 +1727,21 @@ function computeCascadeScales(dish, finalTargetQty) {
     visited.add(sfId);
     const sf = dish.sub_fichas.find(s => s.id === sfId);
     if (!sf) return;
+    const sfIdx = dish.sub_fichas.findIndex(s => s.id === sfId);
     for (const ing of sf.ingredientes || []) {
-      if (ing.subref_id) {
-        const ref = dish.sub_fichas.find(s => s.id === ing.subref_id);
-        if (!ref) continue;
-        const refRend = getSfRendimento(ref);
-        if (refRend.qty <= 0 || ing.qty == null) continue;
-        // Normalize units (ing.unit and refRend.unit)
-        const [qC] = normalizeSubrefQty(ing.qty, ing.unit, refRend.unit);
-        const needed = qC * scale;
-        const refScale = needed / refRend.qty;
-        // Accumulate (multiple sub-fichas could reference the same)
-        scales[ref.id] = (scales[ref.id] || 0) + refScale;
-        propagate(ref.id, refScale, visited);
-      }
+      let ref = null;
+      if (ing.subref_id) ref = dish.sub_fichas.find(s => s.id === ing.subref_id);
+      if (!ref && sfIdx > 0) ref = detectSubref(dish, sfIdx, ing.insumo_name);
+      if (!ref) continue;
+      const refRend = getSfRendimento(ref);
+      if (refRend.qty <= 0 || ing.qty == null) continue;
+      // Normalize units (ing.unit and refRend.unit)
+      const [qC] = normalizeSubrefQty(ing.qty, ing.unit, refRend.unit);
+      const needed = qC * scale;
+      const refScale = needed / refRend.qty;
+      // Accumulate (multiple sub-fichas could reference the same)
+      scales[ref.id] = (scales[ref.id] || 0) + refScale;
+      propagate(ref.id, refScale, visited);
     }
   }
   propagate(finalSf.id, finalScale);
