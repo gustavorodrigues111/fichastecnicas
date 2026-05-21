@@ -723,17 +723,18 @@ tr.row-subproduto .num { color: #8a7050; }
   flex-wrap: wrap;
 }
 .prod-qty-input {
-  width: 70px;
+  width: 80px;
   padding: 0.4rem 0.6rem;
   border: 1px solid #d8d5cb;
   font-family: inherit;
   text-align: right;
 }
-.prod-unit-input {
-  width: 100px;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #d8d5cb;
-  font-family: inherit;
+.prod-unit-fixed {
+  font-size: 0.88rem;
+  color: #6a6a6a;
+  font-weight: 500;
+  min-width: 50px;
+  padding: 0.4rem 0;
 }
 .prod-scale {
   font-size: 0.85rem;

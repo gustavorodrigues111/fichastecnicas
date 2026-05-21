@@ -3505,19 +3505,20 @@ function renderProducao(cid) {
         ),
         el('div', { class: 'prod-item-controls' },
           (() => {
-            const qtyInput = el('input', { type: 'number', step: '0.01', min: '0', value: item.targetQty || '' , class: 'prod-qty-input', placeholder: 'Qty' });
+            // Garante que a unidade-alvo é sempre a unidade da ficha final cadastrada
+            item.targetUnit = origRend.unit || item.targetUnit || '';
+            const qtyInput = el('input', { type: 'text', inputmode: 'decimal', value: item.targetQty ? String(item.targetQty).replace('.', ',') : '', class: 'prod-qty-input', placeholder: '0' });
+            // Atualiza estado em cada keystroke, mas só faz o recompute pesado no blur/change
+            // (recompute destrói o input e perderia o foco)
             qtyInput.addEventListener('input', () => {
-              const v = parseFloat(qtyInput.value);
+              const v = parseFloat(qtyInput.value.replace(',', '.'));
               item.targetQty = isNaN(v) ? 0 : v;
-              recompute();
             });
+            qtyInput.addEventListener('change', () => recompute());
+            qtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qtyInput.blur(); } });
             return qtyInput;
           })(),
-          (() => {
-            const unitInput = el('input', { type: 'text', value: item.targetUnit || '', class: 'prod-unit-input', placeholder: 'kg / porções' });
-            unitInput.addEventListener('input', () => { item.targetUnit = unitInput.value.trim().toLowerCase(); recompute(); });
-            return unitInput;
-          })(),
+          el('span', { class: 'prod-unit-fixed' }, origRend.unit || ''),
           el('span', { class: 'prod-scale muted' }, scale > 0 ? `${fmtNum(scale, 2)}×` : '—'),
           el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)),
           el('button', { class: 'btn btn-small btn-danger', onclick: () => {
