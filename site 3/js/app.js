@@ -2523,17 +2523,39 @@ function renderFicha(cid, dishId, initialSfId = null) {
     app.appendChild(el('div', { class: 'consultor-credit-ficha' }, text));
   }
 
-  // Top action bar — view toggle + exports (sticky)
+  // Top action bar — view toggle + exports (mesma linha, mesmo tamanho)
   const toggle = el('div', { class: 'view-toggle' },
     el('button', { 'data-view': 'trabalho' }, 'Trabalho'),
     el('button', { 'data-view': 'custo' }, 'Custo')
   );
   const exports = el('div', { class: 'export-actions' },
-    el('button', { class: 'btn btn-small', title: 'Exportar PDF', onclick: () => exportFichaPDF(dish, state) }, '📄 PDF'),
-    el('button', { class: 'btn btn-small', title: 'Exportar Excel', onclick: () => exportFichaXLSX(dish, state) }, '📊 Excel')
+    el('button', { class: 'btn', title: 'Exportar PDF', onclick: () => exportFichaPDF(dish, state) }, 'PDF'),
+    el('button', { class: 'btn', title: 'Exportar Excel', onclick: () => exportFichaXLSX(dish, state) }, 'Excel')
   );
   const actionBar = el('div', { class: 'ficha-action-bar' }, toggle, exports);
   app.appendChild(actionBar);
+
+  // Resumo de custo — aparece quando view === 'custo'
+  const costSummaryBar = el('div', { class: 'cost-summary-bar', style: 'display:none;' });
+  app.appendChild(costSummaryBar);
+  function renderCostSummary() {
+    const c = dishCost(dish);
+    costSummaryBar.innerHTML = '';
+    if (state.view !== 'custo') { costSummaryBar.style.display = 'none'; return; }
+    costSummaryBar.style.display = '';
+    const metrics = [
+      { label: 'Custo / porção', value: fmtBRL(c.costPerPortion), tone: 'neutral' },
+      { label: 'CMV', value: c.cmv ? fmtNum(c.cmv, 1) + '%' : '—', tone: 'neutral' },
+      { label: 'Markup', value: c.markup ? fmtNum(c.markup, 0) + '%' : '—', tone: 'neutral' },
+      { label: 'Preço sugerido', value: fmtBRL(c.suggestedPrice), tone: 'accent' }
+    ];
+    metrics.forEach(m => {
+      costSummaryBar.appendChild(el('div', { class: 'cost-metric cost-metric-' + m.tone },
+        el('span', { class: 'cost-metric-label' }, m.label),
+        el('strong', { class: 'cost-metric-value' }, m.value)
+      ));
+    });
+  }
 
   if (dish.photos && dish.photos.length) {
     const gallery = el('div', { class: 'gallery' });
@@ -2598,6 +2620,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
   function updateBody() {
     $$('.view-toggle button', toggle).forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
     scaleBar.style.display = state.view === 'trabalho' ? '' : 'none';
+    renderCostSummary();
     body.innerHTML = '';
     if (state.view === 'trabalho') {
       // Ordem invertida: prato final primeiro, depois preparações
