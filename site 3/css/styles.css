@@ -150,20 +150,11 @@ input::placeholder, textarea::placeholder { color: var(--text4); }
 /* ============ Header ============ */
 .site-header {
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background-color: #ffffff;
   position: sticky;
   top: 0;
   z-index: 50;
-  /* Sombra sutil aparece só quando o conteúdo passa atrás */
   box-shadow: var(--shadow-sm);
-}
-/* Pra evitar conteúdo "vazando" por baixo, garante opacidade sólida */
-.site-header::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--bg);
-  z-index: -1;
 }
 .header-inner {
   display: flex;
