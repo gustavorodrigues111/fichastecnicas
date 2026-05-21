@@ -2093,6 +2093,23 @@ label.field textarea { min-height: 90px; resize: vertical; }
   color: #5a5a5a;
   margin-top: 2px;
 }
+.disabled-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 2px 8px;
+  background: #f0eee5;
+  color: #6a6a6a;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.user-card-disabled {
+  opacity: 0.6;
+  background: #fafaf6 !important;
+}
+.user-card-disabled .user-name { text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.2); }
 
 /* Modal de opções da requisição */
 .req-options {

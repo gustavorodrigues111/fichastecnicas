@@ -1158,6 +1158,12 @@ async function route() {
     return;
   }
 
+  // Usuário desativado (soft delete)
+  if (STATE.userDoc.disabled === true) {
+    renderUserDisabled();
+    return;
+  }
+
   // First-login: força troca de senha antes de qualquer rota
   if (STATE.userDoc.mustChangePassword) {
     renderForcePasswordChange();
@@ -1278,6 +1284,19 @@ function renderNoAccess() {
     el('h1', {}, 'Acesso negado'),
     el('p', { class: 'subtitle' }, 'Você não tem permissão para ver essa página.'),
     el('a', { class: 'btn', href: '#/' }, 'Voltar ao início')
+  ));
+}
+
+function renderUserDisabled() {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'trial-block' },
+    el('div', { class: 'trial-block-card' },
+      el('h1', {}, 'Acesso desativado'),
+      el('p', {}, 'Seu acesso ao sistema foi desativado por um administrador.'),
+      el('p', { class: 'muted' }, 'Entre em contato com a consultoria para regularizar.'),
+      el('button', { class: 'btn', onclick: doLogout }, 'Sair')
+    )
   ));
 }
 
@@ -1516,11 +1535,12 @@ function roleLabel(role) {
 
 function renderUserCard(u) {
   const isMe = u.uid === STATE.user?.uid;
-  const card = el('article', { class: 'user-card' });
+  const card = el('article', { class: 'user-card' + (u.disabled ? ' user-card-disabled' : '') });
   const head = el('div', { class: 'user-card-head' },
     el('div', { class: 'user-id' },
       el('h4', { class: 'user-name' }, u.name || '—',
-        u.mustChangePassword ? el('span', { class: 'pending-badge', title: 'Usuário ainda não fez o primeiro login (não trocou a senha temporária)' }, '⏳ aguarda 1º login') : null
+        u.disabled ? el('span', { class: 'disabled-badge', title: 'Usuário desativado — não consegue acessar o sistema' }, '⏸ inativo') : null,
+        !u.disabled && u.mustChangePassword ? el('span', { class: 'pending-badge', title: 'Usuário ainda não fez o primeiro login (não trocou a senha temporária)' }, '⏳ aguarda 1º login') : null
       ),
       el('span', { class: 'user-email' }, u.email),
       u.whatsapp ? el('span', { class: 'user-whatsapp' }, '📱 ' + u.whatsapp) : null
@@ -1551,13 +1571,30 @@ function renderUserCard(u) {
   const actions = el('div', { class: 'user-actions' });
   if (isMe) {
     actions.appendChild(el('span', { class: 'muted' }, '(você)'));
+  } else if (u.disabled) {
+    // Usuário desativado: botão de reativar + remoção definitiva
+    actions.appendChild(el('button', { class: 'btn btn-small btn-primary', onclick: async () => {
+      try {
+        await setDoc(doc(db, 'users', u.uid), { disabled: deleteField(), disabledAt: deleteField(), reactivatedAt: new Date().toISOString() }, { merge: true });
+        toast('Usuário reativado');
+        renderUsuariosAdmin();
+      } catch (err) { alert('Erro ao reativar: ' + (err.message || err.code)); }
+    } }, '↻ Reativar'));
+    actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+      if (!confirm(`Excluir DEFINITIVAMENTE o registro de ${u.email}?\n\nEssa ação apaga o doc no Firestore. A conta de email no Firebase Auth continua existindo (limitação técnica — só pode ser apagada no console do Firebase).\n\nSe a pessoa tentar criar conta nova com este email vai dar conflito. Recomendado: usar Reativar em vez de excluir.\n\nContinuar mesmo assim?`)) return;
+      try { await deleteDoc(doc(db, 'users', u.uid)); toast('Excluído'); renderUsuariosAdmin(); }
+      catch (err) { alert('Erro: ' + (err.message || err.code)); }
+    } }, '✕ Excluir definitivo'));
   } else {
     actions.appendChild(el('button', { class: 'btn btn-small btn-primary', onclick: () => openEditUserModal(u) }, 'Editar'));
     actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-      if (!confirm(`Remover acesso de ${u.email}?\n\nIsso só remove permissões no site. A conta no Firebase Auth permanece — delete lá também se quiser banir de vez.`)) return;
-      try { await deleteDoc(doc(db, 'users', u.uid)); toast('Removido'); renderUsuariosAdmin(); }
-      catch (err) { toast('Erro: ' + err.message); }
-    } }, 'Remover'));
+      if (!confirm(`Desativar acesso de ${u.email}?\n\nA pessoa perde o acesso ao sistema imediatamente, mas o registro fica salvo (pode ser reativado a qualquer momento sem precisar recriar).`)) return;
+      try {
+        await setDoc(doc(db, 'users', u.uid), { disabled: true, disabledAt: new Date().toISOString() }, { merge: true });
+        toast('Usuário desativado');
+        renderUsuariosAdmin();
+      } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+    } }, 'Desativar'));
   }
   card.appendChild(actions);
   return card;
@@ -1688,6 +1725,31 @@ function generateTempPassword() {
 }
 
 async function inviteUser(email, name, role, clienteIds, whatsapp) {
+  // 1) Antes de criar no Auth, verifica se já existe doc Firestore com esse email (caso de soft-delete anterior)
+  try {
+    const existingSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+    if (!existingSnap.empty) {
+      const existingDoc = { uid: existingSnap.docs[0].id, ...existingSnap.docs[0].data() };
+      if (existingDoc.disabled) {
+        if (!confirm(`O email ${email} já tem conta no sistema (foi desativada antes).\n\nDeseja REATIVAR essa conta com os novos dados (nome, papel, restaurantes, WhatsApp)?\n\nA senha continuará a mesma que a pessoa já usava. Se ela esqueceu, use "Enviar reset de senha" depois.`)) return;
+        await setDoc(doc(db, 'users', existingDoc.uid), {
+          ...existingDoc,
+          name, role, clienteIds,
+          whatsapp: whatsapp || '',
+          disabled: deleteField(),
+          disabledAt: deleteField(),
+          reactivatedAt: new Date().toISOString()
+        }, { merge: true });
+        toast('Usuário reativado com novos dados');
+        renderUsuariosAdmin();
+        return;
+      } else {
+        alert(`Este email já tem conta ATIVA no sistema. Use o botão "Editar" no card do usuário para alterar dados, ou "Enviar reset de senha".`);
+        return;
+      }
+    }
+  } catch (err) { console.warn('check existing user:', err); }
+
   const tempPw = generateTempPassword();
   // Usa app secundário pra não afetar a sessão do master
   const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + uid());
@@ -1699,7 +1761,8 @@ async function inviteUser(email, name, role, clienteIds, whatsapp) {
     await signOut(secondaryAuth);
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
-      alert('Este email já tem conta no sistema. Use o botão "Resetar senha" no card do usuário.');
+      // Auth tem conta mas não tem doc Firestore — só dá pra resolver via console
+      alert(`Este email já tem conta no Firebase Auth, mas não tem registro no sistema (provavelmente foi excluído definitivamente antes).\n\nPra resolver, escolha um dos caminhos:\n• Use outro email para criar o novo usuário\n• Ou peça pro consultor remover o email do console do Firebase (admin → Authentication)`);
       return;
     }
     if (err.code === 'auth/weak-password') {
