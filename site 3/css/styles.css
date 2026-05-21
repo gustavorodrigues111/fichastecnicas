@@ -477,30 +477,40 @@ main { padding: 3rem 0 4rem; flex: 1; }
 }
 .gallery .photo img { width: 100%; height: 100%; object-fit: cover; }
 
-/* Toggle views */
+/* Toggle views — segmented control estilo planejamento.app */
 .view-toggle {
-  display: flex;
-  justify-content: center;
+  display: inline-flex;
   margin-bottom: 2rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 3px;
   gap: 0;
-  border: 1px solid var(--border2);
   width: fit-content;
   margin-left: auto;
   margin-right: auto;
+  justify-content: center;
 }
 .view-toggle button {
   background: transparent;
   border: none;
-  padding: 0.7rem 1.75rem;
+  padding: 0.45rem 1.25rem;
   font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #666;
-  transition: all 0.2s;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text3);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  border-radius: var(--r);
+  cursor: pointer;
+  font-family: inherit;
 }
+.view-toggle button:hover { color: var(--text2); }
 .view-toggle button.active {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Sub-ficha tabs */
