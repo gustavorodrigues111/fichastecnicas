@@ -102,6 +102,31 @@ textarea {
   padding: 0.55rem 0.75rem;
   transition: border-color 0.15s, box-shadow 0.15s;
   line-height: 1.4;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 12px 12px;
+  padding-right: 2rem;
+}
+select optgroup {
+  font-weight: 600;
+  font-style: normal;
+  color: var(--text3);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+select optgroup option {
+  font-weight: 400;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 0.3rem 0.5rem;
 }
 input[type="text"]:focus, input[type="email"]:focus, input[type="tel"]:focus,
 input[type="password"]:focus, input[type="number"]:focus, input[type="search"]:focus,

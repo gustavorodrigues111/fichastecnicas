@@ -1630,12 +1630,17 @@ async function renderUsuariosAdmin() {
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
   const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Minha Equipe — cria/edita fichas e preços (consultoria)'),
-    el('option', { value: 'cliente' }, 'Cliente (dono) — edita preços e cria fichas próprias'),
-    el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente — vê preços, planeja produção'),
-    el('option', { value: 'cliente_op' }, 'Equipe Operacional — só fichas e produção (sem preços)'),
-    el('option', { value: 'master' }, 'Master — acesso total ao sistema')
+    el('optgroup', { label: 'Minha equipe (consultoria)' },
+      el('option', { value: 'master' }, 'Master — acesso total ao sistema'),
+      el('option', { value: 'staff' }, 'Equipe — cria/edita fichas e preços')
+    ),
+    el('optgroup', { label: 'Lado do cliente (restaurante)' },
+      el('option', { value: 'cliente' }, 'Cliente (dono) — edita preços e cria fichas próprias'),
+      el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente — vê preços, planeja produção'),
+      el('option', { value: 'cliente_op' }, 'Equipe Operacional — só fichas e produção (sem preços)')
+    )
   );
+  roleSelect.value = 'cliente_op';
   const clienteChecks = el('div', { class: 'cliente-chip-picker' });
   STATE.clientes.forEach(c => {
     const input = el('input', { type: 'checkbox', value: c.id, id: 'inv-c-' + c.id });
@@ -1834,12 +1839,18 @@ function openEditUserModal(u) {
   const nameInput = el('input', { type: 'text', value: u.name || '' });
   const whatsInput = el('input', { type: 'tel', value: u.whatsapp || '', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Minha Equipe (consultoria)'),
-    el('option', { value: 'cliente' }, 'Cliente (dono)'),
-    el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente'),
-    el('option', { value: 'cliente_op' }, 'Equipe Operacional do Cliente'),
-    el('option', { value: 'equipe' }, 'Equipe (perfil legado)'),
-    el('option', { value: 'master' }, 'Master')
+    el('optgroup', { label: 'Minha equipe (consultoria)' },
+      el('option', { value: 'master' }, 'Master'),
+      el('option', { value: 'staff' }, 'Equipe (consultoria)')
+    ),
+    el('optgroup', { label: 'Lado do cliente (restaurante)' },
+      el('option', { value: 'cliente' }, 'Cliente (dono)'),
+      el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente'),
+      el('option', { value: 'cliente_op' }, 'Equipe Operacional do Cliente')
+    ),
+    el('optgroup', { label: 'Legado' },
+      el('option', { value: 'equipe' }, 'Equipe (perfil legado)')
+    )
   );
   roleSelect.value = u.role || 'cliente_op';
 
