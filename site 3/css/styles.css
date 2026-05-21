@@ -2407,7 +2407,7 @@ label.field textarea { min-height: 90px; resize: vertical; }
   white-space: nowrap;
   flex-shrink: 0;
 }
-.user-card .role-badge.role-master { background: var(--text); color: var(--bg); }
+.user-card .role-badge.role-master { background: var(--accent-bg); color: var(--accent-text); }
 .user-card .role-badge.role-staff { background: #f0e6d2; color: #8b6d3a; }
 .user-card .role-badge.role-cliente { background: #fef6e0; color: #8a6b40; }
 .user-card .role-badge.role-cliente_admin { background: #e8efdf; color: #5a7a3a; }
@@ -3359,25 +3359,28 @@ label.field textarea { min-height: 90px; resize: vertical; }
 .modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(26,26,26,0.55);
-  backdrop-filter: blur(4px);
+  background: rgba(17, 24, 39, 0.5);
+  z-index: 1;
 }
 .modal-content {
   position: relative;
-  background: var(--bg);
-  padding: 2.5rem;
+  z-index: 2;
+  background-color: #ffffff !important;
+  padding: 1.75rem 1.5rem;
   max-width: 420px;
   width: 100%;
   border: 1px solid var(--border);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  border-radius: var(--r-lg);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
-.modal-content h2 { margin-top: 0; margin-bottom: 0.25rem; }
+.modal-content h2 { margin-top: 0; margin-bottom: 0.25rem; font-size: 1.2rem; }
 .modal-subtitle {
-  color: #888;
-  font-size: 0.9rem;
-  font-style: italic;
+  color: var(--text3);
+  font-size: 0.88rem;
+  font-style: normal;
   font-family: inherit;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.45;
 }
 .modal-actions {
   display: flex;
