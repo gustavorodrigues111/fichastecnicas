@@ -2003,6 +2003,96 @@ label.field textarea { min-height: 90px; resize: vertical; }
   border-radius: 4px;
 }
 .btn-dirty { box-shadow: 0 0 0 3px rgba(212, 166, 71, 0.35); animation: dirtyPulse 1.6s ease-in-out infinite; }
+
+/* Modal de credenciais geradas pra novo usuário */
+.invite-cred-box {
+  background: #faf7f0;
+  border: 1px solid #e9d3a0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.8rem 0;
+}
+.invite-cred-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.4rem 0;
+}
+.invite-cred-row + .invite-cred-row { border-top: 1px dashed #e0d9c2; }
+.invite-cred-label {
+  min-width: 130px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a6b40;
+  font-weight: 600;
+}
+.invite-cred-value {
+  font-family: 'DM Mono', ui-monospace, SFMono-Regular, monospace;
+  font-size: 1rem;
+  color: #2a2a2a;
+  background: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #e9d3a0;
+  letter-spacing: 0.05em;
+}
+.invite-cred-password { font-weight: 700; font-size: 1.1rem; color: #a64f10; }
+.invite-msg {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  padding: 0.7rem;
+  border: 1px solid #d8d5cb;
+  border-radius: 6px;
+  background: #fafaf8;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.invite-cred-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  flex-wrap: wrap;
+}
+
+/* Form de troca de senha forçada */
+.password-change-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.password-change-form .field { text-align: left; }
+.password-change-form input[type=password] {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d8d5cb;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Indicação na lista de usuários */
+.pending-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 2px 8px;
+  background: #fef6e0;
+  color: #8a6b40;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.user-whatsapp {
+  display: block;
+  font-size: 0.82rem;
+  color: #5a5a5a;
+  margin-top: 2px;
+}
 @keyframes dirtyPulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(212, 166, 71, 0.25); }
   50% { box-shadow: 0 0 0 6px rgba(212, 166, 71, 0.12); }

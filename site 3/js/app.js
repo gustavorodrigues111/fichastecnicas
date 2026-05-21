@@ -10,7 +10,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  sendPasswordResetEmail, onAuthStateChanged, signOut
+  sendPasswordResetEmail, onAuthStateChanged, signOut, updatePassword
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // ---------- Firebase config ----------
@@ -1023,6 +1023,59 @@ async function ensureUserDoc(user) {
   }
 }
 
+// Tela de troca obrigatória de senha (primeiro login após convite)
+function renderForcePasswordChange() {
+  const app = $('#app');
+  app.innerHTML = '';
+  const userDoc = STATE.userDoc || {};
+  const box = el('section', { class: 'trial-block' },
+    el('div', { class: 'trial-block-card' },
+      el('h1', {}, 'Defina sua senha'),
+      el('p', {}, 'Bem-vindo(a)' + (userDoc.name ? ', ' + userDoc.name.split(' ')[0] : '') + '!'),
+      el('p', { class: 'muted' }, 'Este é seu primeiro acesso. Crie uma senha pessoal pra continuar.'),
+      (() => {
+        const form = el('form', { class: 'password-change-form', onsubmit: (e) => e.preventDefault() });
+        const newPw = el('input', { type: 'password', placeholder: 'Nova senha (mínimo 6 caracteres)', required: '', minlength: '6' });
+        const confirmPw = el('input', { type: 'password', placeholder: 'Repita a nova senha', required: '', minlength: '6' });
+        const errEl = el('p', { class: 'pw-error', style: 'display:none;color:#a31e1e;font-size:0.85rem;margin-top:0.5rem;' });
+        const submitBtn = el('button', { class: 'btn btn-primary', type: 'submit' }, 'Salvar nova senha');
+        form.appendChild(el('label', { class: 'field', style: 'margin-top:1rem;' }, el('span', { class: 'label-text' }, 'Nova senha'), newPw));
+        form.appendChild(el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Confirmar senha'), confirmPw));
+        form.appendChild(errEl);
+        form.appendChild(submitBtn);
+        function showErr(msg) { errEl.textContent = msg; errEl.style.display = ''; }
+        submitBtn.addEventListener('click', async () => {
+          errEl.style.display = 'none';
+          const a = newPw.value; const b = confirmPw.value;
+          if (a.length < 6) { showErr('Senha precisa ter pelo menos 6 caracteres'); return; }
+          if (a !== b) { showErr('As senhas não conferem'); return; }
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Salvando...';
+          try {
+            await updatePassword(auth.currentUser, a);
+            await setDoc(doc(db, 'users', auth.currentUser.uid), { mustChangePassword: deleteField(), passwordChangedAt: new Date().toISOString() }, { merge: true });
+            if (STATE.userDoc) { delete STATE.userDoc.mustChangePassword; }
+            toast('Senha atualizada');
+            route();
+          } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Salvar nova senha';
+            if (err.code === 'auth/requires-recent-login') {
+              showErr('Sua sessão expirou. Faça login de novo e tente novamente.');
+              setTimeout(() => doLogout(), 2500);
+            } else {
+              showErr('Erro: ' + (err.message || err.code));
+            }
+          }
+        });
+        return form;
+      })(),
+      el('button', { class: 'btn', style: 'margin-top:1rem;', onclick: doLogout }, 'Sair sem trocar')
+    )
+  );
+  app.appendChild(box);
+}
+
 function openLoginModal() {
   $('#login-modal').hidden = false;
   $('#login-email').focus();
@@ -1102,6 +1155,12 @@ async function route() {
   // Logged in but no user doc (not authorized)
   if (!STATE.userDoc) {
     renderUnauthorized();
+    return;
+  }
+
+  // First-login: força troca de senha antes de qualquer rota
+  if (STATE.userDoc.mustChangePassword) {
+    renderForcePasswordChange();
     return;
   }
 
@@ -1395,11 +1454,12 @@ async function renderUsuariosAdmin() {
   // Invite form — cleaner layout
   const invitePanel = el('section', { class: 'admin-panel-card' },
     el('h3', {}, 'Convidar novo usuário'),
-    el('p', { class: 'muted' }, 'Ao salvar, um email será enviado com link para a pessoa definir sua própria senha.')
+    el('p', { class: 'muted' }, 'Ao salvar, o sistema gera uma senha temporária. Você copia ou envia direto pelo WhatsApp. No primeiro login, a pessoa será obrigada a trocar a senha.')
   );
 
+  const nameInput = el('input', { type: 'text', placeholder: 'Nome completo', required: true });
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
-  const nameInput = el('input', { type: 'text', placeholder: 'Nome completo' });
+  const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
     el('option', { value: 'staff' }, 'Equipe — admin completo nos restaurantes atribuídos'),
     el('option', { value: 'cliente' }, 'Cliente — visualiza e edita só preços'),
@@ -1411,26 +1471,29 @@ async function renderUsuariosAdmin() {
     clienteChecks.appendChild(el('label', { class: 'cliente-chip-option', for: 'inv-c-' + c.id }, input, document.createTextNode(c.name)));
   });
   invitePanel.appendChild(el('div', { class: 'form-grid' },
-    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Email'), emailInput),
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
-    el('label', { class: 'field field-wide' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Email'), emailInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'WhatsApp'), whatsInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
   ));
   invitePanel.appendChild(el('label', { class: 'field' },
-    el('span', { class: 'label-text' }, 'Restaurantes autorizados (obrigatório para staff e cliente)'),
+    el('span', { class: 'label-text' }, 'Restaurantes autorizados (obrigatório para Equipe e Cliente)'),
     clienteChecks
   ));
   invitePanel.appendChild(el('div', { class: 'panel-actions' },
     el('button', { class: 'btn btn-primary', onclick: async () => {
       const email = emailInput.value.trim();
       const name = nameInput.value.trim() || email.split('@')[0];
+      const whatsapp = whatsInput.value.trim();
       const role = roleSelect.value;
       const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
-      if (!email) { alert('Informe email'); return; }
+      if (!name) { alert('Informe o nome'); return; }
+      if (!email) { alert('Informe o email'); return; }
       if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
       try {
-        await inviteUser(email, name, role, selected);
+        await inviteUser(email, name, role, selected, whatsapp);
       } catch (err) { alert('Erro: ' + err.message); }
-    } }, 'Enviar convite')
+    } }, 'Criar usuário')
   ));
   app.appendChild(invitePanel);
 
@@ -1456,8 +1519,11 @@ function renderUserCard(u) {
   const card = el('article', { class: 'user-card' });
   const head = el('div', { class: 'user-card-head' },
     el('div', { class: 'user-id' },
-      el('h4', { class: 'user-name' }, u.name || '—'),
-      el('span', { class: 'user-email' }, u.email)
+      el('h4', { class: 'user-name' }, u.name || '—',
+        u.mustChangePassword ? el('span', { class: 'pending-badge', title: 'Usuário ainda não fez o primeiro login (não trocou a senha temporária)' }, '⏳ aguarda 1º login') : null
+      ),
+      el('span', { class: 'user-email' }, u.email),
+      u.whatsapp ? el('span', { class: 'user-whatsapp' }, '📱 ' + u.whatsapp) : null
     ),
     el('span', { class: 'role-badge role-' + (u.role || 'none') }, roleLabel(u.role))
   );
@@ -1504,6 +1570,7 @@ function openEditUserModal(u) {
 
   const emailEl = el('div', { class: 'modal-read' }, el('span', { class: 'label-text' }, 'Email'), el('div', {}, u.email));
   const nameInput = el('input', { type: 'text', value: u.name || '' });
+  const whatsInput = el('input', { type: 'tel', value: u.whatsapp || '', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
     el('option', { value: 'staff' }, 'Staff (consultoria)'),
     el('option', { value: 'cliente' }, 'Cliente (dono)'),
@@ -1558,13 +1625,30 @@ function openEditUserModal(u) {
       el('p', { class: 'modal-subtitle' }, u.email),
       el('div', { class: 'form-grid' },
         el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
-        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
+        el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'WhatsApp'), whatsInput),
+        el('label', { class: 'field field-wide' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
       ),
       el('label', { class: 'field' },
         el('span', { class: 'label-text' }, 'Restaurantes autorizados'),
         clienteChecks
       ),
       permSection,
+      el('div', { style: 'margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;' },
+        el('h4', { style: 'font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:#888;font-weight:500;margin-bottom:0.5rem;' }, 'Senha'),
+        el('p', { class: 'muted', style: 'font-size:0.85rem;margin-bottom:0.6rem;' },
+          u.mustChangePassword
+            ? '⚠ Usuário ainda não trocou a senha temporária inicial.'
+            : 'Reset envia um link no email do usuário pra ele definir uma nova senha.'
+        ),
+        el('button', { class: 'btn btn-small', onclick: async (e) => {
+          e.preventDefault();
+          if (!confirm(`Enviar email de reset de senha para ${u.email}?`)) return;
+          try {
+            await sendPasswordResetEmail(auth, u.email);
+            toast('Email de reset enviado');
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '✉ Enviar reset de senha')
+      ),
       el('div', { class: 'modal-actions' },
         el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
         el('button', { class: 'btn btn-primary', onclick: async () => {
@@ -1580,6 +1664,7 @@ function openEditUserModal(u) {
           try {
             await setDoc(doc(db, 'users', u.uid), {
               ...u, name: nameInput.value.trim() || u.email,
+              whatsapp: whatsInput.value.trim(),
               role, clienteIds: ids,
               permissions: role === 'equipe' ? permissions : {}
             }, { merge: true });
@@ -1594,9 +1679,17 @@ function openEditUserModal(u) {
   document.body.appendChild(modal);
 }
 
-async function inviteUser(email, name, role, clienteIds) {
-  // Create user with a random temp password via secondary Firebase app (doesn't affect current session)
-  const tempPw = 'Temp' + Math.random().toString(36).slice(2, 10) + '!1';
+// Gera senha temporária legível: 8 chars alfanuméricos sem caracteres confusos (0/O/1/l/I)
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let p = '';
+  for (let i = 0; i < 8; i++) p += chars.charAt(Math.floor(Math.random() * chars.length));
+  return p;
+}
+
+async function inviteUser(email, name, role, clienteIds, whatsapp) {
+  const tempPw = generateTempPassword();
+  // Usa app secundário pra não afetar a sessão do master
   const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + uid());
   const secondaryAuth = getAuth(secondaryApp);
   let newUid = null;
@@ -1606,23 +1699,96 @@ async function inviteUser(email, name, role, clienteIds) {
     await signOut(secondaryAuth);
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
-      // If already exists, we can't know the UID from client-side. Ask admin to input UID or just create user doc with email-indexed hack.
-      // For simplicity: use email as doc id fallback (though UID indexing is better)
-      alert('Email já possui conta. Crie o doc manualmente ou contate suporte.');
+      alert('Este email já tem conta no sistema. Use o botão "Resetar senha" no card do usuário.');
+      return;
+    }
+    if (err.code === 'auth/weak-password') {
+      alert('Senha muito fraca — tente de novo.');
       return;
     }
     throw err;
   }
-  // Create user doc
   await setDoc(doc(db, 'users', newUid), {
-    email, name, role, clienteIds, createdAt: serverTimestamp()
+    email, name, role, clienteIds,
+    whatsapp: whatsapp || '',
+    mustChangePassword: true,
+    createdAt: serverTimestamp()
   });
-  // Send password reset email
-  try {
-    await sendPasswordResetEmail(auth, email);
-  } catch (err) { console.warn('reset email failed', err); }
-  toast('Usuário criado. Email de definição de senha enviado.');
+  toast('Usuário criado');
+  showInviteCredentialsModal({ name, email, password: tempPw, whatsapp });
   renderUsuariosAdmin();
+}
+
+// Modal com credenciais geradas — admin copia ou envia pelo WhatsApp
+function showInviteCredentialsModal({ name, email, password, whatsapp }) {
+  const cliente = STATE.currentCliente;
+  const consultorNome = cliente?.consultor_name || 'Gustavo Rodrigues';
+  const appUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+  const message =
+    `Olá, ${name}!\n\n` +
+    `Seu acesso ao AppMise foi liberado.\n\n` +
+    `Link: ${appUrl}\n` +
+    `Email: ${email}\n` +
+    `Senha temporária: ${password}\n\n` +
+    `No primeiro acesso o sistema vai pedir pra você trocar a senha por uma de sua escolha.\n\n` +
+    `Qualquer dúvida, é só falar.\n` +
+    `— ${consultorNome}`;
+
+  const existing = $('#invite-cred-modal');
+  if (existing) existing.remove();
+
+  const credBox = el('div', { class: 'invite-cred-box' });
+  credBox.appendChild(el('div', { class: 'invite-cred-row' },
+    el('span', { class: 'invite-cred-label' }, 'Email'),
+    el('code', { class: 'invite-cred-value' }, email)
+  ));
+  credBox.appendChild(el('div', { class: 'invite-cred-row' },
+    el('span', { class: 'invite-cred-label' }, 'Senha temporária'),
+    el('code', { class: 'invite-cred-value invite-cred-password' }, password)
+  ));
+
+  const msgTextarea = el('textarea', { class: 'invite-msg', readonly: '', rows: '10' });
+  msgTextarea.value = message;
+
+  function copyText(text, label) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => toast(label + ' copiado'), () => fallback());
+    } else { fallback(); }
+    function fallback() {
+      msgTextarea.select();
+      try { document.execCommand('copy'); toast(label + ' copiado'); }
+      catch { toast('Use Cmd/Ctrl+C pra copiar'); }
+    }
+  }
+
+  function onlyDigits(s) { return (s || '').replace(/\D/g, ''); }
+  const waDigits = onlyDigits(whatsapp);
+  const waPhone = waDigits.startsWith('55') || waDigits.length < 11 ? waDigits : ('55' + waDigits);
+  const waLink = waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}` : null;
+
+  const actions = el('div', { class: 'invite-cred-actions' },
+    el('button', { class: 'btn btn-primary', onclick: () => copyText(message, 'Mensagem') }, '⧉ Copiar mensagem'),
+    el('button', { class: 'btn', onclick: () => copyText(password, 'Senha') }, '⧉ Só a senha'),
+    waLink
+      ? el('a', { class: 'btn btn-accent', href: waLink, target: '_blank', rel: 'noopener' }, '✉ Enviar pelo WhatsApp')
+      : el('button', { class: 'btn btn-accent', disabled: '', title: 'Cadastre o WhatsApp do usuário pra usar este botão' }, '✉ WhatsApp (sem número)')
+  );
+
+  const modal = el('div', { class: 'modal', id: 'invite-cred-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content modal-content-wide' },
+      el('h2', {}, '✓ Usuário criado: ' + name),
+      el('p', { class: 'modal-subtitle' }, 'Envie estas credenciais pelo canal que preferir. A pessoa será obrigada a trocar a senha no primeiro login.'),
+      credBox,
+      el('p', { class: 'muted', style: 'margin:0.8rem 0 0.3rem;font-size:0.85rem;' }, 'Mensagem pronta:'),
+      msgTextarea,
+      actions,
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Fechar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // ---------- Unidade canônica: helpers ----------
