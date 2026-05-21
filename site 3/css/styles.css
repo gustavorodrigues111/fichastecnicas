@@ -748,10 +748,10 @@ tr.row-subproduto .num { color: #8a7050; }
   top: 100%;
   margin-top: 0.3rem;
   z-index: 100;
-  background: var(--text);
-  color: var(--bg);
+  background: #1f2937;
+  color: #fff;
   padding: 0.6rem 0.8rem;
-  border: 1px solid #333;
+  border-radius: var(--r);
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
   font-size: 0.78rem;
   min-width: 200px;
@@ -799,21 +799,24 @@ tr.row-subproduto .num { color: #8a7050; }
   gap: 1.5rem;
 }
 .prod-summary-card {
-  background: var(--text);
-  color: var(--bg);
-  padding: 1rem 1.25rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 2rem;
   align-items: center;
+  box-shadow: var(--shadow-sm);
 }
 .prod-sum-row {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.25rem;
 }
-.prod-sum-row .muted { color: #999; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
-.prod-sum-row strong { color: #d4b97b; font-family: inherit; font-size: 1.6rem; font-weight: 500; }
+.prod-sum-row .muted { color: var(--text3); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.prod-sum-row strong { color: var(--text); font-family: inherit; font-size: 1.5rem; font-weight: 700; }
 .prod-actions {
   margin-left: auto;
   display: flex;
@@ -1153,8 +1156,9 @@ tr.row-subproduto .num { color: #8a7050; }
 .stock-submit-bar {
   position: sticky;
   bottom: 0;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--bg);
+  color: var(--text);
+  border-top: 1px solid var(--border);
   padding: 0.9rem 1.2rem;
   display: flex;
   justify-content: space-between;
@@ -1377,8 +1381,9 @@ tr.row-subproduto .num { color: #8a7050; }
   margin-bottom: 1rem;
   flex-wrap: wrap;
   padding: 1rem 1.2rem;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--bg);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1669,9 +1674,9 @@ tr.row-subproduto .num { color: #8a7050; }
 }
 .chip-filter:hover { border-color: var(--accent); color: var(--accent); }
 .chip-filter.active {
-  background: var(--text);
-  color: var(--bg);
-  border-color: var(--text);
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* ============ Sub-ficha editor: acordeão ============ */
@@ -1730,18 +1735,19 @@ tr.row-subproduto .num { color: #8a7050; }
   position: sticky;
   bottom: 0;
   z-index: 20;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--bg);
+  color: var(--text);
   padding: 0.75rem 1.25rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
   margin: 0 -2rem -4rem;
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
 }
-.sticky-save-bar .muted { color: var(--border2); }
-.sticky-save-bar .btn { color: var(--text); background: var(--bg); border-color: var(--bg); }
+.sticky-save-bar .muted { color: var(--text3); }
+.sticky-save-bar .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .sticky-save-bar .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 
 /* ============ Scroll hint para tabelas mobile ============ */
@@ -1814,9 +1820,12 @@ tr.row-subproduto .num { color: #8a7050; }
 
 .total-dish-cost {
   margin-top: 3rem;
-  padding: 2rem;
-  background: var(--text);
-  color: var(--bg);
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1.5rem;
@@ -2351,7 +2360,7 @@ label.field textarea { min-height: 90px; resize: vertical; }
   display: inline-block;
   background: #c9a766;
 }
-.role-section-dot.role-master { background: var(--text); }
+.role-section-dot.role-master { background: var(--accent); }
 .role-section-dot.role-staff { background: #8b6d3a; }
 .role-section-dot.role-cliente { background: #c9a766; }
 .role-section-dot.role-cliente_admin { background: #7a9e4e; }
@@ -3439,17 +3448,19 @@ label.field textarea { min-height: 90px; resize: vertical; }
 /* ============ Toast ============ */
 .toast {
   position: fixed;
-  bottom: 2rem;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--text);
-  color: var(--bg);
-  padding: 0.85rem 1.75rem;
-  font-size: 0.9rem;
-  letter-spacing: 0.02em;
-  z-index: 100;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-  animation: toast-in 0.3s;
+  background: #1f2937;
+  color: #fff;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  z-index: 300;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  animation: toast-in 0.25s;
 }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
@@ -3641,9 +3652,10 @@ label.field textarea { min-height: 90px; resize: vertical; }
   /* tfoot (subtotal) */
   .ficha-table tfoot { display: block; padding-top: 0.3rem; }
   .ficha-table tfoot tr {
-    background: var(--text);
-    color: var(--bg);
-    border: none;
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
     padding: 0.7rem 1rem;
     margin-top: 0.35rem;
     position: relative;
