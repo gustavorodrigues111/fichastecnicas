@@ -2587,22 +2587,28 @@ label.field textarea { min-height: 90px; resize: vertical; }
 .cliente-card {
   background: var(--bg);
   border: 1px solid var(--border);
-  padding: 2rem 1.75rem;
+  border-radius: var(--r-md);
+  padding: 1.5rem 1.5rem;
   display: block;
   text-decoration: none;
   color: inherit;
-  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+  cursor: pointer;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.12);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.cliente-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.06);
-  border-color: var(--accent);
+@media (hover: hover) {
+  .cliente-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-bg);
+  }
 }
+.cliente-card:active { background: var(--bg2); }
 .cliente-card h3 {
-  font-size: 1.6rem;
-  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+  margin: 0 0 0.25rem 0;
+  font-weight: 600;
 }
-.cliente-card p { margin: 0; font-size: 0.8rem; }
+.cliente-card p { margin: 0; font-size: 0.8rem; color: var(--text3); font-family: 'DM Mono', monospace; }
 
 /* ============ Credito de consultoria ============ */
 .consultor-credit {
