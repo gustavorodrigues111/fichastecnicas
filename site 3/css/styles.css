@@ -1989,6 +1989,23 @@ label.field textarea { min-height: 90px; resize: vertical; }
   font-size: 0.82rem;
 }
 .rename-hint-text { color: #8a6b40; flex: 1; min-width: 200px; line-height: 1.4; }
+
+/* dirty state pra modais (variações, etc.) */
+.dirty-hint {
+  margin: 0.6rem 0;
+  padding: 0.55rem 0.8rem;
+  background: #fef6e0;
+  border-left: 3px solid #d4a647;
+  color: #8a6b40;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+.btn-dirty { box-shadow: 0 0 0 3px rgba(212, 166, 71, 0.35); animation: dirtyPulse 1.6s ease-in-out infinite; }
+@keyframes dirtyPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(212, 166, 71, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(212, 166, 71, 0.12); }
+}
 .ingredient-row .var-select:invalid, .ingredient-row .var-select option[value=""] {
   color: #aaa;
 }

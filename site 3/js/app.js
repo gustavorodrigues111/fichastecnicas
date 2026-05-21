@@ -5,7 +5,8 @@
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
   getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, addDoc,
-  getDoc, getDocs, writeBatch, collectionGroup, serverTimestamp, query, where
+  getDoc, getDocs, writeBatch, collectionGroup, serverTimestamp, query, where,
+  deleteField
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -4109,8 +4110,12 @@ function openCopySubfichaModal(targetDish, onCopy) {
 // Modal de variações do insumo (ex: Cebola branca → brunoise FC 1,15, julienne FC 1,12)
 function openVariationsModal(cid, insumo) {
   const variations = JSON.parse(JSON.stringify(insumo.variations || []));
+  const original = JSON.stringify(variations);
   const modal = el('div', { class: 'modal' },
-    el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
+    el('div', { class: 'modal-overlay', onclick: () => {
+      if (JSON.stringify(variations) !== original && !confirm('Há alterações não salvas. Descartar?')) return;
+      modal.remove();
+    } })
   );
   const content = el('div', { class: 'modal-content modal-wide' },
     el('h2', {}, 'Variações de ' + insumo.name),
@@ -4118,6 +4123,14 @@ function openVariationsModal(cid, insumo) {
       'Variações são cortes ou preparos do insumo base (ex: brunoise, julienne) com fator de correção próprio. ' +
       'Nas fichas, selecionar uma variação carrega o FC automaticamente. Na lista de compras, agrega no insumo base.')
   );
+  const dirtyHint = el('p', { class: 'dirty-hint', style: 'display:none;' }, '● Alterações não salvas — clique em "Salvar" pra confirmar.');
+  content.appendChild(dirtyHint);
+  let saveBtn;
+  function markDirty() {
+    const isDirty = JSON.stringify(variations) !== original;
+    dirtyHint.style.display = isDirty ? '' : 'none';
+    if (saveBtn) saveBtn.classList.toggle('btn-dirty', isDirty);
+  }
   const varList = el('div', { class: 'variations-list' });
   function renderVars() {
     varList.innerHTML = '';
@@ -4126,14 +4139,15 @@ function openVariationsModal(cid, insumo) {
     }
     variations.forEach((v, idx) => {
       const nameI = el('input', { type: 'text', value: v.name || '', placeholder: 'Ex: brunoise' });
-      nameI.addEventListener('input', () => v.name = nameI.value);
+      nameI.addEventListener('input', () => { v.name = nameI.value; markDirty(); });
       const fcI = el('input', { type: 'text', inputmode: 'decimal', value: v.fc != null ? String(v.fc).replace('.', ',') : '', placeholder: 'Ex: 1,15' });
       fcI.addEventListener('input', () => {
         const n = parseFloat(fcI.value.replace(',', '.'));
         v.fc = isNaN(n) ? null : n;
+        markDirty();
       });
       const delBtn = el('button', { class: 'btn btn-small btn-danger', onclick: () => {
-        variations.splice(idx, 1); renderVars();
+        variations.splice(idx, 1); renderVars(); markDirty();
       } }, '×');
       varList.appendChild(el('div', { class: 'variation-row' },
         el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameI),
@@ -4147,27 +4161,37 @@ function openVariationsModal(cid, insumo) {
   content.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
     variations.push({ name: '', fc: 1 });
     renderVars();
+    markDirty();
   } }, '+ Adicionar variação'));
-  content.appendChild(el('div', { class: 'modal-actions' },
-    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
-    el('button', { class: 'btn btn-primary', onclick: async () => {
-      // Valida: nomes únicos, FC válido
-      const clean = variations
-        .filter(v => (v.name || '').trim())
-        .map(v => ({ name: v.name.trim(), fc: (typeof v.fc === 'number' && v.fc > 0) ? v.fc : 1 }));
-      const names = new Set();
-      for (const v of clean) {
-        if (names.has(v.name.toLowerCase())) { alert(`Nome duplicado: "${v.name}"`); return; }
-        names.add(v.name.toLowerCase());
-      }
-      try {
-        insumo.variations = clean.length > 0 ? clean : undefined;
-        if (insumo.variations === undefined) delete insumo.variations;
+  saveBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
+    // Valida: nomes únicos, FC válido
+    const clean = variations
+      .filter(v => (v.name || '').trim())
+      .map(v => ({ name: v.name.trim(), fc: (typeof v.fc === 'number' && v.fc > 0) ? v.fc : 1 }));
+    const names = new Set();
+    for (const v of clean) {
+      if (names.has(v.name.toLowerCase())) { alert(`Nome duplicado: "${v.name}"`); return; }
+      names.add(v.name.toLowerCase());
+    }
+    try {
+      if (clean.length > 0) {
+        insumo.variations = clean;
         await saveInsumo(cid, insumo);
-        toast('Variações salvas');
-        modal.remove();
-      } catch (err) { toast('Erro: ' + err.message); }
-    } }, 'Salvar')
+      } else {
+        // Removeu todas: precisa apagar campo no Firestore (merge:true não apaga ausentes)
+        delete insumo.variations;
+        await setDoc(insumoDoc(cid, insumo.id), { variations: deleteField() }, { merge: true });
+      }
+      toast('Variações salvas');
+      modal.remove();
+    } catch (err) { toast('Erro: ' + err.message); }
+  } }, 'Salvar');
+  content.appendChild(el('div', { class: 'modal-actions' },
+    el('button', { class: 'btn', onclick: () => {
+      if (JSON.stringify(variations) !== original && !confirm('Há alterações não salvas. Descartar?')) return;
+      modal.remove();
+    } }, 'Cancelar'),
+    saveBtn
   ));
   modal.appendChild(content);
   document.body.appendChild(modal);
