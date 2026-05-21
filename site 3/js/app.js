@@ -4029,11 +4029,12 @@ function renderProducao(cid) {
           (() => {
             // Garante que a unidade-alvo é sempre a unidade da ficha final cadastrada
             item.targetUnit = origRend.unit || item.targetUnit || '';
+            // Stepper: −10 | input | +10  com −1/+1 em long press (opcional via shift+click)
+            const stepper = el('div', { class: 'prod-qty-stepper' });
+            const minusBtn = el('button', { class: 'qty-step-btn', title: 'Diminuir 10 (Shift+click: 1)', type: 'button' }, '−10');
             const qtyInput = el('input', { type: 'text', inputmode: 'numeric', value: item.targetQty || '', class: 'prod-qty-input', placeholder: '0' });
-            // Atualiza estado em cada keystroke, mas só faz o recompute pesado no blur/change
-            // (recompute destrói o input e perderia o foco)
+            const plusBtn = el('button', { class: 'qty-step-btn', title: 'Aumentar 10 (Shift+click: 1)', type: 'button' }, '+10');
             qtyInput.addEventListener('input', () => {
-              // Aceita só dígitos e ponto (sem vírgula)
               const cleaned = qtyInput.value.replace(/[^0-9.]/g, '');
               if (cleaned !== qtyInput.value) qtyInput.value = cleaned;
               const v = parseFloat(cleaned);
@@ -4041,12 +4042,24 @@ function renderProducao(cid) {
             });
             qtyInput.addEventListener('change', () => recompute());
             qtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qtyInput.blur(); } });
-            return qtyInput;
+            function bump(delta) {
+              const cur = Number(item.targetQty) || 0;
+              const next = Math.max(0, cur + delta);
+              item.targetQty = next;
+              qtyInput.value = next || '';
+              recompute();
+            }
+            minusBtn.addEventListener('click', (e) => bump(e.shiftKey ? -1 : -10));
+            plusBtn.addEventListener('click', (e) => bump(e.shiftKey ? 1 : 10));
+            stepper.appendChild(minusBtn);
+            stepper.appendChild(qtyInput);
+            stepper.appendChild(plusBtn);
+            return stepper;
           })(),
           el('span', { class: 'prod-unit-fixed' }, origRend.unit || ''),
           el('span', { class: 'prod-scale muted' }, scale > 0 ? `${fmtNum(scale, 2)}×` : '—'),
           el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)),
-          el('button', { class: 'btn btn-small btn-danger', onclick: () => {
+          el('button', { class: 'btn btn-small btn-danger', title: 'Remover do plano', onclick: () => {
             PROD_PLAN.items.splice(itemIdx, 1); recompute();
           } }, '×')
         )

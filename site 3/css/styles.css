@@ -918,21 +918,50 @@ tr.row-subproduto .num { color: #8a7050; }
   align-items: center;
   flex-wrap: wrap;
 }
-.prod-qty-input {
-  width: 70px;
-  padding: 0.4rem 0.65rem;
+.prod-qty-stepper {
+  display: inline-flex;
+  align-items: stretch;
   border: 1px solid var(--border2);
-  border-radius: var(--r);
-  font-family: inherit;
-  font-size: 0.9rem;
-  text-align: right;
+  border-radius: var(--r-md);
+  overflow: hidden;
   background: var(--bg);
+  height: 38px;
 }
-.prod-qty-input:focus {
-  outline: none;
+.prod-qty-stepper:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-bg);
 }
+.qty-step-btn {
+  background: var(--bg2);
+  border: none;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text2);
+  padding: 0 0.7rem;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
+}
+.qty-step-btn:hover { background: var(--accent-bg); color: var(--accent-text); }
+.qty-step-btn:active { background: var(--accent); color: #fff; }
+.prod-qty-input {
+  width: 60px;
+  padding: 0 0.5rem;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+}
+.prod-qty-input:focus { outline: none; box-shadow: none; }
 .prod-unit-fixed {
   font-size: 0.85rem;
   color: var(--text3);
@@ -4121,7 +4150,9 @@ label.field textarea { min-height: 90px; resize: vertical; }
     justify-content: space-between;
     gap: 0.4rem !important;
   }
-  .prod-qty-input { width: 60px !important; padding: 0.6rem !important; font-size: 16px; }
+  .prod-qty-stepper { height: 40px; }
+  .prod-qty-input { width: 56px !important; font-size: 16px; padding: 0 0.3rem !important; }
+  .qty-step-btn { padding: 0 0.6rem; font-size: 0.85rem; }
   .prod-unit-fixed { font-size: 0.82rem; min-width: 40px; }
   .prod-item-cost { margin-left: auto; }
   .prod-sf-box { flex-direction: column !important; gap: 0.3rem; }
