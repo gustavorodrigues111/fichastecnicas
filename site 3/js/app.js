@@ -3974,6 +3974,68 @@ function openAddDishToPlanModal(cid) {
   searchInput.focus();
 }
 
+// ─── Layout helpers compartilhados pelos PDFs ───
+const PDF_COLORS = {
+  ink: [28, 28, 28],         // texto principal
+  body: [60, 60, 60],        // corpo
+  muted: [125, 125, 125],    // metadata
+  accent: [140, 105, 50],    // marrom AppMise
+  accentLight: [247, 240, 224],
+  hairline: [200, 195, 180], // linhas finas
+  zebra: [250, 248, 242]
+};
+const PDF_LAYOUT = {
+  margin: 16,
+  pageHeight: 297,
+  pageWidth: 210
+};
+
+function pdfDrawHeader(docPdf, title, subtitle) {
+  const M = PDF_LAYOUT.margin;
+  const W = PDF_LAYOUT.pageWidth;
+  const cliente = STATE.currentCliente;
+  let y = M;
+  // Linha decorativa fina no topo
+  docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.8);
+  docPdf.line(M, y, M + 30, y); y += 6;
+  // Marca da consultoria (pequeno, italic)
+  if (cliente?.consultor_name) {
+    docPdf.setFont('times', 'italic').setFontSize(8.5).setTextColor(...PDF_COLORS.muted);
+    docPdf.text((cliente.consultor_name + (cliente.consultor_info ? ' · ' + cliente.consultor_info : '')).toUpperCase(), M, y);
+    y += 3;
+  }
+  // Restaurante
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...PDF_COLORS.muted);
+  docPdf.text((cliente?.name || '').toUpperCase(), M, y); y += 7;
+  // Título principal
+  docPdf.setFont('times', 'normal').setFontSize(22).setTextColor(...PDF_COLORS.ink);
+  docPdf.text(title, M, y); y += 4;
+  // Subtítulo + data alinhados na mesma linha
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...PDF_COLORS.muted);
+  if (subtitle) docPdf.text(subtitle, M, y);
+  docPdf.text(new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }), W - M, y, { align: 'right' });
+  y += 6;
+  // Linha hairline embaixo
+  docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+  docPdf.line(M, y, W - M, y); y += 6;
+  return y;
+}
+
+function pdfDrawFooter(docPdf) {
+  const M = PDF_LAYOUT.margin;
+  const W = PDF_LAYOUT.pageWidth;
+  const H = PDF_LAYOUT.pageHeight;
+  const total = docPdf.internal.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    docPdf.setPage(i);
+    docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+    docPdf.line(M, H - 11, W - M, H - 11);
+    docPdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...PDF_COLORS.muted);
+    docPdf.text('AppMise · appmise.app', M, H - 7);
+    docPdf.text(`${i} / ${total}`, W - M, H - 7, { align: 'right' });
+  }
+}
+
 // Helper: monta resumo de pratos × quantidades pro topo dos PDFs
 function buildProdResumoLines() {
   return PROD_PLAN.items
@@ -3987,44 +4049,42 @@ function buildProdResumoLines() {
 }
 
 // PDF de Produção: roteiro detalhado pra equipe de cozinha
-// Para cada prato → ordem das sub-fichas → ingredientes escalados + modo de preparo
 function exportProducaoPDF(cid) {
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const margin = 15;
-  const pageWidth = docPdf.internal.pageSize.getWidth();
-  const pageHeight = docPdf.internal.pageSize.getHeight();
-  const cliente = STATE.currentCliente;
-  let y = margin;
+  const M = PDF_LAYOUT.margin;
+  const W = PDF_LAYOUT.pageWidth;
+  const H = PDF_LAYOUT.pageHeight;
+  let y;
 
   function ensureSpace(needed) {
-    if (y + needed > pageHeight - margin) { docPdf.addPage(); y = margin; }
+    if (y + needed > H - 16) { docPdf.addPage(); y = M; }
   }
 
   // ── Cabeçalho ──
-  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
-  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
-  docPdf.setFont('times', 'normal').setFontSize(20).setTextColor(20);
-  docPdf.text('Roteiro de Produção', pageWidth / 2, y, { align: 'center' }); y += 7;
-  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(110);
-  docPdf.text(new Date().toLocaleDateString('pt-BR'), pageWidth / 2, y, { align: 'center' }); y += 8;
+  y = pdfDrawHeader(docPdf, 'Roteiro de Produção', 'Para a equipe de cozinha');
 
   // ── Resumo do plano ──
   const resumo = buildProdResumoLines();
   if (resumo.length === 0) {
-    docPdf.setFont('helvetica', 'normal').setFontSize(11).setTextColor(80);
-    docPdf.text('Nenhum prato no plano. Defina quantidades antes de gerar o PDF.', margin, y);
-    docPdf.save(`producao-${new Date().toISOString().slice(0, 10)}.pdf`);
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.body);
+    docPdf.text('Nenhum prato no plano. Defina quantidades antes de gerar o PDF.', M, y);
+    pdfDrawFooter(docPdf);
+    docPdf.save(`roteiro-producao-${new Date().toISOString().slice(0, 10)}.pdf`);
     return;
   }
-  docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
-  docPdf.text('Pratos planejados', margin, y); y += 5;
-  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(50);
-  resumo.forEach(r => {
-    ensureSpace(5);
-    docPdf.text(`• ${r.name} — ${fmtNum(r.qty, 0)} ${r.unit}`, margin + 2, y); y += 5;
+  // Card de resumo no topo
+  docPdf.setFillColor(...PDF_COLORS.accentLight);
+  const resumoH = 8 + resumo.length * 5;
+  docPdf.rect(M, y, W - 2 * M, resumoH, 'F');
+  docPdf.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...PDF_COLORS.accent);
+  docPdf.text('PRATOS PLANEJADOS', M + 4, y + 5);
+  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.ink);
+  resumo.forEach((r, i) => {
+    docPdf.text(`${r.name}`, M + 4, y + 10 + i * 5);
+    docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 10 + i * 5, { align: 'right' });
   });
-  y += 4;
+  y += resumoH + 8;
 
   // ── Roteiro por prato ──
   PROD_PLAN.items.forEach((item, itemIdx) => {
@@ -4043,17 +4103,18 @@ function exportProducaoPDF(cid) {
     if (activeSfs.length === 0) return;
 
     // Page break entre pratos (mas não antes do primeiro)
-    if (itemIdx > 0) { docPdf.addPage(); y = margin; }
-    else ensureSpace(20);
+    if (itemIdx > 0) { docPdf.addPage(); y = M; }
 
-    // Cabeçalho do prato
-    docPdf.setDrawColor(180).setLineWidth(0.3);
-    docPdf.line(margin, y, pageWidth - margin, y); y += 5;
-    docPdf.setFont('times', 'bold').setFontSize(15).setTextColor(20);
-    docPdf.text(dish.name.toUpperCase(), margin, y); y += 5;
-    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(90);
-    docPdf.text(`${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, margin, y); y += 4;
-    docPdf.line(margin, y, pageWidth - margin, y); y += 6;
+    // Cabeçalho do prato (bloco com fundo)
+    ensureSpace(22);
+    docPdf.setFillColor(...PDF_COLORS.ink);
+    docPdf.rect(M, y, W - 2 * M, 14, 'F');
+    docPdf.setFont('times', 'bold').setFontSize(15).setTextColor(255, 255, 255);
+    docPdf.text(dish.name.toUpperCase(), M + 4, y + 6);
+    docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(220, 215, 200);
+    docPdf.text(`Produzir: ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, M + 4, y + 11);
+    docPdf.text(`Prato ${String(itemIdx + 1).padStart(2, '0')} de ${PROD_PLAN.items.length}`, W - M - 4, y + 11, { align: 'right' });
+    y += 18;
 
     // Cada sub-ficha na ordem
     activeSfs.forEach((sf, sfIdx) => {
@@ -4062,60 +4123,79 @@ function exportProducaoPDF(cid) {
       const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
       const isFinal = dish.sub_fichas.indexOf(sf) === dish.sub_fichas.length - 1;
 
-      ensureSpace(22);
-      docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(40);
-      const label = isFinal ? `MONTAGEM FINAL — ${sf.name}` : `PREPARAÇÃO ${String(sfIdx + 1).padStart(2, '0')} — ${sf.name}`;
-      docPdf.text(label, margin, y); y += 5;
-      docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(110);
-      docPdf.text(`Rendimento: ${sn.text} ${sn.unit}`.trim(), margin, y); y += 5;
+      ensureSpace(26);
+      // Header da sub-ficha (estilo "numero | nome")
+      docPdf.setFillColor(...PDF_COLORS.accentLight);
+      docPdf.rect(M, y, 12, 9, 'F');
+      docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(...PDF_COLORS.accent);
+      docPdf.text(isFinal ? '✓' : String(sfIdx + 1).padStart(2, '0'), M + 6, y + 6, { align: 'center' });
+      docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(...PDF_COLORS.ink);
+      docPdf.text(isFinal ? 'MONTAGEM FINAL — ' + sf.name : sf.name, M + 16, y + 5);
+      docPdf.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...PDF_COLORS.muted);
+      docPdf.text(`Rendimento: ${sn.text} ${sn.unit}`.trim(), M + 16, y + 9);
+      y += 12;
 
-      // Tabela de ingredientes (sem custo — equipe não precisa)
+      // Tabela de ingredientes (sem custo)
       const ingRows = (sf.ingredientes || []).map(ing => {
         const f = formatIngQty(ing, sfScale);
         let nameLabel = ing.insumo_name || '';
-        // Marca subref pra equipe saber que é um preparo, não item de estoque
         let subSf = null;
         const sfIdxInDish = dish.sub_fichas.findIndex(s => s.id === sf.id);
         if (ing.subref_id) subSf = dish.sub_fichas.find(s => s.id === ing.subref_id);
         if (!subSf && sfIdxInDish > 0) subSf = detectSubref(dish, sfIdxInDish, ing.insumo_name);
-        if (subSf) nameLabel = `↪ ${nameLabel} (preparo)`;
+        if (subSf) nameLabel = `↪ ${nameLabel}`;
         else if (ing.variation_name) nameLabel = `${nameLabel} — ${ing.variation_name}`;
         return [nameLabel, f.text, f.unit, ing.observacao || ''];
       });
       if (ingRows.length > 0) {
         docPdf.autoTable({
           startY: y,
-          margin: { left: margin, right: margin },
+          margin: { left: M, right: M },
           head: [['Ingrediente', 'Qtd', 'Un.', 'Obs.']],
           body: ingRows,
-          theme: 'grid',
-          headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
-          bodyStyles: { fontSize: 9, cellPadding: 1.5 },
-          columnStyles: { 1: { halign: 'right', cellWidth: 22 }, 2: { cellWidth: 14 }, 3: { cellWidth: 50, textColor: [100, 100, 100] } }
+          theme: 'plain',
+          styles: { lineColor: PDF_COLORS.hairline, lineWidth: 0.1 },
+          headStyles: {
+            fillColor: PDF_COLORS.accentLight,
+            textColor: PDF_COLORS.accent,
+            fontStyle: 'bold',
+            fontSize: 7.5,
+            cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }
+          },
+          bodyStyles: {
+            fontSize: 9.5,
+            cellPadding: { top: 2.2, bottom: 2.2, left: 3, right: 3 },
+            textColor: PDF_COLORS.body
+          },
+          alternateRowStyles: { fillColor: PDF_COLORS.zebra },
+          columnStyles: {
+            1: { halign: 'right', cellWidth: 22, fontStyle: 'bold', textColor: PDF_COLORS.ink },
+            2: { cellWidth: 14, textColor: PDF_COLORS.muted },
+            3: { cellWidth: 55, textColor: PDF_COLORS.muted, fontSize: 8.5 }
+          }
         });
-        y = docPdf.lastAutoTable.finalY + 4;
+        y = docPdf.lastAutoTable.finalY + 5;
       }
 
-      // Modo de preparo
+      // Modo de preparo (bloco discreto)
       if (sf.modo_preparo && sf.modo_preparo.trim()) {
-        ensureSpace(12);
-        docPdf.setFont('times', 'bold').setFontSize(10).setTextColor(40);
-        docPdf.text('Modo de preparo', margin, y); y += 4;
-        docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(60);
-        const textWidth = pageWidth - 2 * margin;
+        ensureSpace(15);
+        docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accent);
+        docPdf.text('MODO DE PREPARO', M, y); y += 4;
+        docPdf.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...PDF_COLORS.body);
+        const textWidth = W - 2 * M;
         const lines = docPdf.splitTextToSize(sf.modo_preparo, textWidth);
         lines.forEach(line => {
           ensureSpace(4.5);
-          docPdf.text(line, margin, y); y += 4.2;
+          docPdf.text(line, M, y); y += 4.3;
         });
-        y += 2;
-      } else {
-        y += 1;
+        y += 3;
       }
-      y += 3;
+      y += 4;
     });
   });
 
+  pdfDrawFooter(docPdf);
   docPdf.save(`roteiro-producao-${new Date().toISOString().slice(0, 10)}.pdf`);
   toast('PDF gerado');
 }
@@ -4189,89 +4269,112 @@ function exportRequisicaoPDF(cid, options) {
   options = options || {};
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const margin = 15;
-  const pageWidth = docPdf.internal.pageSize.getWidth();
-  const cliente = STATE.currentCliente;
-  let y = margin;
+  const M = PDF_LAYOUT.margin;
+  const W = PDF_LAYOUT.pageWidth;
+  const H = PDF_LAYOUT.pageHeight;
+  let y;
 
   // ── Cabeçalho ──
-  docPdf.setFont('times', 'italic').setFontSize(10).setTextColor(130);
-  docPdf.text(cliente?.name || '', pageWidth / 2, y, { align: 'center' }); y += 5;
-  docPdf.setFont('times', 'normal').setFontSize(20).setTextColor(20);
-  docPdf.text('Requisição de Estoque', pageWidth / 2, y, { align: 'center' }); y += 8;
-  docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(80);
-  docPdf.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, margin, y);
-  docPdf.text('Solicitante: ____________________', pageWidth - margin - 70, y); y += 6;
-  if (options.withPickupTime && options.pickupTime) {
-    docPdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(40);
-    docPdf.text(`⏰ Retirar até: ${options.pickupTime}`, margin, y); y += 6;
-  } else { y += 2; }
+  y = pdfDrawHeader(docPdf, 'Requisição de Estoque', 'Pedido de insumos para a produção');
 
-  // ── Resumo da produção (pra estoquista entender o pedido) ──
+  // Linha de meta: solicitante + retirada
+  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...PDF_COLORS.muted);
+  docPdf.text('Solicitante', M, y);
+  docPdf.text('Estoquista', M + 70, y);
+  if (options.withPickupTime && options.pickupTime) {
+    docPdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...PDF_COLORS.accent);
+    docPdf.text(`Retirar até ${options.pickupTime}`, W - M, y, { align: 'right' });
+  }
+  y += 4;
+  // Linhas pra preencher
+  docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+  docPdf.line(M, y, M + 60, y);
+  docPdf.line(M + 70, y, M + 130, y);
+  y += 8;
+
+  // ── Resumo da produção (card destacado) ──
   const resumo = buildProdResumoLines();
   if (resumo.length > 0) {
-    docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
-    docPdf.text('Para a produção de:', margin, y); y += 5;
-    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(60);
-    resumo.forEach(r => {
-      docPdf.text(`• ${r.name} — ${fmtNum(r.qty, 0)} ${r.unit}`, margin + 2, y); y += 4.5;
+    const card_h = 7 + resumo.length * 4.5;
+    docPdf.setFillColor(...PDF_COLORS.accentLight);
+    docPdf.rect(M, y, W - 2 * M, card_h, 'F');
+    docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accent);
+    docPdf.text('PARA A PRODUÇÃO DE', M + 4, y + 5);
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.ink);
+    resumo.forEach((r, i) => {
+      docPdf.text(r.name, M + 4, y + 9 + i * 4.5);
+      docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 9 + i * 4.5, { align: 'right' });
     });
-    y += 4;
+    y += card_h + 8;
   }
 
   const shoppingRaw = (window.__prodBuildShopping ? window.__prodBuildShopping() : []);
-
   if (shoppingRaw.length === 0) {
-    docPdf.setFont('helvetica', 'normal').setFontSize(11).setTextColor(80);
-    docPdf.text('Nenhum insumo a solicitar.', margin, y);
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.body);
+    docPdf.text('Nenhum insumo a solicitar.', M, y);
+    pdfDrawFooter(docPdf);
     docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
     return;
   }
 
-  // Separa reutilizáveis se solicitado
   const normais = options.separateReutilizaveis ? shoppingRaw.filter(r => !r.isReutilizavel) : shoppingRaw.slice();
   const reut = options.separateReutilizaveis ? shoppingRaw.filter(r => r.isReutilizavel) : [];
 
   function renderTable(title, rows, startN) {
     if (rows.length === 0) return startN;
-    if (y > 250) { docPdf.addPage(); y = margin; }
-    docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(30);
-    docPdf.text(`${title} (${rows.length})`, margin, y); y += 4;
+    if (y > H - 50) { docPdf.addPage(); y = M; }
+    // Header de seção
+    docPdf.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...PDF_COLORS.accent);
+    docPdf.text(title.toUpperCase() + ` · ${rows.length}`, M, y); y += 1;
+    docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.4);
+    docPdf.line(M, y, M + 25, y); y += 4;
+
     docPdf.autoTable({
       startY: y,
-      margin: { left: margin, right: margin },
-      head: [['#', 'Insumo', 'Qtd solic.', 'Un.', 'Qtd retirada', 'Visto']],
+      margin: { left: M, right: M },
+      head: [['#', 'Insumo', 'Qtd', 'Un.', 'Retirado', 'Visto']],
       body: rows.map((r, i) => {
         const norm = normUnitForDisplay(r.qty, r.unit);
-        const label = r.isReutilizavel ? `${r.name} (rateio)` : r.name;
+        const label = r.isReutilizavel ? `${r.name}  (rateio)` : r.name;
         return [String(startN + i), label, norm.text, norm.unit, '', ''];
       }),
-      theme: 'grid',
-      headStyles: { fillColor: [240, 237, 228], textColor: [50, 50, 50], fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 9, minCellHeight: 9 },
+      theme: 'plain',
+      styles: { lineColor: PDF_COLORS.hairline, lineWidth: 0.1 },
+      headStyles: {
+        fillColor: PDF_COLORS.ink,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 7.5,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }
+      },
+      bodyStyles: {
+        fontSize: 9.5,
+        cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+        textColor: PDF_COLORS.body,
+        minCellHeight: 9
+      },
+      alternateRowStyles: { fillColor: PDF_COLORS.zebra },
       columnStyles: {
-        0: { cellWidth: 10, halign: 'center', textColor: [130, 130, 130] },
-        2: { cellWidth: 22, halign: 'right' },
-        3: { cellWidth: 14 },
+        0: { cellWidth: 10, halign: 'center', textColor: PDF_COLORS.muted, fontSize: 8 },
+        2: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: PDF_COLORS.ink },
+        3: { cellWidth: 14, textColor: PDF_COLORS.muted },
         4: { cellWidth: 26, halign: 'right' },
         5: { cellWidth: 26 }
       },
       didDrawPage: (data) => { y = data.cursor.y; }
     });
-    y = docPdf.lastAutoTable.finalY + 6;
+    y = docPdf.lastAutoTable.finalY + 7;
     return startN + rows.length;
   }
 
   let counter = 1;
   if (options.groupByCategory) {
-    // Agrupa normais por categoria
     const byCat = {};
     normais.forEach(r => {
       const cat = categorizeInsumo({ name: r.name });
       if (!byCat[cat]) byCat[cat] = [];
       byCat[cat].push(r);
     });
-    // Ordem fixa das categorias (alfabética por label, "outros" no fim)
     const catIds = Object.keys(byCat).sort((a, b) => {
       if (a === 'outros') return 1;
       if (b === 'outros') return -1;
@@ -4291,15 +4394,22 @@ function exportRequisicaoPDF(cid, options) {
     counter = renderTable('Reutilizáveis / rateio', sorted, counter);
   }
 
-  // Footer
-  if (y > 260) { docPdf.addPage(); y = margin; }
-  const finalY = y + 8;
-  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(80);
-  docPdf.text('Aprovado por: ____________________', margin, finalY);
-  docPdf.text('Estoquista: ____________________', pageWidth - margin - 70, finalY);
-  docPdf.setFontSize(8).setTextColor(120);
-  docPdf.text(`Data/hora da retirada: ____________________`, margin, finalY + 6);
+  // ── Bloco de assinaturas no final ──
+  if (y > H - 40) { docPdf.addPage(); y = M; }
+  y += 8;
+  docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+  docPdf.line(M, y, W - M, y); y += 8;
+  // 3 colunas: Aprovado / Estoquista / Hora real
+  const colW = (W - 2 * M) / 3;
+  ['Aprovado por', 'Entregue por (estoquista)', 'Data e hora da entrega'].forEach((label, i) => {
+    const cx = M + i * colW;
+    docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.3);
+    docPdf.line(cx + 2, y, cx + colW - 4, y);
+    docPdf.setFont('helvetica', 'normal').setFontSize(7).setTextColor(...PDF_COLORS.muted);
+    docPdf.text(label, cx + 2, y + 4);
+  });
 
+  pdfDrawFooter(docPdf);
   docPdf.save(`requisicao-${new Date().toISOString().slice(0, 10)}.pdf`);
   toast('PDF gerado');
 }
