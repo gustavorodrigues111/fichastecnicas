@@ -1070,9 +1070,103 @@ async function ensureUserDoc(user) {
     const d = { email: user.email, role: 'master', clienteIds: [], name: 'Master', createdAt: serverTimestamp() };
     await setDoc(ref, d);
     STATE.userDoc = { uid: user.uid, ...d };
-  } else {
-    STATE.userDoc = null;
+    return;
   }
+  // Verifica se há pré-cadastro pendente com este email
+  try {
+    const slug = emailSlug(user.email);
+    const pendingRef = doc(db, 'pending_users', slug);
+    const pendingSnap = await getDoc(pendingRef);
+    if (pendingSnap.exists() && pendingSnap.data().email === user.email) {
+      const pData = pendingSnap.data();
+      const newDoc = {
+        email: user.email,
+        name: pData.name || user.email,
+        role: pData.role || 'cliente_op',
+        clienteIds: pData.clienteIds || [],
+        whatsapp: pData.whatsapp || '',
+        mustChangePassword: pData.mustChangePassword !== false, // default true
+        createdAt: serverTimestamp(),
+        claimedFromPending: true
+      };
+      await setDoc(ref, newDoc);
+      // Apaga o pre-claim
+      try { await deleteDoc(pendingRef); } catch (e) { console.warn('delete pending:', e); }
+      STATE.userDoc = { uid: user.uid, ...newDoc };
+      return;
+    }
+  } catch (err) { console.warn('check pending_users:', err); }
+  STATE.userDoc = null;
+}
+
+// Modal: oferece pré-cadastro quando o email já existe no Firebase Auth mas não tem doc Firestore.
+// Quando a pessoa logar com a senha que ela já tem, o ensureUserDoc cria o doc automaticamente.
+async function offerPendingEnrollment({ email, name, role, clienteIds, whatsapp }) {
+  return new Promise((resolve) => {
+    const existing = $('#pending-enroll-modal');
+    if (existing) existing.remove();
+
+    async function doPreClaim() {
+      const slug = emailSlug(email);
+      try {
+        await setDoc(doc(db, 'pending_users', slug), {
+          email, name, role, clienteIds,
+          whatsapp: whatsapp || '',
+          mustChangePassword: false, // já tem senha — não força troca
+          createdBy: STATE.user?.uid || 'master',
+          createdAt: new Date().toISOString()
+        });
+        toast('Pré-cadastro salvo');
+        showPreClaimSuccessModal(email, name);
+        modal.remove();
+        renderUsuariosAdmin();
+        resolve();
+      } catch (err) { alert('Erro ao pré-cadastrar: ' + (err.message || err.code)); }
+    }
+
+    const modal = el('div', { class: 'modal', id: 'pending-enroll-modal' },
+      el('div', { class: 'modal-overlay', onclick: () => { modal.remove(); resolve(); } }),
+      el('div', { class: 'modal-content modal-content-wide' },
+        el('h2', {}, 'Email já existe no Firebase'),
+        el('p', { class: 'modal-subtitle' }, `O email ${email} tem conta no Firebase Auth, mas não tem registro no sistema (foi excluído antes ou nunca foi vinculado).`),
+        el('div', { style: 'background:#fef6e0;border:1px solid #e9d3a0;border-radius:8px;padding:1rem;margin:1rem 0;' },
+          el('p', { style: 'margin:0 0 0.5rem;font-weight:600;color:#8a6b40;' }, 'Solução recomendada: pré-cadastro'),
+          el('p', { class: 'muted', style: 'font-size:0.85rem;line-height:1.5;margin:0;' },
+            'O sistema salva o cadastro (nome, papel, restaurantes, WhatsApp) numa "fila de pendentes" amarrada ao email. ',
+            'Quando a pessoa entrar com a senha que ela já tem, o sistema vincula automaticamente os dados do pré-cadastro.',
+            el('br', {}), el('br', {}),
+            el('strong', {}, 'Se ela esqueceu a senha:'),
+            ' depois do pré-cadastro, peça pra ela usar "Esqueci senha" no login pra receber um link de reset.')
+        ),
+        el('div', { class: 'modal-actions' },
+          el('button', { class: 'btn', onclick: () => { modal.remove(); resolve(); } }, 'Cancelar'),
+          el('button', { class: 'btn btn-primary', onclick: doPreClaim }, 'Pré-cadastrar este email')
+        )
+      )
+    );
+    document.body.appendChild(modal);
+  });
+}
+
+function showPreClaimSuccessModal(email, name) {
+  const existing = $('#pre-claim-success-modal');
+  if (existing) existing.remove();
+  const modal = el('div', { class: 'modal', id: 'pre-claim-success-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content' },
+      el('h2', {}, '✓ Pré-cadastro salvo'),
+      el('p', {}, `${name || email} ficou na fila de pendentes.`),
+      el('p', { class: 'muted', style: 'font-size:0.88rem;' },
+        'Avise a pessoa que ela pode entrar no sistema com o email ',
+        el('strong', {}, email),
+        ' e a senha que ela já usava. Se esqueceu, pode usar "Esqueci senha" no login.'
+      ),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn btn-primary', onclick: () => modal.remove() }, 'Entendi')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // Tela de troca obrigatória de senha (primeiro login após convite)
@@ -1509,9 +1603,13 @@ async function renderClientesAdmin() {
 async function renderUsuariosAdmin() {
   const app = $('#app');
   renderLoadingScreen();
-  const [usersSnap] = await Promise.all([getDocs(collection(db, 'users'))]);
+  const [usersSnap, pendingSnap] = await Promise.all([
+    getDocs(collection(db, 'users')),
+    getDocs(collection(db, 'pending_users')).catch(() => ({ docs: [] }))
+  ]);
   await loadClientesList();
   const users = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+  const pendings = pendingSnap.docs.map(d => ({ slug: d.id, ...d.data() }));
   app.innerHTML = '';
 
   app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar'));
@@ -1569,6 +1667,47 @@ async function renderUsuariosAdmin() {
     } }, 'Criar usuário')
   ));
   app.appendChild(invitePanel);
+
+  // Pré-cadastros pendentes (esperando primeiro login)
+  if (pendings.length > 0) {
+    app.appendChild(el('h3', { class: 'section-title' }, `Pré-cadastros pendentes (${pendings.length})`));
+    app.appendChild(el('p', { class: 'muted', style: 'margin-bottom:1rem;font-size:0.88rem;' },
+      'Aguardando primeiro login da pessoa. Assim que ela entrar com o email + senha que já tem no Firebase, vira usuário ativo automaticamente.'
+    ));
+    const pendingGrid = el('div', { class: 'user-admin-list' });
+    pendings.forEach(p => {
+      const card = el('article', { class: 'user-card' },
+        el('div', { class: 'user-card-head' },
+          el('div', { class: 'user-id' },
+            el('h4', { class: 'user-name' }, p.name || '—',
+              el('span', { class: 'pending-badge' }, '⏳ aguardando login')),
+            el('span', { class: 'user-email' }, p.email),
+            p.whatsapp ? el('span', { class: 'user-whatsapp' }, '📱 ' + p.whatsapp) : null
+          ),
+          el('span', { class: 'role-badge role-' + (p.role || 'none') }, roleLabel(p.role))
+        ),
+        el('div', { class: 'user-actions' },
+          el('button', { class: 'btn btn-small', onclick: async () => {
+            if (!confirm(`Enviar reset de senha para ${p.email}? A pessoa recebe um email pra criar nova senha.`)) return;
+            try {
+              await sendPasswordResetEmail(auth, p.email);
+              toast('Email de reset enviado');
+            } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+          } }, '✉ Reset de senha'),
+          el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+            if (!confirm(`Cancelar o pré-cadastro de ${p.email}?\n\nIsso só apaga a "reserva" do nosso lado — não mexe na conta dela no Firebase.`)) return;
+            try {
+              await deleteDoc(doc(db, 'pending_users', p.slug));
+              toast('Pré-cadastro cancelado');
+              renderUsuariosAdmin();
+            } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+          } }, '✕ Cancelar')
+        )
+      );
+      pendingGrid.appendChild(card);
+    });
+    app.appendChild(pendingGrid);
+  }
 
   // Existing users — list of cards
   app.appendChild(el('h3', { class: 'section-title' }, `Usuários cadastrados (${users.length})`));
@@ -1780,6 +1919,10 @@ function generateTempPassword() {
   return p;
 }
 
+function emailSlug(email) {
+  return (email || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
 async function inviteUser(email, name, role, clienteIds, whatsapp) {
   // 1) Antes de criar no Auth, verifica se já existe doc Firestore com esse email (caso de soft-delete anterior)
   try {
@@ -1817,8 +1960,10 @@ async function inviteUser(email, name, role, clienteIds, whatsapp) {
     await signOut(secondaryAuth);
   } catch (err) {
     if (err.code === 'auth/email-already-in-use') {
-      // Auth tem conta mas não tem doc Firestore — só dá pra resolver via console
-      alert(`Este email já tem conta no Firebase Auth, mas não tem registro no sistema (provavelmente foi excluído definitivamente antes).\n\nPra resolver, escolha um dos caminhos:\n• Use outro email para criar o novo usuário\n• Ou peça pro consultor remover o email do console do Firebase (admin → Authentication)`);
+      // Email já existe no Auth (foi excluído definitivamente antes ou nunca teve doc).
+      // Em vez de bloquear, oferece pré-cadastrar via pending_users — quando a pessoa logar
+      // com a senha que já tem no Firebase, o sistema cria o doc users/{uid} automaticamente.
+      await offerPendingEnrollment({ email, name, role, clienteIds, whatsapp });
       return;
     }
     if (err.code === 'auth/weak-password') {
