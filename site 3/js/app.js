@@ -4245,14 +4245,17 @@ function openAddDishToPlanModal(cid) {
 }
 
 // ─── Layout helpers compartilhados pelos PDFs ───
+// Paleta alinhada com o app web (planejamento.app style): índigo accent + cinzas neutros
 const PDF_COLORS = {
-  ink: [28, 28, 28],         // texto principal
-  body: [60, 60, 60],        // corpo
-  muted: [125, 125, 125],    // metadata
-  accent: [140, 105, 50],    // marrom AppMise
-  accentLight: [247, 240, 224],
-  hairline: [200, 195, 180], // linhas finas
-  zebra: [250, 248, 242]
+  ink:         [17, 24, 39],    // gray-900 (--text)
+  body:        [55, 65, 81],    // gray-700 (--text2)
+  muted:       [107, 114, 128], // gray-500 (--text3)
+  subtle:      [156, 163, 175], // gray-400 (--text4)
+  hairline:    [229, 231, 235], // gray-200 (--border)
+  zebra:       [249, 250, 251], // gray-50 (--bg2)
+  accent:      [99, 102, 241],  // indigo-500 (--accent)
+  accentDark:  [67, 56, 202],   // indigo-700 (--accent-text)
+  accentLight: [238, 242, 255]  // indigo-50 (--accent-bg)
 };
 const PDF_LAYOUT = {
   margin: 16,
@@ -4265,29 +4268,31 @@ function pdfDrawHeader(docPdf, title, subtitle) {
   const W = PDF_LAYOUT.pageWidth;
   const cliente = STATE.currentCliente;
   let y = M;
-  // Linha decorativa fina no topo
-  docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.8);
-  docPdf.line(M, y, M + 30, y); y += 6;
-  // Marca da consultoria (pequeno, italic)
-  if (cliente?.consultor_name) {
-    docPdf.setFont('times', 'italic').setFontSize(8.5).setTextColor(...PDF_COLORS.muted);
-    docPdf.text((cliente.consultor_name + (cliente.consultor_info ? ' · ' + cliente.consultor_info : '')).toUpperCase(), M, y);
-    y += 3;
+  // Marca da consultoria + restaurante (linha única no topo, pequeno)
+  docPdf.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...PDF_COLORS.accent);
+  docPdf.text('APPMISE', M, y);
+  if (cliente?.name) {
+    docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
+    docPdf.text(' · ' + cliente.name, M + 18, y);
   }
-  // Restaurante
-  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...PDF_COLORS.muted);
-  docPdf.text((cliente?.name || '').toUpperCase(), M, y); y += 7;
-  // Título principal
-  docPdf.setFont('times', 'normal').setFontSize(22).setTextColor(...PDF_COLORS.ink);
-  docPdf.text(title, M, y); y += 4;
-  // Subtítulo + data alinhados na mesma linha
-  docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...PDF_COLORS.muted);
-  if (subtitle) docPdf.text(subtitle, M, y);
-  docPdf.text(new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }), W - M, y, { align: 'right' });
+  // Data à direita
+  docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
+  docPdf.text(new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }), W - M, y, { align: 'right' });
   y += 6;
+  // Linha índigo decorativa fina sob o cabeçalho
+  docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.6);
+  docPdf.line(M, y, M + 20, y); y += 6;
+  // Título principal — DM Sans peso bold (jsPDF: helvetica bold)
+  docPdf.setFont('helvetica', 'bold').setFontSize(20).setTextColor(...PDF_COLORS.ink);
+  docPdf.text(title, M, y); y += 4;
+  // Subtítulo
+  if (subtitle) {
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.muted);
+    docPdf.text(subtitle, M, y); y += 5;
+  } else { y += 2; }
   // Linha hairline embaixo
   docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
-  docPdf.line(M, y, W - M, y); y += 6;
+  docPdf.line(M, y, W - M, y); y += 7;
   return y;
 }
 
@@ -4299,10 +4304,10 @@ function pdfDrawFooter(docPdf) {
   for (let i = 1; i <= total; i++) {
     docPdf.setPage(i);
     docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
-    docPdf.line(M, H - 11, W - M, H - 11);
-    docPdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...PDF_COLORS.muted);
-    docPdf.text('AppMise · appmise.app', M, H - 7);
-    docPdf.text(`${i} / ${total}`, W - M, H - 7, { align: 'right' });
+    docPdf.line(M, H - 12, W - M, H - 12);
+    docPdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...PDF_COLORS.subtle);
+    docPdf.text('appmise.app', M, H - 7);
+    docPdf.text(`${i} de ${total}`, W - M, H - 7, { align: 'right' });
   }
 }
 
@@ -4343,16 +4348,19 @@ function exportProducaoPDF(cid) {
     docPdf.save(`roteiro-producao-${new Date().toISOString().slice(0, 10)}.pdf`);
     return;
   }
-  // Card de resumo no topo
-  docPdf.setFillColor(...PDF_COLORS.accentLight);
-  const resumoH = 8 + resumo.length * 5;
-  docPdf.rect(M, y, W - 2 * M, resumoH, 'F');
-  docPdf.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...PDF_COLORS.accent);
+  // Card de resumo — border + bg cinza claro (estilo "card" do app)
+  const resumoH = 9 + resumo.length * 5.5;
+  docPdf.setFillColor(...PDF_COLORS.zebra);
+  docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+  docPdf.roundedRect(M, y, W - 2 * M, resumoH, 1.5, 1.5, 'FD');
+  docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accentDark);
   docPdf.text('PRATOS PLANEJADOS', M + 4, y + 5);
   docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.ink);
   resumo.forEach((r, i) => {
-    docPdf.text(`${r.name}`, M + 4, y + 10 + i * 5);
-    docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 10 + i * 5, { align: 'right' });
+    docPdf.text(r.name, M + 4, y + 10.5 + i * 5.5);
+    docPdf.setFont('helvetica', 'bold').setTextColor(...PDF_COLORS.body);
+    docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 10.5 + i * 5.5, { align: 'right' });
+    docPdf.setFont('helvetica', 'normal').setTextColor(...PDF_COLORS.ink);
   });
   y += resumoH + 8;
 
@@ -4375,16 +4383,17 @@ function exportProducaoPDF(cid) {
     // Page break entre pratos (mas não antes do primeiro)
     if (itemIdx > 0) { docPdf.addPage(); y = M; }
 
-    // Cabeçalho do prato (bloco com fundo)
-    ensureSpace(22);
-    docPdf.setFillColor(...PDF_COLORS.ink);
-    docPdf.rect(M, y, W - 2 * M, 14, 'F');
-    docPdf.setFont('times', 'bold').setFontSize(15).setTextColor(255, 255, 255);
-    docPdf.text(dish.name.toUpperCase(), M + 4, y + 6);
-    docPdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(220, 215, 200);
-    docPdf.text(`Produzir: ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, M + 4, y + 11);
-    docPdf.text(`Prato ${String(itemIdx + 1).padStart(2, '0')} de ${PROD_PLAN.items.length}`, W - M - 4, y + 11, { align: 'right' });
-    y += 18;
+    // Cabeçalho do prato — texto grande limpo (sem bloco preto)
+    ensureSpace(20);
+    docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
+    docPdf.text(`PRATO ${String(itemIdx + 1).padStart(2, '0')} DE ${PROD_PLAN.items.length}`, M, y); y += 4;
+    docPdf.setFont('helvetica', 'bold').setFontSize(18).setTextColor(...PDF_COLORS.ink);
+    docPdf.text(dish.name, M, y); y += 6;
+    docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.body);
+    docPdf.text(`Produzir ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, M, y); y += 4;
+    // Linha índigo decorativa
+    docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.6);
+    docPdf.line(M, y, M + 20, y); y += 8;
 
     // Cada sub-ficha na ordem
     activeSfs.forEach((sf, sfIdx) => {
@@ -4393,17 +4402,31 @@ function exportProducaoPDF(cid) {
       const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
       const isFinal = dish.sub_fichas.indexOf(sf) === dish.sub_fichas.length - 1;
 
-      ensureSpace(26);
-      // Header da sub-ficha (estilo "numero | nome")
-      docPdf.setFillColor(...PDF_COLORS.accentLight);
-      docPdf.rect(M, y, 12, 9, 'F');
-      docPdf.setFont('times', 'bold').setFontSize(11).setTextColor(...PDF_COLORS.accent);
-      docPdf.text(isFinal ? '✓' : String(sfIdx + 1).padStart(2, '0'), M + 6, y + 6, { align: 'center' });
-      docPdf.setFont('times', 'bold').setFontSize(12).setTextColor(...PDF_COLORS.ink);
-      docPdf.text(isFinal ? 'MONTAGEM FINAL — ' + sf.name : sf.name, M + 16, y + 5);
-      docPdf.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(...PDF_COLORS.muted);
-      docPdf.text(`Rendimento: ${sn.text} ${sn.unit}`.trim(), M + 16, y + 9);
-      y += 12;
+      ensureSpace(28);
+      // Número em chip arredondado + nome + label final
+      const chipSize = 8;
+      if (isFinal) {
+        docPdf.setFillColor(...PDF_COLORS.accent);
+      } else {
+        docPdf.setFillColor(...PDF_COLORS.accentLight);
+      }
+      docPdf.roundedRect(M, y, chipSize, chipSize, 1.5, 1.5, 'F');
+      docPdf.setFont('helvetica', 'bold').setFontSize(7.5);
+      docPdf.setTextColor(...(isFinal ? [255,255,255] : PDF_COLORS.accentDark));
+      docPdf.text(String(sfIdx + 1).padStart(2, '0'), M + chipSize/2, y + chipSize/2 + 1.3, { align: 'center' });
+      // Nome da sub-ficha em peso 600
+      docPdf.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...PDF_COLORS.ink);
+      docPdf.text(sf.name, M + chipSize + 3, y + chipSize/2 + 0.7);
+      if (isFinal) {
+        const nameWidth = docPdf.getTextWidth(sf.name);
+        docPdf.setFont('helvetica', 'bold').setFontSize(6.5).setTextColor(...PDF_COLORS.accentDark);
+        docPdf.setFillColor(...PDF_COLORS.accentLight);
+        docPdf.roundedRect(M + chipSize + 3 + nameWidth + 3, y + 1.5, 18, 5, 1, 1, 'F');
+        docPdf.text('FINAL', M + chipSize + 3 + nameWidth + 12, y + 5, { align: 'center' });
+      }
+      y += chipSize + 2;
+      docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
+      docPdf.text(`Rendimento ${sn.text} ${sn.unit}`.trim(), M + chipSize + 3, y); y += 4;
 
       // Tabela de ingredientes (sem custo)
       const ingRows = (sf.ingredientes || []).map(ing => {
@@ -4562,18 +4585,21 @@ function exportRequisicaoPDF(cid, options) {
   docPdf.line(M + 70, y, M + 130, y);
   y += 8;
 
-  // ── Resumo da produção (card destacado) ──
+  // ── Resumo da produção — card com border ──
   const resumo = buildProdResumoLines();
   if (resumo.length > 0) {
-    const card_h = 7 + resumo.length * 4.5;
-    docPdf.setFillColor(...PDF_COLORS.accentLight);
-    docPdf.rect(M, y, W - 2 * M, card_h, 'F');
-    docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accent);
+    const card_h = 9 + resumo.length * 5;
+    docPdf.setFillColor(...PDF_COLORS.zebra);
+    docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
+    docPdf.roundedRect(M, y, W - 2 * M, card_h, 1.5, 1.5, 'FD');
+    docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accentDark);
     docPdf.text('PARA A PRODUÇÃO DE', M + 4, y + 5);
     docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.ink);
     resumo.forEach((r, i) => {
-      docPdf.text(r.name, M + 4, y + 9 + i * 4.5);
-      docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 9 + i * 4.5, { align: 'right' });
+      docPdf.text(r.name, M + 4, y + 10 + i * 5);
+      docPdf.setFont('helvetica', 'bold').setTextColor(...PDF_COLORS.body);
+      docPdf.text(`${fmtNum(r.qty, 0)} ${r.unit}`, W - M - 4, y + 10 + i * 5, { align: 'right' });
+      docPdf.setFont('helvetica', 'normal').setTextColor(...PDF_COLORS.ink);
     });
     y += card_h + 8;
   }
@@ -4594,10 +4620,10 @@ function exportRequisicaoPDF(cid, options) {
     if (rows.length === 0) return startN;
     if (y > H - 50) { docPdf.addPage(); y = M; }
     // Header de seção
-    docPdf.setFont('helvetica', 'bold').setFontSize(8).setTextColor(...PDF_COLORS.accent);
-    docPdf.text(title.toUpperCase() + ` · ${rows.length}`, M, y); y += 1;
-    docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.4);
-    docPdf.line(M, y, M + 25, y); y += 4;
+    docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accentDark);
+    docPdf.text(title.toUpperCase() + ` · ${rows.length}`, M, y); y += 2;
+    docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.5);
+    docPdf.line(M, y, M + 20, y); y += 5;
 
     docPdf.autoTable({
       startY: y,
@@ -4611,10 +4637,10 @@ function exportRequisicaoPDF(cid, options) {
       theme: 'plain',
       styles: { lineColor: PDF_COLORS.hairline, lineWidth: 0.1 },
       headStyles: {
-        fillColor: PDF_COLORS.ink,
-        textColor: [255, 255, 255],
+        fillColor: PDF_COLORS.accentLight,
+        textColor: PDF_COLORS.accentDark,
         fontStyle: 'bold',
-        fontSize: 7.5,
+        fontSize: 7,
         cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }
       },
       bodyStyles: {
@@ -4625,7 +4651,7 @@ function exportRequisicaoPDF(cid, options) {
       },
       alternateRowStyles: { fillColor: PDF_COLORS.zebra },
       columnStyles: {
-        0: { cellWidth: 10, halign: 'center', textColor: PDF_COLORS.muted, fontSize: 8 },
+        0: { cellWidth: 10, halign: 'center', textColor: PDF_COLORS.subtle, fontSize: 8 },
         2: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: PDF_COLORS.ink },
         3: { cellWidth: 14, textColor: PDF_COLORS.muted },
         4: { cellWidth: 26, halign: 'right' },
