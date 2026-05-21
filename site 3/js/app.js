@@ -4321,6 +4321,11 @@ function renderAdminEdit(cid, dishId) {
           const refBadge = el('span', { class: 'ref-badge', style: 'display:none' }, '');
           const unitInput = el('input', { type: 'text', value: ing.unit || '', placeholder: 'g' });
           function detectRef() {
+            // Vínculo manual via subref_id sempre sobrepõe detecção automática
+            if (ing.subref_id) {
+              const manual = dish.sub_fichas.find(s => s.id === ing.subref_id && s.id !== sf.id);
+              if (manual) return { type: 'subref', sf: manual };
+            }
             // Verifica se o nome bate com uma sub-ficha do mesmo prato (exceto a atual)
             const n = nrm(nameInput.value);
             if (!n) return null;
@@ -4428,6 +4433,40 @@ function renderAdminEdit(cid, dishId) {
           });
           rebuildVarSelect();
           row.appendChild(nameInput);
+          // Dropdown manual de vínculo a sub-ficha (override do detectRef por nome)
+          const subrefSelect = el('select', { class: 'subref-select', title: 'Vincular esta linha a uma sub-ficha do prato (sobrepõe detecção por nome)' });
+          function rebuildSubrefSelect() {
+            subrefSelect.innerHTML = '';
+            const optNone = el('option', { value: '' }, '↪ sub-ficha? (auto)');
+            subrefSelect.appendChild(optNone);
+            (dish.sub_fichas || []).forEach((otherSf, oIdx) => {
+              if (otherSf.id === sf.id) return;
+              const opt = el('option', { value: otherSf.id }, `↪ ${otherSf.name || `sub-ficha ${oIdx+1}`}`);
+              if (ing.subref_id === otherSf.id) opt.setAttribute('selected', '');
+              subrefSelect.appendChild(opt);
+            });
+          }
+          rebuildSubrefSelect();
+          subrefSelect.addEventListener('change', () => {
+            if (subrefSelect.value) {
+              ing.subref_id = subrefSelect.value;
+              delete ing.fc;
+              delete ing.variation_name;
+              ing.insumo_id = '';
+              const ref = (dish.sub_fichas || []).find(s => s.id === subrefSelect.value);
+              if (ref) {
+                const refRend = getSfRendimento(ref);
+                if (refRend.unit && !ing.unit) {
+                  ing.unit = refRend.unit;
+                  unitInput.value = refRend.unit;
+                }
+              }
+            } else {
+              delete ing.subref_id;
+            }
+            rebuildVarSelect();
+          });
+          row.appendChild(subrefSelect);
           row.appendChild(varSelect);
           const qtyInput = el('input', { type: 'number', step: '0.01', value: ing.qty != null ? ing.qty : '', placeholder: 'Qtd' });
           qtyInput.addEventListener('input', () => {
