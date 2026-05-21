@@ -3607,6 +3607,145 @@ label.field textarea { min-height: 90px; resize: vertical; }
   .brand-name { font-size: 1.05rem; }
 }
 
+/* ============ Mobile fixes adicionais ============ */
+@media (max-width: 640px) {
+  /* Modais: limitar largura, padding interno menor, evitar overflow */
+  .modal-content,
+  .modal-content-wide,
+  .modal-wide {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    padding: 1.25rem !important;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .modal-content h2 { font-size: 1.2rem; line-height: 1.3; }
+  .modal-subtitle { font-size: 0.82rem; }
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  .modal-actions .btn {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  /* Form grids no mobile: sempre 1 coluna */
+  .form-grid { grid-template-columns: 1fr !important; gap: 0.8rem; }
+  .field input, .field select, .field textarea {
+    padding: 0.7rem 0.8rem;
+    font-size: 16px; /* evita zoom do iOS ao focar */
+  }
+  .label-text { font-size: 0.78rem; }
+
+  /* Tabs do cliente: scroll horizontal se passar */
+  .cliente-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    margin: 0 -1rem;
+    padding: 0 1rem 4px;
+  }
+  .cliente-tabs::-webkit-scrollbar { height: 2px; }
+  .cliente-tab {
+    flex-shrink: 0;
+    font-size: 0.78rem !important;
+    padding: 0.6rem 0.9rem;
+  }
+
+  /* Tela de produção: cada item ocupa coluna inteira, controles empilhados */
+  .prod-item-head {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 0.6rem !important;
+  }
+  .prod-item-name { font-size: 1rem; }
+  .prod-item-controls {
+    justify-content: space-between;
+    gap: 0.4rem !important;
+  }
+  .prod-qty-input { width: 60px !important; padding: 0.6rem !important; font-size: 16px; }
+  .prod-unit-fixed { font-size: 0.82rem; min-width: 40px; }
+  .prod-item-cost { margin-left: auto; }
+  .prod-sf-box { flex-direction: column !important; gap: 0.3rem; }
+  .prod-sf-check { padding: 0.5rem 0.6rem; font-size: 0.85rem; }
+  .prod-actions { flex-direction: column; gap: 0.5rem; }
+  .prod-actions .btn { width: 100%; }
+
+  /* Lista de admin: cards compactos */
+  .cliente-admin-grid,
+  .user-admin-list {
+    grid-template-columns: 1fr !important;
+  }
+  .cliente-admin-card,
+  .user-card { padding: 1rem; }
+  .cc-actions, .user-actions {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .cc-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .cc-menu .btn { font-size: 0.78rem; padding: 0.55rem 0.6rem; }
+
+  /* Modal de credenciais: campos legíveis */
+  .invite-cred-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.6rem 0;
+  }
+  .invite-cred-label { min-width: 0; font-size: 0.7rem; }
+  .invite-cred-value { font-size: 0.9rem; padding: 0.4rem 0.7rem; width: 100%; box-sizing: border-box; }
+  .invite-cred-password { font-size: 1rem; }
+  .invite-cred-actions { flex-direction: column; }
+  .invite-cred-actions .btn { width: 100%; }
+  .invite-msg { font-size: 0.78rem; min-height: 200px; }
+
+  /* Tabela de variações: stack rows */
+  .variation-row {
+    grid-template-columns: 1fr 1fr auto !important;
+    gap: 0.4rem;
+  }
+
+  /* Editor de ingredientes (admin): já tem stack; tornar inputs tappable */
+  .ingredient-row input,
+  .ingredient-row select {
+    padding: 0.7rem 0.7rem;
+    font-size: 16px;
+  }
+  .ingredient-row .subref-select { font-size: 0.85rem; }
+
+  /* Banner de trial no topo do cliente */
+  .trial-banner { font-size: 0.78rem; padding: 0.5rem 0.7rem; }
+
+  /* Page header */
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .page-header > div:last-child .btn { width: 100%; }
+
+  /* Botões em geral no mobile: tappable */
+  .btn { min-height: 38px; }
+  .btn-small { min-height: 32px; font-size: 0.82rem; }
+
+  /* Tela de força troca de senha */
+  .trial-block-card {
+    padding: 1.5rem 1.2rem;
+    max-width: 95vw;
+  }
+  .trial-block-card h1 { font-size: 1.2rem; }
+  .password-change-form input { font-size: 16px; }
+
+  /* Opções da requisição: cards mais compactos */
+  .req-opt { padding: 0.7rem; }
+  .req-opt strong { font-size: 0.88rem; }
+  .req-opt .muted { font-size: 0.78rem; }
+}
+
 /* ============ Print ============ */
 @media print {
   body { background: #fff; }
