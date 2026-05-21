@@ -1709,7 +1709,7 @@ async function renderUsuariosAdmin() {
     app.appendChild(pendingGrid);
   }
 
-  // Existing users — list of cards
+  // Existing users — agrupado por papel
   app.appendChild(el('h3', { class: 'section-title' }, `Usuários cadastrados (${users.length})`));
   if (users.length === 0) {
     app.appendChild(el('div', { class: 'empty-state' },
@@ -1717,9 +1717,41 @@ async function renderUsuariosAdmin() {
     ));
     return;
   }
-  const grid = el('div', { class: 'user-admin-list' });
-  users.forEach(u => grid.appendChild(renderUserCard(u)));
-  app.appendChild(grid);
+
+  // Resolve role efetivo (cliente_admin/op vs equipe legado)
+  function effectiveRole(u) {
+    if (u.role !== 'equipe') return u.role;
+    return u.permissions?.can_view_insumos ? 'cliente_admin' : 'cliente_op';
+  }
+  const roleOrder = ['master', 'staff', 'cliente', 'cliente_admin', 'cliente_op'];
+  const groups = {};
+  users.forEach(u => {
+    const r = effectiveRole(u) || 'outros';
+    if (!groups[r]) groups[r] = [];
+    groups[r].push(u);
+  });
+  const groupedIds = roleOrder.filter(r => groups[r]?.length).concat(
+    Object.keys(groups).filter(r => !roleOrder.includes(r))
+  );
+
+  groupedIds.forEach(roleId => {
+    const list = groups[roleId];
+    // ordena: ativos primeiro, depois desativados, ambos por nome
+    list.sort((a, b) => {
+      if (!!a.disabled !== !!b.disabled) return a.disabled ? 1 : -1;
+      return (a.name || a.email || '').localeCompare(b.name || b.email || '', 'pt-BR');
+    });
+    const section = el('section', { class: 'user-role-section' });
+    section.appendChild(el('div', { class: 'user-role-header' },
+      el('span', { class: 'role-section-dot role-' + roleId }),
+      el('h4', { class: 'user-role-title' }, roleLabel(roleId)),
+      el('span', { class: 'user-role-count' }, `${list.length}`)
+    ));
+    const grid = el('div', { class: 'user-admin-list' });
+    list.forEach(u => grid.appendChild(renderUserCard(u)));
+    section.appendChild(grid);
+    app.appendChild(section);
+  });
 }
 
 function roleLabel(role) {
