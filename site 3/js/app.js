@@ -4407,16 +4407,23 @@ function exportProducaoPDF(cid) {
     if (itemIdx > 0) { docPdf.addPage(); y = M; }
 
     // Cabeçalho do prato — texto grande limpo (sem bloco preto)
-    ensureSpace(20);
-    docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
-    docPdf.text(`PRATO ${String(itemIdx + 1).padStart(2, '0')} DE ${PROD_PLAN.items.length}`, M, y); y += 4;
+    ensureSpace(36);
+    // Eyebrow pequeno
+    docPdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...PDF_COLORS.muted);
+    docPdf.text(`PRATO ${String(itemIdx + 1).padStart(2, '0')} DE ${PROD_PLAN.items.length}`, M, y);
+    y += 7;
+    // Título grande
     docPdf.setFont('helvetica', 'bold').setFontSize(18).setTextColor(...PDF_COLORS.ink);
-    docPdf.text(dish.name, M, y); y += 6;
+    docPdf.text(dish.name, M, y);
+    y += 8;
+    // Sublinha "Produzir X porções"
     docPdf.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...PDF_COLORS.body);
-    docPdf.text(`Produzir ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, M, y); y += 4;
+    docPdf.text(`Produzir ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`, M, y);
+    y += 4;
     // Linha índigo decorativa
     docPdf.setDrawColor(...PDF_COLORS.accent).setLineWidth(0.6);
-    docPdf.line(M, y, M + 20, y); y += 8;
+    docPdf.line(M, y, M + 20, y);
+    y += 9;
 
     // Cada sub-ficha na ordem
     activeSfs.forEach((sf, sfIdx) => {
@@ -4447,9 +4454,10 @@ function exportProducaoPDF(cid) {
         docPdf.roundedRect(M + chipSize + 3 + nameWidth + 3, y + 1.5, 18, 5, 1, 1, 'F');
         docPdf.text('FINAL', M + chipSize + 3 + nameWidth + 12, y + 5, { align: 'center' });
       }
-      y += chipSize + 2;
+      y += chipSize + 4;
       docPdf.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...PDF_COLORS.muted);
-      docPdf.text(`Rendimento ${sn.text} ${sn.unit}`.trim(), M + chipSize + 3, y); y += 4;
+      docPdf.text(`Rendimento ${sn.text} ${sn.unit}`.trim(), M + chipSize + 3, y);
+      y += 5;
 
       // Tabela de ingredientes (sem custo)
       const ingRows = (sf.ingredientes || []).map(ing => {
@@ -4496,8 +4504,9 @@ function exportProducaoPDF(cid) {
       // Modo de preparo (bloco discreto)
       if (sf.modo_preparo && sf.modo_preparo.trim()) {
         ensureSpace(15);
-        docPdf.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(...PDF_COLORS.accent);
-        docPdf.text('MODO DE PREPARO', M, y); y += 4;
+        docPdf.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...PDF_COLORS.accentDark);
+        docPdf.text('MODO DE PREPARO', M, y);
+        y += 5;
         docPdf.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...PDF_COLORS.body);
         const textWidth = W - 2 * M;
         const lines = docPdf.splitTextToSize(sf.modo_preparo, textWidth);
