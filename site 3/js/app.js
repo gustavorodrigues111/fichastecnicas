@@ -155,25 +155,77 @@ function scheduleSave(key, fn, delay = 700) {
 }
 
 // ---------- Permission helpers ----------
+// Roles do sistema:
+//   master         — Gustavo. Cria/edita tudo. Único que cria clientes e Minha Equipe (staff).
+//   staff          — "Minha Equipe" (consultoria). Cria/edita fichas e preços nos restaurantes atribuídos.
+//   cliente        — Dono do restaurante. Vê tudo, edita preços, planeja produção, cria sua equipe.
+//                    Cria fichas próprias (desbloqueadas). Não edita fichas locked (criadas pela consultoria).
+//   cliente_admin  — Equipe administrativa do cliente. Vê preços, planeja produção. Não cria fichas.
+//   cliente_op     — Equipe operacional do cliente. Acessa fichas e planeja produção. Não vê preços.
+//   equipe (legado)— Mapeado dinamicamente pra cliente_admin (se via insumos) ou cliente_op.
 const isMaster = () => STATE.userDoc && (STATE.userDoc.role === 'master' || STATE.user?.email === MASTER_EMAIL);
 const isStaff = () => STATE.userDoc && STATE.userDoc.role === 'staff';
 const isClienteUser = () => STATE.userDoc && STATE.userDoc.role === 'cliente';
-const isEquipe = () => STATE.userDoc && STATE.userDoc.role === 'equipe';
+const isClienteAdmin = () => STATE.userDoc && (STATE.userDoc.role === 'cliente_admin'
+  || (STATE.userDoc.role === 'equipe' && !!STATE.userDoc.permissions?.can_view_insumos));
+const isClienteOp = () => STATE.userDoc && (STATE.userDoc.role === 'cliente_op'
+  || (STATE.userDoc.role === 'equipe' && !STATE.userDoc.permissions?.can_view_insumos));
+// Compatibilidade: qualquer perfil de cliente (dono ou equipe)
+const isAnyClienteSide = () => isClienteUser() || isClienteAdmin() || isClienteOp();
+
 const hasClientAccess = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
-// Permissões granulares do perfil equipe — cliente/staff/master sempre tem
-const equipePerm = (name) => !!(STATE.userDoc?.permissions && STATE.userDoc.permissions[name]);
-const canEditCliente = (cid) => isMaster() || (isStaff() && (STATE.userDoc.clienteIds || []).includes(cid));
 const canViewCliente = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
-const canEditInsumoPrice = (cid) => canEditCliente(cid) || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
-const canViewCardapio = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_cardapio'));
-const canViewInsumosTab = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_insumos'));
-const canViewProducao = (cid) => canViewCliente(cid) && (!isEquipe() || equipePerm('can_view_producao'));
-const canCountStock = (cid) => hasClientAccess(cid); // todos que têm acesso ao cliente
-const canManageStock = (cid) => canEditCliente(cid) || (isClienteUser() && hasClientAccess(cid)) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_manage_contagem'));
-const canEditContagem = (cid) => canManageStock(cid) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_edit_contagem'));
-const canManageTemplates = (cid) => canEditCliente(cid) || (isClienteUser() && hasClientAccess(cid)) || (isEquipe() && hasClientAccess(cid) && equipePerm('can_manage_templates'));
+
+// Edição de fichas (admin completo do restaurante): só master + staff
+const canEditCliente = (cid) => isMaster() || (isStaff() && (STATE.userDoc.clienteIds || []).includes(cid));
+
+// Edição de preço de insumo: master, staff, cliente (dono), cliente_admin
+const canEditInsumoPrice = (cid) => canEditCliente(cid)
+  || ((isClienteUser() || isClienteAdmin()) && (STATE.userDoc.clienteIds || []).includes(cid));
+
+// Visualização das abas
+const canViewCardapio = (cid) => canViewCliente(cid); // todos veem o cardápio
+const canViewInsumosTab = (cid) => canViewCliente(cid) && (isMaster() || isStaff() || isClienteUser() || isClienteAdmin());
+const canViewProducao = (cid) => canViewCliente(cid); // todos veem produção
+
+// Cliente (dono) gerencia equipe do próprio restaurante
+const canManageClientTeam = (cid) => isMaster() || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
+
+// Edição de uma ficha específica (considera lock):
+//   - Ficha locked (default pra fichas criadas por master/staff): só master e staff editam
+//   - Ficha unlocked: master, staff e cliente (dono) editam
+//   - cliente_admin, cliente_op: nunca editam fichas (só veem)
+function canEditDish(cid, dish) {
+  if (!canViewCliente(cid)) return false;
+  if (isMaster() || (isStaff() && hasClientAccess(cid))) return true;
+  if (isClienteUser() && hasClientAccess(cid)) {
+    // Cliente pode editar se a ficha NÃO está locked
+    return !dish.locked;
+  }
+  return false;
+}
+function canCreateDish(cid) {
+  if (isMaster()) return true;
+  if (isStaff() && hasClientAccess(cid)) return true;
+  if (isClienteUser() && hasClientAccess(cid)) return true; // cliente cria fichas próprias
+  return false;
+}
+function canToggleDishLock(cid) {
+  // Só master e staff travam/destravam fichas
+  return isMaster() || (isStaff() && hasClientAccess(cid));
+}
+
 const canManageUsers = () => isMaster();
 const canManageClientes = () => isMaster();
+
+const ROLE_LABELS = {
+  master: 'Master',
+  staff: 'Minha Equipe',
+  cliente: 'Cliente (dono)',
+  cliente_admin: 'Equipe Admin do Cliente',
+  cliente_op: 'Equipe Operacional',
+  equipe: 'Equipe (legado)'
+};
 
 // ---------- Trial / assinatura ----------
 const TRIAL_DEFAULT_DAYS = 180; // 6 meses
@@ -1217,12 +1269,6 @@ async function route() {
 
     const rest = parts.slice(2);
     if (rest.length === 0) {
-      // Se equipe sem permissão pra cardápio, manda pra primeira aba disponível
-      if (isEquipe() && !canViewCardapio(cid)) {
-        if (canViewProducao(cid)) { location.hash = `#/c/${cid}/producao`; return; }
-        if (canViewInsumosTab(cid)) { location.hash = `#/c/${cid}/insumos`; return; }
-        renderNoAccess(); return;
-      }
       renderClienteHome(cid); return;
     }
     if (rest[0] === 'ficha' && rest[1]) {
@@ -1243,10 +1289,16 @@ async function route() {
       return;
     }
     if (rest[0] === 'admin') {
-      if (!canEditCliente(cid)) { renderNoAccess(); return; }
+      // master/staff: acesso total; cliente (dono): pode criar/editar fichas próprias
+      if (!canCreateDish(cid)) { renderNoAccess(); return; }
       if (rest[1] === 'new') { renderAdminEdit(cid, null); return; }
       if (rest[1] === 'edit' && rest[2]) { renderAdminEdit(cid, rest[2]); return; }
       renderAdminList(cid); return;
+    }
+    if (rest[0] === 'equipe') {
+      // Cliente (dono) gerencia equipe do próprio restaurante
+      if (!canManageClientTeam(cid)) { renderNoAccess(); return; }
+      renderClientTeamAdmin(cid); return;
     }
   }
 
@@ -1480,9 +1532,11 @@ async function renderUsuariosAdmin() {
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
   const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Equipe — admin completo nos restaurantes atribuídos'),
-    el('option', { value: 'cliente' }, 'Cliente — visualiza e edita só preços'),
-    el('option', { value: 'master' }, 'Master — acesso total')
+    el('option', { value: 'staff' }, 'Minha Equipe — cria/edita fichas e preços (consultoria)'),
+    el('option', { value: 'cliente' }, 'Cliente (dono) — edita preços e cria fichas próprias'),
+    el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente — vê preços, planeja produção'),
+    el('option', { value: 'cliente_op' }, 'Equipe Operacional — só fichas e produção (sem preços)'),
+    el('option', { value: 'master' }, 'Master — acesso total ao sistema')
   );
   const clienteChecks = el('div', { class: 'cliente-chip-picker' });
   STATE.clientes.forEach(c => {
@@ -1530,7 +1584,7 @@ async function renderUsuariosAdmin() {
 }
 
 function roleLabel(role) {
-  return { master: 'Master', staff: 'Equipe', cliente: 'Cliente' }[role] || role || '—';
+  return ROLE_LABELS[role] || role || '—';
 }
 
 function renderUserCard(u) {
@@ -1609,12 +1663,14 @@ function openEditUserModal(u) {
   const nameInput = el('input', { type: 'text', value: u.name || '' });
   const whatsInput = el('input', { type: 'tel', value: u.whatsapp || '', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('option', { value: 'staff' }, 'Staff (consultoria)'),
+    el('option', { value: 'staff' }, 'Minha Equipe (consultoria)'),
     el('option', { value: 'cliente' }, 'Cliente (dono)'),
-    el('option', { value: 'equipe' }, 'Equipe (operacional do restaurante)'),
+    el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente'),
+    el('option', { value: 'cliente_op' }, 'Equipe Operacional do Cliente'),
+    el('option', { value: 'equipe' }, 'Equipe (perfil legado)'),
     el('option', { value: 'master' }, 'Master')
   );
-  roleSelect.value = u.role || 'staff';
+  roleSelect.value = u.role || 'cliente_op';
 
   const clienteChecks = el('div', { class: 'cliente-chip-picker' });
   const currentIds = new Set(u.clienteIds || []);
@@ -1646,8 +1702,8 @@ function openEditUserModal(u) {
         el('span', { class: 'perm-desc' }, p.desc))));
   });
   const permSection = el('div', { class: 'perm-section' },
-    el('h3', {}, 'Permissões extras'),
-    el('p', { class: 'muted' }, 'Só se aplica ao perfil Equipe. Cliente/Staff/Master já têm acesso total.'),
+    el('h3', {}, 'Permissões extras (perfil legado)'),
+    el('p', { class: 'muted' }, 'Estas permissões eram do antigo perfil "Equipe" com checkboxes. O sistema agora detecta automaticamente: se "Ver insumos com preços" está marcado, o usuário se comporta como Equipe Admin do Cliente; senão, como Equipe Operacional. Migre o papel pra um dos novos pra simplificar.'),
     permBox
   );
   permSection.style.display = roleSelect.value === 'equipe' ? '' : 'none';
@@ -2220,7 +2276,9 @@ function renderClienteContext(cid) {
       el('span', { class: 'tab-icon' }, '▲'), 'Produção') : null,
     canViewInsumosTab(cid) ? el('a', { class: 'cliente-tab' + (isInsumos ? ' active' : ''), href: `#/c/${cid}/insumos` },
       el('span', { class: 'tab-icon' }, '◎'), 'Insumos') : null,
-    canEditCliente(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
+    canManageClientTeam(cid) ? el('a', { class: 'cliente-tab' + (hash.includes(`/c/${cid}/equipe`) ? ' active' : ''), href: `#/c/${cid}/equipe` },
+      el('span', { class: 'tab-icon' }, '☱'), 'Equipe') : null,
+    canCreateDish(cid) ? el('a', { class: 'cliente-tab' + (isAdmin ? ' active' : ''), href: `#/c/${cid}/admin` },
       el('span', { class: 'tab-icon' }, '⚙'), 'Gerenciar') : null,
   );
   wrap.appendChild(tabs);
@@ -4819,10 +4877,13 @@ function renderAdminList(cid) {
   const app = $('#app');
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
+  const isFullAdmin = canEditCliente(cid);
   const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar fichas'),
-      el('p', {}, 'Adicione, edite ou exclua pratos. Salva automaticamente.')
+      el('p', {}, isFullAdmin
+        ? 'Adicione, edite ou exclua pratos. Salva automaticamente.'
+        : 'Crie fichas próprias ou edite as que estão desbloqueadas. Fichas bloqueadas pela consultoria só podem ser visualizadas.')
     ),
     el('a', { class: 'btn btn-primary', href: `#/c/${cid}/admin/new` }, '+ Nova ficha')
   );
@@ -4830,24 +4891,142 @@ function renderAdminList(cid) {
   const panel = el('div', { class: 'admin-panel' });
   const list = el('div', { class: 'dish-admin-list' });
   STATE.dishes.forEach(dish => {
-    const item = el('div', { class: 'dish-admin-item' },
+    const canEdit = canEditDish(cid, dish);
+    const lockedByConsultor = !!dish.locked && !isFullAdmin;
+    const item = el('div', { class: 'dish-admin-item' + (lockedByConsultor ? ' dish-locked' : '') },
       el('div', { class: 'info' },
-        el('h4', {}, dish.name),
+        el('h4', {}, dish.name,
+          dish.locked && isFullAdmin ? el('span', { class: 'lock-badge lock-by-master', title: 'Bloqueada pra edição pelo cliente' }, '🔒 travada') : null,
+          lockedByConsultor ? el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 bloqueada pelo consultor') : null
+        ),
         el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
       el('div', { class: 'dish-admin-actions' },
         el('a', { class: 'btn btn-small', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver'),
-        el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar'),
-        el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-          if (!confirm(`Excluir "${dish.name}"?`)) return;
-          try { await deleteDish(cid, dish.id); toast('Excluída'); } catch (e) { toast('Erro: ' + e.message); }
-        } }, 'Excluir')
+        canEdit
+          ? el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar')
+          : el('button', { class: 'btn btn-small', disabled: '', title: 'Esta ficha foi bloqueada pela consultoria' }, 'Editar 🔒'),
+        isFullAdmin
+          ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+              if (!confirm(`Excluir "${dish.name}"?`)) return;
+              try { await deleteDish(cid, dish.id); toast('Excluída'); } catch (e) { toast('Erro: ' + e.message); }
+            } }, 'Excluir')
+          : null
       )
     );
     list.appendChild(item);
   });
   panel.appendChild(list);
   app.appendChild(panel);
+}
+
+// Cliente (dono) gerencia a própria equipe (admin + op) do restaurante atual
+async function renderClientTeamAdmin(cid) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  renderLoadingScreen();
+  const allUsersSnap = await getDocs(collection(db, 'users'));
+  const teamUsers = allUsersSnap.docs
+    .map(d => ({ uid: d.id, ...d.data() }))
+    .filter(u => (u.clienteIds || []).includes(cid))
+    .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Equipe do restaurante'),
+      el('p', {}, 'Cadastre as pessoas que ajudam você a operar a cozinha. Equipe Admin vê preços e planeja produção; Equipe Operacional só acessa fichas e produção.')
+    )
+  ));
+  // Painel de convite
+  const invitePanel = el('section', { class: 'admin-panel-card' },
+    el('h3', {}, 'Adicionar pessoa à equipe'),
+    el('p', { class: 'muted' }, 'Após salvar, o sistema gera uma senha temporária — copie ou envie pelo WhatsApp pra pessoa. No primeiro login ela troca por uma senha pessoal.')
+  );
+  const nameInput = el('input', { type: 'text', placeholder: 'Nome completo' });
+  const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com' });
+  const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
+  const roleSelect = el('select', {},
+    el('option', { value: 'cliente_op' }, 'Equipe Operacional — acessa fichas e produção'),
+    el('option', { value: 'cliente_admin' }, 'Equipe Admin — vê preços, planeja produção')
+  );
+  invitePanel.appendChild(el('div', { class: 'form-grid' },
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Email'), emailInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'WhatsApp'), whatsInput),
+    el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
+  ));
+  invitePanel.appendChild(el('div', { class: 'panel-actions' },
+    el('button', { class: 'btn btn-primary', onclick: async () => {
+      const email = emailInput.value.trim();
+      const name = nameInput.value.trim() || email.split('@')[0];
+      if (!name) { alert('Informe o nome'); return; }
+      if (!email) { alert('Informe o email'); return; }
+      try {
+        await inviteUser(email, name, roleSelect.value, [cid], whatsInput.value.trim());
+      } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      renderClientTeamAdmin(cid);
+    } }, 'Adicionar à equipe')
+  ));
+  app.appendChild(invitePanel);
+
+  // Lista
+  app.appendChild(el('h3', { class: 'section-title' }, `Equipe atual (${teamUsers.length})`));
+  if (teamUsers.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' }, el('p', { class: 'muted' }, 'Ainda não há ninguém na equipe.')));
+    return;
+  }
+  const grid = el('div', { class: 'user-admin-list' });
+  teamUsers.forEach(u => {
+    const isMe = u.uid === STATE.user?.uid;
+    const card = el('article', { class: 'user-card' + (u.disabled ? ' user-card-disabled' : '') });
+    card.appendChild(el('div', { class: 'user-card-head' },
+      el('div', { class: 'user-id' },
+        el('h4', { class: 'user-name' }, u.name || '—',
+          u.disabled ? el('span', { class: 'disabled-badge' }, '⏸ inativo') : null,
+          !u.disabled && u.mustChangePassword ? el('span', { class: 'pending-badge' }, '⏳ aguarda 1º login') : null
+        ),
+        el('span', { class: 'user-email' }, u.email),
+        u.whatsapp ? el('span', { class: 'user-whatsapp' }, '📱 ' + u.whatsapp) : null
+      ),
+      el('span', { class: 'role-badge role-' + (u.role || 'none') }, roleLabel(u.role))
+    ));
+    const actions = el('div', { class: 'user-actions' });
+    if (isMe) actions.appendChild(el('span', { class: 'muted' }, '(você)'));
+    else if (u.disabled) {
+      actions.appendChild(el('button', { class: 'btn btn-small btn-primary', onclick: async () => {
+        try {
+          await setDoc(doc(db, 'users', u.uid), { disabled: deleteField(), disabledAt: deleteField(), reactivatedAt: new Date().toISOString() }, { merge: true });
+          toast('Reativado');
+          renderClientTeamAdmin(cid);
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } }, '↻ Reativar'));
+    } else {
+      // Toggle entre admin e op
+      const otherRole = u.role === 'cliente_admin' ? 'cliente_op' : 'cliente_admin';
+      const otherLabel = otherRole === 'cliente_admin' ? 'Promover a Admin' : 'Rebaixar para Operacional';
+      actions.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
+        if (!confirm(`Mudar ${u.email} para "${roleLabel(otherRole)}"?`)) return;
+        try {
+          await setDoc(doc(db, 'users', u.uid), { role: otherRole }, { merge: true });
+          toast('Papel alterado');
+          renderClientTeamAdmin(cid);
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } }, otherLabel));
+      actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+        if (!confirm(`Desativar ${u.email}? Pode reativar depois.`)) return;
+        try {
+          await setDoc(doc(db, 'users', u.uid), { disabled: true, disabledAt: new Date().toISOString() }, { merge: true });
+          toast('Desativado');
+          renderClientTeamAdmin(cid);
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } }, 'Desativar'));
+    }
+    card.appendChild(actions);
+    grid.appendChild(card);
+  });
+  app.appendChild(grid);
 }
 
 function renderAdminEdit(cid, dishId) {
@@ -4858,15 +5037,47 @@ function renderAdminEdit(cid, dishId) {
   if (dishId) {
     const existing = STATE.dishes.find(d => d.id === dishId);
     if (!existing) { app.appendChild(el('p', {}, 'Prato não encontrado')); return; }
+    // Bloqueia cliente ao tentar editar ficha locked
+    if (!canEditDish(cid, existing)) {
+      app.appendChild(el('a', { href: `#/c/${cid}/admin`, class: 'back-link' }, '← Voltar'));
+      app.appendChild(el('div', { class: 'trial-block' },
+        el('div', { class: 'trial-block-card' },
+          el('h1', {}, 'Ficha bloqueada'),
+          el('p', {}, `A ficha "${existing.name}" está bloqueada para edição pela consultoria.`),
+          el('p', { class: 'muted' }, 'Você pode visualizá-la normalmente, mas alterações precisam ser feitas pelo consultor.'),
+          el('a', { class: 'btn', href: `#/c/${cid}/ficha/${existing.id}` }, 'Ver ficha'),
+          el('a', { class: 'btn', href: `#/c/${cid}/admin`, style: 'margin-left:0.5rem;' }, 'Voltar')
+        )
+      ));
+      return;
+    }
     dish = JSON.parse(JSON.stringify(existing));
   } else {
+    // Nova ficha: master/staff cria locked por default; cliente cria desbloqueada
+    const defaultLocked = isMaster() || isStaff();
     dish = { id: 'new-' + uid(), name: '', description: '', photos: [], louca: '', equipamentos: [],
       sub_fichas: [{ id: uid(), name: 'Preparação 1', rendimento: '', ingredientes: [], modo_preparo: '' }],
-      markup: 300 };
+      markup: 300,
+      locked: defaultLocked,
+      createdBy: isClienteUser() ? 'cliente' : 'consultoria'
+    };
   }
   app.appendChild(el('a', { href: `#/c/${cid}/admin`, class: 'back-link' }, '← Voltar'));
   app.appendChild(el('h1', {}, dishId ? 'Editar ficha' : 'Nova ficha'));
   const panel = el('div', { class: 'admin-panel' });
+  // Switch de bloqueio (só master/staff vê)
+  if (canToggleDishLock(cid)) {
+    const lockToggle = el('input', { type: 'checkbox' });
+    if (dish.locked) lockToggle.setAttribute('checked', '');
+    lockToggle.addEventListener('change', () => { dish.locked = lockToggle.checked; });
+    panel.appendChild(el('div', { class: 'lock-toggle-box' },
+      lockToggle,
+      el('div', {},
+        el('strong', {}, '🔒 Bloquear edição pelo cliente'),
+        el('p', { class: 'muted' }, 'Quando ativo, o dono do restaurante e a equipe dele não conseguem editar esta ficha — só visualizar. Use pra fichas que você entrega como parte da consultoria e quer manter o controle.')
+      )
+    ));
+  }
   panel.appendChild(el('h2', {}, 'Informações gerais'));
   panel.appendChild(el('div', { class: 'form-grid' },
     fieldInput('Nome do prato', 'text', dish.name, v => dish.name = v),
@@ -5295,6 +5506,11 @@ async function saveDishAction(cid, dish, originalId) {
   if (!dish.name.trim()) { alert('Nome do prato é obrigatório'); return; }
   const newId = slugify(dish.name);
   dish.id = newId;
+  // Cliente não pode alterar lock — força ao valor original
+  if (!canToggleDishLock(cid)) {
+    const orig = originalId ? STATE.dishes.find(d => d.id === originalId) : null;
+    dish.locked = orig ? !!orig.locked : false; // nova ficha do cliente nasce desbloqueada
+  }
   try {
     // Coleta nomes de subprodutos (global + da ficha atual) pra evitar criar insumo pra eles
     const subprodutoNames = new Set();

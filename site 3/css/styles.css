@@ -2111,6 +2111,36 @@ label.field textarea { min-height: 90px; resize: vertical; }
 }
 .user-card-disabled .user-name { text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.2); }
 
+/* Lock de fichas */
+.lock-badge {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.lock-by-master { background: #efece4; color: #8a6b40; }
+.lock-by-consultor { background: #fbd8d5; color: #a31e1e; }
+.dish-locked { opacity: 0.75; }
+.dish-locked .info h4 { color: #6a6a6a; }
+
+.lock-toggle-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e9d3a0;
+  border-radius: 8px;
+  background: #fef6e0;
+  margin-bottom: 1.5rem;
+}
+.lock-toggle-box input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
+.lock-toggle-box strong { display: block; color: #8a6b40; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.lock-toggle-box .muted { font-size: 0.82rem; line-height: 1.4; color: #6a6a6a; margin: 0; }
+
 /* Modal de opções da requisição */
 .req-options {
   display: flex;
