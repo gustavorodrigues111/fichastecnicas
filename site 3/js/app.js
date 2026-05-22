@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0380';
+const APP_BUILD = '20260522-V2-0390';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2909,16 +2909,30 @@ function renderClienteHome(cid) {
     const cmvT = cmvTrend();
     const markupT = markupTrend();
 
-    // PREÇO DE VENDA — único badge que abre o editor (preço, CMV, markup)
-    const priceBadge = showCost ? el('span', {
-      class: 'dish-price-badge' + (canEditPrice ? ' is-editable' : ''),
-      title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
-    }, fmtBRL(salePrice)) : null;
-    if (priceBadge && canEditPrice) {
-      priceBadge.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        openDishPriceEditor(cid, dish);
-      });
+    // PREÇO DE VENDA + CUSTO — bloco compacto com labels
+    let priceBlock = null;
+    if (showCost) {
+      priceBlock = el('div', { class: 'dish-price-block' });
+      // Preço de venda (clicável pra editar)
+      const priceBadgeInner = el('div', {
+        class: 'dish-price-badge' + (canEditPrice ? ' is-editable' : ''),
+        title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
+      }, fmtBRL(salePrice));
+      if (canEditPrice) {
+        priceBadgeInner.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          openDishPriceEditor(cid, dish);
+        });
+      }
+      priceBlock.appendChild(el('div', { class: 'dish-price-row' },
+        el('span', { class: 'dish-price-label' }, 'Preço de venda'),
+        priceBadgeInner
+      ));
+      // Custo por porção — cor herdada do status do CMV
+      priceBlock.appendChild(el('div', { class: 'dish-price-row' },
+        el('span', { class: 'dish-price-label' }, 'Custo / porção'),
+        el('div', { class: 'dish-cost-badge dish-cost-' + cmvStatus }, fmtBRL(costInfo.costPerPortion))
+      ));
     }
 
     // CMV — badge inteiro abre histórico. Seta inline mostra direção da última variação.
@@ -2960,7 +2974,7 @@ function renderClienteHome(cid) {
           el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
           el('span', { class: 'dish-name' }, dish.name)
         ),
-        priceBadge
+        priceBlock
       ),
       showCost ? el('div', { class: 'dish-summary-bottom' }, cmvBadge, markupBadge) : null
     );
