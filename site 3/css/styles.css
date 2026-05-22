@@ -3074,11 +3074,14 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   cursor: pointer;
   background: var(--bg);
   transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
 }
-.req-opt:hover { background: #faf7f0; border-color: #c9a766; }
-.req-opt input[type=checkbox] { margin-top: 3px; flex-shrink: 0; }
-.req-opt strong { display: block; color: #2a2a2a; font-size: 0.95rem; margin-bottom: 0.2rem; }
-.req-opt .muted { font-size: 0.82rem; line-height: 1.4; color: #6a6a6a; }
+.req-opt:hover { background: var(--bg2); border-color: var(--accent-border); }
+.req-opt > input[type=checkbox] { margin-top: 3px; flex-shrink: 0; width: auto; }
+.req-opt > div { flex: 1 1 auto; min-width: 0; }
+.req-opt strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 0.2rem; }
+.req-opt .muted { display: block; font-size: 0.82rem; line-height: 1.4; color: var(--text3); }
 .req-time-input {
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--border2);
