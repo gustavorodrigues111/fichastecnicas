@@ -3309,59 +3309,36 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   flex-shrink: 0;
 }
 
-/* ============ Credito de consultoria ============ */
-.consultor-credit {
+/* ============ Crédito de consultoria — faixa fina no contexto do cliente ============ */
+.consultor-strip {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  margin: -1rem auto 2.5rem;
-  padding: 0.75rem 1.5rem;
-  text-align: center;
-  max-width: 500px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.consultor-credit .consultor-by {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: #999;
-  font-weight: 500;
-}
-.consultor-credit .consultor-name {
-  font-family: inherit;
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: 0.02em;
-}
-.consultor-credit .consultor-info {
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.4rem 0;
+  margin-bottom: 1rem;
   font-size: 0.78rem;
-  color: #888;
-  font-style: italic;
-  margin-top: 0.1rem;
+  color: var(--text2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
-.consultor-credit-ficha {
-  display: block;
-  margin: 0 0 1.25rem;
-  padding: 0.55rem 0.9rem;
-  border: none;
-  border-left: 2px solid var(--accent);
-  background: #faf8f2;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.82rem;
-  color: #6a6a6a;
+.consultor-strip-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  color: var(--text3);
+  font-weight: 600;
+}
+.consultor-strip-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.consultor-strip-info {
+  color: var(--text3);
   font-style: italic;
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-  max-width: none;
-  text-align: left;
 }
 @media (max-width: 640px) {
-  .consultor-credit { margin: -0.5rem 0 1.75rem; padding: 0.6rem 0.9rem; }
-  .consultor-credit .consultor-name { font-size: 1.05rem; }
-  .consultor-credit-ficha { padding: 0.45rem 0.75rem; margin-bottom: 1rem; font-size: 0.78rem; }
+  .consultor-strip { padding: 0.35rem 0; gap: 0.3rem; font-size: 0.72rem; }
+  .consultor-strip-label { font-size: 0.58rem; }
 }
 
 /* ============ Cardápio list (home) ============ */

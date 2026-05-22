@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0400';
+const APP_BUILD = '20260522-V2-0410';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2834,23 +2834,13 @@ function renderClienteHome(cid) {
 
   app.appendChild(renderClienteContext(cid));
 
-  const cliente = STATE.currentCliente;
-  const hero = el('section', { class: 'home-hero' },
-    el('h1', {}, 'Cardápio'),
-    el('p', { class: 'subtitle' }, cliente?.name || ''),
-    el('p', { class: 'home-stats-mini' },
-      `${STATE.dishes.length} pratos · ${totalSubfichas} sub-fichas · ${STATE.insumos.length} insumos`)
-  );
-  app.appendChild(hero);
-
-  // Consultoria (se ativa)
-  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
-    app.appendChild(el('div', { class: 'consultor-credit' },
-      el('span', { class: 'consultor-by' }, 'Consultoria por'),
-      el('span', { class: 'consultor-name' }, cliente.consultor_name),
-      cliente.consultor_info ? el('span', { class: 'consultor-info' }, cliente.consultor_info) : null
-    ));
-  }
+  // Header padronizado com outras telas: h1 alinhado à esquerda + descrição em baixo
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Cardápio'),
+      el('p', {}, `${STATE.dishes.length} pratos · ${totalSubfichas} sub-fichas · ${STATE.insumos.length} insumos`)
+    )
+  ));
 
   if (STATE.dishes.length === 0) {
     const empty = el('div', { class: 'empty-state' },
@@ -3218,6 +3208,17 @@ function renderClienteContext(cid) {
       el('span', { class: 'tab-icon' }, '⚙'), 'Gerenciar') : null,
   );
   wrap.appendChild(tabs);
+  // Faixa de consultoria sempre visível em todas as telas do restaurante
+  const cliente = STATE.currentCliente;
+  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
+    wrap.appendChild(el('div', { class: 'consultor-strip' },
+      el('span', { class: 'consultor-strip-label' }, 'Consultoria por'),
+      el('span', { class: 'consultor-strip-name' }, cliente.consultor_name),
+      cliente.consultor_info
+        ? el('span', { class: 'consultor-strip-info' }, '· ' + cliente.consultor_info)
+        : null
+    ));
+  }
   return wrap;
 }
 
@@ -3249,11 +3250,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
   app.appendChild(header);
 
   // Consultoria (se ativa) — uma linha só, tipografia consistente
-  const cliente = STATE.currentCliente;
-  if (cliente?.show_consultor !== false && cliente?.consultor_name) {
-    const text = 'Consultoria por ' + cliente.consultor_name + (cliente.consultor_info ? ' · ' + cliente.consultor_info : '');
-    app.appendChild(el('div', { class: 'consultor-credit-ficha' }, text));
-  }
+  // (consultoria já aparece no header global via renderClienteContext)
 
   // Top action bar — view toggle + exports (mesma linha, mesmo tamanho)
   // Botão "Custo" só aparece pra quem tem permissão de ver preços (cliente_op não vê)
@@ -5980,13 +5977,24 @@ function pdfDrawFooter(docPdf) {
   const W = PDF_LAYOUT.pageWidth;
   const H = PDF_LAYOUT.pageHeight;
   const total = docPdf.internal.getNumberOfPages();
+  const cliente = STATE.currentCliente;
+  const consultor = cliente?.show_consultor !== false && cliente?.consultor_name
+    ? 'Consultoria por ' + cliente.consultor_name
+      + (cliente.consultor_info ? ' · ' + cliente.consultor_info : '')
+    : null;
   for (let i = 1; i <= total; i++) {
     docPdf.setPage(i);
     docPdf.setDrawColor(...PDF_COLORS.hairline).setLineWidth(0.2);
     docPdf.line(M, H - 12, W - M, H - 12);
     docPdf.setFont('helvetica', 'normal').setFontSize(7.5).setTextColor(...PDF_COLORS.subtle);
-    docPdf.text('appmise.app', M, H - 7);
-    docPdf.text(`${i} de ${total}`, W - M, H - 7, { align: 'right' });
+    // Linha 1 do rodapé: appmise.app · paginação
+    docPdf.text('appmise.app', M, H - 8);
+    docPdf.text(`${i} de ${total}`, W - M, H - 8, { align: 'right' });
+    // Linha 2: nome do consultor (se ativo)
+    if (consultor) {
+      docPdf.setFontSize(7).setTextColor(...PDF_COLORS.subtle);
+      docPdf.text(consultor, W / 2, H - 4, { align: 'center' });
+    }
   }
 }
 
