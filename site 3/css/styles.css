@@ -3811,6 +3811,10 @@ label.field textarea { min-height: 90px; resize: vertical; }
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0.75rem;
 }
+/* Labels com display:flex (checkbox + texto longo) precisam de min-width 0 e quebra de palavra */
+.modal-content label { min-width: 0; }
+.modal-content label > * { min-width: 0; }
+.modal-content label span { overflow-wrap: anywhere; word-break: break-word; flex: 1 1 auto; }
 .modal-content h2 { margin-top: 0; margin-bottom: 0.25rem; font-size: 1.2rem; }
 .modal-subtitle {
   color: var(--text3);
