@@ -3547,6 +3547,15 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
 .dish-price-badge.is-editable:hover { text-decoration: underline; text-underline-offset: 3px; }
 .dish-metric.is-editable:hover { filter: brightness(0.95); }
 
+.dish-metric-trend {
+  margin-left: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: help;
+}
+.dish-metric-trend.trend-up { color: #dc2626; }
+.dish-metric-trend.trend-down { color: #16a34a; }
+
 .price-editor-grid {
   display: grid;
   grid-template-columns: 1fr;

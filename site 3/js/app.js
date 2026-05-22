@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0300';
+const APP_BUILD = '20260522-V2-0310';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -435,6 +435,68 @@ async function saveInsumo(cid, insumo) {
   const clean = { ...insumo };
   delete clean.id;
   await setDoc(insumoDoc(cid, insumo.id), clean, { merge: true });
+  // Atualiza STATE.insumos local pra que dishCost recalcule com o novo preço
+  const localIdx = STATE.insumos.findIndex(i => i.id === insumo.id);
+  if (localIdx >= 0) STATE.insumos[localIdx] = { ...STATE.insumos[localIdx], ...insumo };
+  else STATE.insumos.push(insumo);
+  // Registra variação no price_history de cada dish afetado (item: ícone ↑↓ no card)
+  await recordPriceHistoryForAffectedDishes(cid, insumo.id, 'insumo:' + (insumo.name || insumo.id));
+}
+
+// Lazy backfill: garante que todo dish tenha sale_price gravado (fixo)
+// Roda silencioso pra users com permissão de editar preço
+async function backfillSalePrices(cid) {
+  const needBackfill = STATE.dishes.filter(d =>
+    !d.inactive
+    && (typeof d.sale_price !== 'number' || d.sale_price <= 0)
+    && d.sub_fichas && d.sub_fichas.length > 0
+  );
+  if (needBackfill.length === 0) return;
+  console.info('[backfill] fixando sale_price em', needBackfill.length, 'fichas');
+  for (const dish of needBackfill) {
+    const c = dishCost(dish);
+    if (c.costPerPortion <= 0) continue; // sem custo, não fixa
+    const fixed = Number((c.suggestedPrice || 0).toFixed(2));
+    if (!isFinite(fixed) || fixed <= 0) continue;
+    try {
+      await setDoc(dishDoc(cid, dish.id), { sale_price: fixed }, { merge: true });
+      dish.sale_price = fixed;
+    } catch (e) { console.warn('[backfill]', dish.id, e?.code); break; }
+  }
+}
+
+// Após mudança em insumo, percorre dishes que o usam e registra variação no price_history
+async function recordPriceHistoryForAffectedDishes(cid, insumoId, trigger) {
+  try {
+    const affected = STATE.dishes.filter(d =>
+      (d.sub_fichas || []).some(sf =>
+        (sf.ingredientes || []).some(ing => ing.insumo_id === insumoId)
+      )
+    );
+    if (affected.length === 0) return;
+    const userName = STATE.userDoc?.name || STATE.user?.email || 'sistema';
+    const at = new Date().toISOString();
+    await Promise.all(affected.map(async (dish) => {
+      const c = dishCost(dish);
+      const lastEntry = (dish.price_history || []).slice(-1)[0];
+      const costChanged = !lastEntry || Math.abs((lastEntry.costPerPortion || 0) - c.costPerPortion) > 0.01;
+      if (!costChanged) return;
+      const entry = {
+        at,
+        costPerPortion: Number(c.costPerPortion.toFixed(4)),
+        cmv: Number(c.cmv.toFixed(2)),
+        markup: Number(c.markup.toFixed(2)),
+        salePrice: Number((c.salePrice || 0).toFixed(2)),
+        by: userName,
+        trigger: trigger || 'manual'
+      };
+      const next = ((dish.price_history || []).concat([entry])).slice(-5);
+      try {
+        await setDoc(dishDoc(cid, dish.id), { price_history: next }, { merge: true });
+        dish.price_history = next;
+      } catch (e) { console.warn('[priceHistory]', dish.id, e?.code); }
+    }));
+  } catch (e) { console.warn('[priceHistory] batch:', e); }
 }
 async function deleteInsumo(cid, iid) {
   await deleteDoc(insumoDoc(cid, iid));
@@ -2757,6 +2819,11 @@ function renderClienteHome(cid) {
     return;
   }
 
+  // Lazy backfill: garante que todo dish tenha sale_price fixo (pra cmv/markup
+  // refletirem mudanças de custo do insumo). Só roda pra users com permissão.
+  if (canEditInsumoPrice(cid)) {
+    backfillSalePrices(cid).catch(e => console.warn('[backfill]', e?.code));
+  }
   // Filtra fichas inativas — só aparecem na tela de gerenciamento
   const visibleDishes = STATE.dishes.filter(d => !d.inactive);
   if (visibleDishes.length === 0 && STATE.dishes.length > 0) {
@@ -2780,6 +2847,33 @@ function renderClienteHome(cid) {
       if (cmv <= targetCmv + 5) return 'warn';
       return 'bad';
     })();
+    // Tendência: compara com último entry do price_history pra mostrar seta ↑↓
+    const history = Array.isArray(dish.price_history) ? dish.price_history : [];
+    const lastEntry = history.length > 0 ? history[history.length - 1] : null;
+    const prevEntry = history.length > 1 ? history[history.length - 2] : null;
+    function cmvTrend() {
+      if (!lastEntry || !prevEntry) return null;
+      const diff = (lastEntry.cmv || 0) - (prevEntry.cmv || 0);
+      if (Math.abs(diff) < 0.1) return null;
+      return { dir: diff > 0 ? 'up' : 'down', amount: Math.abs(diff) };
+    }
+    function markupTrend() {
+      if (!lastEntry || !prevEntry) return null;
+      const diff = (lastEntry.markup || 0) - (prevEntry.markup || 0);
+      if (Math.abs(diff) < 0.5) return null;
+      return { dir: diff > 0 ? 'up' : 'down', amount: Math.abs(diff) };
+    }
+    function buildHistoryTooltip() {
+      if (history.length === 0) return 'Sem histórico de variações';
+      return 'Últimas variações:\n' + history.slice(-5).reverse().map(h => {
+        const d = new Date(h.at);
+        const dateStr = isNaN(d) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return `${dateStr} · custo R$${fmtNum(h.costPerPortion || 0, 2)} · CMV ${fmtNum(h.cmv || 0, 1)}% · Markup ${fmtNum(h.markup || 0, 0)}%`;
+      }).join('\n');
+    }
+    const cmvT = cmvTrend();
+    const markupT = markupTrend();
+
     // Preço/CMV/Markup editáveis pra master/staff/dono/admin (mesmo critério de canEditInsumoPrice)
     const priceBadge = showCost ? el('span', { class: 'dish-price-badge' + (hasPriceOverride ? ' is-override' : '') + (canEditPrice ? ' is-editable' : ''),
       title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
@@ -2791,11 +2885,19 @@ function renderClienteHome(cid) {
       title: (canEditPrice ? 'Clique pra editar. ' : '') + (targetCmv ? `Alvo: ${fmtNum(targetCmv, 1)}%` : '')
     },
       el('span', { class: 'dish-metric-label' }, 'CMV'),
-      el('span', { class: 'dish-metric-value' }, fmtNum(cmv, 1) + '%')
+      el('span', { class: 'dish-metric-value' }, fmtNum(cmv, 1) + '%'),
+      cmvT ? el('span', {
+        class: 'dish-metric-trend trend-' + cmvT.dir,
+        title: buildHistoryTooltip()
+      }, cmvT.dir === 'up' ? '↑' : '↓') : null
     ) : null;
     const markupBadge = showCost ? el('span', { class: 'dish-metric dish-metric-markup' + (canEditPrice ? ' is-editable' : '') },
       el('span', { class: 'dish-metric-label' }, 'Markup'),
-      el('span', { class: 'dish-metric-value' }, fmtNum(markup, 0) + '%')
+      el('span', { class: 'dish-metric-value' }, fmtNum(markup, 0) + '%'),
+      markupT ? el('span', {
+        class: 'dish-metric-trend trend-' + (markupT.dir === 'up' ? 'down' : 'up'), // markup invertido: subir markup = bom (verde)
+        title: buildHistoryTooltip()
+      }, markupT.dir === 'up' ? '↑' : '↓') : null
     ) : null;
     if (canEditPrice) {
       const openEditor = (e) => { e.preventDefault(); e.stopPropagation(); openDishPriceEditor(cid, dish); };
@@ -2879,25 +2981,32 @@ function openDishPriceEditor(cid, dish) {
   async function saveAndClose() {
     const priceVal = parseDec(priceInput.value);
     const cmvVal = parseDec(cmvInput.value);
+    const markupVal = parseDec(markupInput.value);
     if (!isFinite(priceVal) || priceVal <= 0) { alert('Preço inválido'); return; }
     if (!isFinite(cmvVal) || cmvVal <= 0) { alert('CMV inválido'); return; }
-    // Política:
-    //   - driver === 'price' ou 'markup' → grava sale_price override + target_cmv consistente
-    //   - driver === 'cmv' (ou null) → grava target_cmv, REMOVE sale_price override (volta a derivar)
-    const patch = {};
-    if (driver === 'price' || driver === 'markup') {
-      patch.sale_price = priceVal;
-      patch.target_cmv = cmvVal;
-    } else {
-      patch.target_cmv = cmvVal;
-      patch.sale_price = deleteField();
-    }
+    // Política nova: PREÇO SEMPRE FIXO. Editar CMV ou markup só serve pra calcular
+    // o preço correspondente — que vira o sale_price gravado.
+    const patch = {
+      sale_price: priceVal,
+      target_cmv: cmvVal
+    };
+    // Histórico: registra a edição manual no price_history
+    const at = new Date().toISOString();
+    const newEntry = {
+      at,
+      costPerPortion: Number((cost || 0).toFixed(4)),
+      cmv: Number(cmvVal.toFixed(2)),
+      markup: Number((isFinite(markupVal) ? markupVal : c.markup).toFixed(2)),
+      salePrice: Number(priceVal.toFixed(2)),
+      by: STATE.userDoc?.name || STATE.user?.email || '—',
+      trigger: 'manual'
+    };
+    patch.price_history = ((dish.price_history || []).concat([newEntry])).slice(-5);
     try {
       await setDoc(dishDoc(cid, dish.id), patch, { merge: true });
-      // Atualiza state local pra UI refletir antes do snapshot voltar
-      if (patch.sale_price === deleteField()) delete dish.sale_price;
-      else if (typeof patch.sale_price === 'number') dish.sale_price = patch.sale_price;
-      dish.target_cmv = patch.target_cmv;
+      dish.sale_price = priceVal;
+      dish.target_cmv = cmvVal;
+      dish.price_history = patch.price_history;
       toast('Preço atualizado');
       modal.remove();
       renderClienteHome(cid);
@@ -3524,7 +3633,11 @@ function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
 async function prodPlanCreateDraft(cid, opts) {
   opts = opts || {};
   prodPlanReset();
-  PROD_PLAN.name = opts.name || '';
+  const defaultName = (() => {
+    const d = new Date();
+    return 'Planejamento iniciado em ' + d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  })();
+  PROD_PLAN.name = opts.name || defaultName;
   if (opts.items) PROD_PLAN.items = opts.items;
   PROD_PLAN.createdAt = new Date().toISOString();
   PROD_PLAN.createdBy = STATE.user?.uid || null;
@@ -7499,6 +7612,9 @@ async function saveDishAction(cid, dish, originalId) {
   if (!dish.createdBy) {
     dish.createdBy = orig?.createdBy || ((isMaster() || isStaff()) ? 'consultoria' : 'cliente');
   }
+  // Preserva sale_price se já existe (não recalcula automaticamente — fixo)
+  if (orig?.sale_price && !dish.sale_price) dish.sale_price = orig.sale_price;
+  if (orig?.price_history) dish.price_history = orig.price_history;
   // Preserva estado de inativação (não muda via formulário de edição)
   if (orig) {
     dish.inactive = !!orig.inactive;
