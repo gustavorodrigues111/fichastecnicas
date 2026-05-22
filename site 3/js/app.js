@@ -270,9 +270,14 @@ function renderTrialBanner(cid) {
   if (status.paid) return null;
   if (!status.started) {
     if (!(isMaster() || isStaff())) return null;
+    const configLink = el('a', { href: '#' }, 'Configurar →');
+    configLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (cliente) openEditClienteModal(cliente);
+    });
     return el('div', { class: 'trial-banner trial-banner-warning' },
       'Avaliação não iniciada para este restaurante. ',
-      el('a', { href: `#/c/${cid}/admin` }, 'Configurar →')
+      configLink
     );
   }
   if (status.daysLeft > 30) return null;
