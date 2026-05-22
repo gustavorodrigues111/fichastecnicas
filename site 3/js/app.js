@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0360';
+const APP_BUILD = '20260522-V2-0370';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -444,24 +444,67 @@ async function saveInsumo(cid, insumo) {
 }
 
 // Lazy backfill: garante que todo dish tenha sale_price gravado (fixo)
-// Roda silencioso pra users com permissão de editar preço
+// Também cria a PRIMEIRA entry no price_history (linha base) pra que as setas
+// de tendência apareçam já na próxima alteração.
 async function backfillSalePrices(cid) {
-  const needBackfill = STATE.dishes.filter(d =>
+  // 2 casos:
+  //  a) sem sale_price: fixa + cria primeira entry no price_history
+  //  b) com sale_price mas sem price_history: cria primeira entry (linha base)
+  const at = new Date().toISOString();
+  const needSalePrice = STATE.dishes.filter(d =>
     !d.inactive
     && (typeof d.sale_price !== 'number' || d.sale_price <= 0)
     && d.sub_fichas && d.sub_fichas.length > 0
   );
-  if (needBackfill.length === 0) return;
-  console.info('[backfill] fixando sale_price em', needBackfill.length, 'fichas');
-  for (const dish of needBackfill) {
+  const needBaselineHistory = STATE.dishes.filter(d =>
+    !d.inactive
+    && typeof d.sale_price === 'number' && d.sale_price > 0
+    && (!Array.isArray(d.price_history) || d.price_history.length === 0)
+    && d.sub_fichas && d.sub_fichas.length > 0
+  );
+  if (needSalePrice.length === 0 && needBaselineHistory.length === 0) return;
+  console.info('[backfill] sale_price:', needSalePrice.length, '· baseline history:', needBaselineHistory.length);
+
+  for (const dish of needSalePrice) {
     const c = dishCost(dish);
-    if (c.costPerPortion <= 0) continue; // sem custo, não fixa
+    if (c.costPerPortion <= 0) continue;
     const fixed = Number((c.suggestedPrice || 0).toFixed(2));
     if (!isFinite(fixed) || fixed <= 0) continue;
+    const cmvAt = fixed > 0 ? (c.costPerPortion / fixed) * 100 : 0;
+    const markupAt = c.costPerPortion > 0 ? ((fixed / c.costPerPortion) - 1) * 100 : 0;
+    const baselineEntry = {
+      at,
+      costPerPortion: Number(c.costPerPortion.toFixed(4)),
+      cmv: Number(cmvAt.toFixed(2)),
+      markup: Number(markupAt.toFixed(2)),
+      salePrice: fixed,
+      by: 'sistema',
+      trigger: 'inicial'
+    };
+    const history = ((dish.price_history || []).concat([baselineEntry])).slice(-5);
     try {
-      await setDoc(dishDoc(cid, dish.id), { sale_price: fixed }, { merge: true });
+      await setDoc(dishDoc(cid, dish.id), { sale_price: fixed, price_history: history }, { merge: true });
       dish.sale_price = fixed;
-    } catch (e) { console.warn('[backfill]', dish.id, e?.code); break; }
+      dish.price_history = history;
+    } catch (e) { console.warn('[backfill sale_price]', dish.id, e?.code); break; }
+  }
+
+  for (const dish of needBaselineHistory) {
+    const c = dishCost(dish);
+    if (c.costPerPortion <= 0) continue;
+    const baselineEntry = {
+      at,
+      costPerPortion: Number(c.costPerPortion.toFixed(4)),
+      cmv: Number((c.cmv || 0).toFixed(2)),
+      markup: Number((c.markup || 0).toFixed(2)),
+      salePrice: Number((c.salePrice || dish.sale_price).toFixed(2)),
+      by: 'sistema',
+      trigger: 'inicial'
+    };
+    try {
+      await setDoc(dishDoc(cid, dish.id), { price_history: [baselineEntry] }, { merge: true });
+      dish.price_history = [baselineEntry];
+    } catch (e) { console.warn('[backfill history]', dish.id, e?.code); break; }
   }
 }
 
@@ -2955,7 +2998,11 @@ function openPriceHistoryModal(dish) {
 
   function describeTrigger(t) {
     if (!t) return 'edição';
-    if (t === 'manual') return 'edição manual de preço/CMV';
+    if (t === 'inicial') return 'registro inicial (linha base)';
+    if (t === 'manual') return 'edição manual';
+    if (t === 'manual:preço') return 'preço de venda alterado manualmente';
+    if (t === 'manual:cmv') return 'CMV alterado manualmente';
+    if (t === 'manual:markup') return 'markup alterado manualmente';
     if (t.startsWith('insumo:')) return 'mudança no preço do insumo "' + t.slice(7) + '"';
     return t;
   }
@@ -3072,6 +3119,10 @@ function openDishPriceEditor(cid, dish) {
     };
     // Histórico: registra a edição manual no price_history
     const at = new Date().toISOString();
+    const trigger = driver === 'price' ? 'manual:preço'
+                  : driver === 'cmv' ? 'manual:cmv'
+                  : driver === 'markup' ? 'manual:markup'
+                  : 'manual';
     const newEntry = {
       at,
       costPerPortion: Number((cost || 0).toFixed(4)),
@@ -3079,7 +3130,7 @@ function openDishPriceEditor(cid, dish) {
       markup: Number((isFinite(markupVal) ? markupVal : c.markup).toFixed(2)),
       salePrice: Number(priceVal.toFixed(2)),
       by: STATE.userDoc?.name || STATE.user?.email || '—',
-      trigger: 'manual'
+      trigger
     };
     patch.price_history = ((dish.price_history || []).concat([newEntry])).slice(-5);
     try {
