@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0320';
+const APP_BUILD = '20260522-V2-0330';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -5160,8 +5160,8 @@ function renderProducao(cid) {
       ),
       nameInput,
       el('p', { style: 'margin-top:0.5rem;' }, locked
-        ? `Finalizado em ${new Date(PROD_PLAN.finalizedAt).toLocaleString('pt-BR')}${PROD_PLAN.finalizedBy ? ' por ' + PROD_PLAN.finalizedBy : ''}.`
-        : isReady ? 'Planejamento marcado como pronto. Quando produzir, clique em "Finalizar produção".' : 'Defina os pratos e quantidades. As mudanças salvam automaticamente.')
+        ? `Produção finalizada em ${new Date(PROD_PLAN.finalizedAt).toLocaleString('pt-BR')}${PROD_PLAN.finalizedBy ? ' por ' + PROD_PLAN.finalizedBy : ''}.`
+        : isReady ? 'Plano pronto. Quando a produção for efetivamente realizada, clique em "Finalizar produção" pra arquivar no histórico.' : 'Adicione pratos e quantidades. Quando estiver tudo certo, clique em "Marcar plano como pronto". As mudanças salvam automaticamente.')
     ),
     el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
       locked && PROD_PLAN.planId
@@ -5383,64 +5383,51 @@ function renderProducao(cid) {
       actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
       actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
       actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
+    } else if (isReadyState) {
+      // Planejamento pronto — só Finalizar produção (+ voltar + relatórios)
+      actions.appendChild(el('button', { class: 'btn', onclick: async () => {
+        if (!confirm('Voltar este planejamento pra "em aberto" pra editar?')) return;
+        try { await prodPlanMarkDraftAgain(cid); renderProducao(cid); } catch (err) { alert(err.message); }
+      } }, '↶ Voltar pra editar'));
+      actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
+      actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
+      actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
+      const finalizeBtn = el('button', { class: 'btn btn-primary' }, '✓ Finalizar produção');
+      finalizeBtn.addEventListener('click', async () => {
+        const msg = `Marcar produção como FINALIZADA?\n\n` +
+          `Significa que os pratos foram efetivamente produzidos. O plano vai pro histórico do restaurante (não some) e a edição fica bloqueada — você pode reabrir como rascunho depois se precisar.`;
+        if (!confirm(msg)) return;
+        finalizeBtn.disabled = true;
+        finalizeBtn.textContent = 'Salvando…';
+        try {
+          await prodPlanFinalize(cid, totalCost, totalPortions);
+          toast('Produção finalizada');
+          renderProducao(cid);
+        } catch (err) {
+          finalizeBtn.disabled = false;
+          finalizeBtn.textContent = '✓ Finalizar produção';
+          alert('Erro ao finalizar: ' + (err.message || err.code));
+        }
+      });
+      actions.appendChild(finalizeBtn);
     } else {
-      // 3 botões progressivos: salvar como template, marcar pronto, finalizar produção
-      // Salvar como template (sempre disponível se tem item)
+      // Status = draft (em aberto) — único próximo passo é "Marcar como pronto"
       if (PROD_PLAN.items.length > 0) {
         actions.appendChild(el('button', { class: 'btn', onclick: () => openSaveAsTemplateModal(cid) }, '☰ Salvar como template'));
       }
-      // Marcar como pronto / Voltar pra em aberto
-      if (isReadyState) {
-        actions.appendChild(el('button', { class: 'btn', onclick: async () => {
-          if (!confirm('Voltar este planejamento pra "em aberto"?')) return;
-          try { await prodPlanMarkDraftAgain(cid); renderProducao(cid); } catch (err) { alert(err.message); }
-        } }, '↶ Voltar pra em aberto'));
-        // Relatórios já liberados quando ready
-        actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
-        actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
-        actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
-      } else {
-        // Status = draft
-        const readyBtn = el('button', { class: 'btn btn-accent' }, '✓ Marcar como pronto');
-        if (!canFinalize) {
-          readyBtn.disabled = true;
-          readyBtn.title = PROD_PLAN.items.length === 0
-            ? 'Adicione pelo menos um prato com quantidade > 0'
-            : 'Defina a quantidade de produção de todos os pratos';
-        } else {
-          readyBtn.addEventListener('click', async () => {
-            try { await prodPlanMarkReady(cid); toast('Marcado como pronto'); renderProducao(cid); }
-            catch (err) { alert('Erro: ' + (err.message || err.code)); }
-          });
-        }
-        actions.appendChild(readyBtn);
-      }
-      // Finalizar produção (irreversível — vai pro histórico)
-      const finalizeBtn = el('button', { class: 'btn btn-primary' }, '✓ Finalizar produção');
+      const readyBtn = el('button', { class: 'btn btn-primary' }, '✓ Marcar plano como pronto');
       if (!canFinalize) {
-        finalizeBtn.disabled = true;
-        finalizeBtn.title = 'Defina a quantidade de produção de todos os pratos';
+        readyBtn.disabled = true;
+        readyBtn.title = PROD_PLAN.items.length === 0
+          ? 'Adicione pelo menos um prato com quantidade > 0'
+          : 'Defina a quantidade de produção de todos os pratos';
       } else {
-        finalizeBtn.addEventListener('click', async () => {
-          const msg = `Finalizar a PRODUÇÃO?\n\n` +
-            `Após finalizar:\n` +
-            `• O plano vai pro histórico do restaurante (não some)\n` +
-            `• A edição fica bloqueada (você pode reabrir como rascunho depois)`;
-          if (!confirm(msg)) return;
-          finalizeBtn.disabled = true;
-          finalizeBtn.textContent = 'Salvando…';
-          try {
-            await prodPlanFinalize(cid, totalCost, totalPortions);
-            toast('Produção finalizada');
-            renderProducao(cid);
-          } catch (err) {
-            finalizeBtn.disabled = false;
-            finalizeBtn.textContent = '✓ Finalizar produção';
-            alert('Erro ao finalizar: ' + (err.message || err.code));
-          }
+        readyBtn.addEventListener('click', async () => {
+          try { await prodPlanMarkReady(cid); toast('Plano marcado como pronto'); renderProducao(cid); }
+          catch (err) { alert('Erro: ' + (err.message || err.code)); }
         });
       }
-      actions.appendChild(finalizeBtn);
+      actions.appendChild(readyBtn);
     }
     // Lista compacta de preparações pra confirmação (antes ou depois de finalizar)
     if (PROD_PLAN.items.some(it => Number(it.targetQty) > 0)) {
