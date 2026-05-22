@@ -3796,9 +3796,20 @@ label.field textarea { min-height: 90px; resize: vertical; }
   width: 100%;
   max-height: 88vh;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+}
+.modal-content * { max-width: 100%; box-sizing: border-box; }
+.modal-content input,
+.modal-content select,
+.modal-content textarea { width: 100%; }
+.modal-content .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 .modal-content h2 { margin-top: 0; margin-bottom: 0.25rem; font-size: 1.2rem; }
 .modal-subtitle {
