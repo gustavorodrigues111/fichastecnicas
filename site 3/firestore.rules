@@ -219,13 +219,5 @@ service cloud.firestore {
       }
     }
 
-    // ============================================================
-    // /users (LEGADO v1) — só master pode acessar enquanto não removido.
-    // Migração lê daqui. App não escreve mais aqui.
-    // ============================================================
-    match /users/{uid} {
-      allow read, write: if isMaster();
-      allow get: if isSignedIn() && request.auth.uid == uid;
-    }
   }
 }

@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0100';
+const APP_BUILD = '20260522-V2-0200';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -1127,28 +1127,7 @@ async function ensureUserDoc(user) {
     if (claimed) return;
   } catch (err) { console.warn('[Auth v2] erro reivindicando team pending:', err); }
 
-  // (c) Fallback legacy — pré-migração, lê de /users e /pending_users
-  // (vai sumir depois da migração + cleanup)
-  try {
-    const legacyUserSnap = await getDoc(doc(db, 'users', user.uid));
-    if (legacyUserSnap.exists()) {
-      const data = legacyUserSnap.data();
-      console.warn('[Auth v2] LEGACY /users/{uid} ainda existe — rodar migração');
-      // Decifra role e mounta como se fosse v2 pra UI funcionar
-      const isPlat = data.role === 'master' || data.role === 'staff';
-      if (isPlat) {
-        STATE.userDoc = { uid: user.uid, type: 'platform', ...data };
-      } else {
-        const cids = Array.isArray(data.clienteIds) ? data.clienteIds : [];
-        const cidRole = data.role === 'cliente' ? 'dono'
-                      : data.role === 'cliente_admin' ? 'admin'
-                      : 'op';
-        STATE.userDoc = { uid: user.uid, type: 'restaurant', cid: cids[0] || null, cids, ...data, role: cidRole };
-      }
-      return;
-    }
-  } catch (err) { console.warn('[Auth v2] erro legacy users:', err); }
-
+  // Nenhum caminho válido — usuário não autorizado
   STATE.userDoc = null;
   STATE.userDocError = 'no-doc-found';
 }
@@ -2657,18 +2636,24 @@ function dishCost(dish) {
   const total = finalResult ? finalResult.total : 0;
   const portions = parsePortions(finalSf ? finalSf.rendimento : '');
   const costPerPortion = portions > 0 ? total / portions : 0;
-  // Preço sugerido: se dish.target_cmv definido, usa CMV alvo; senão usa markup legado
-  let suggestedPrice, cmv, markup;
+  // Preço sugerido (derivado de target_cmv ou markup legado)
+  let suggestedPrice, targetCmv, targetMarkup;
   if (typeof dish.target_cmv === 'number' && dish.target_cmv > 0) {
-    cmv = dish.target_cmv;
-    suggestedPrice = costPerPortion / (cmv / 100);
-    markup = costPerPortion > 0 ? ((suggestedPrice / costPerPortion) - 1) * 100 : 0;
+    targetCmv = dish.target_cmv;
+    suggestedPrice = costPerPortion / (targetCmv / 100);
+    targetMarkup = costPerPortion > 0 ? ((suggestedPrice / costPerPortion) - 1) * 100 : 0;
   } else {
-    markup = dish.markup || 300;
-    suggestedPrice = costPerPortion * (1 + markup / 100);
-    cmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
+    targetMarkup = dish.markup || 300;
+    suggestedPrice = costPerPortion * (1 + targetMarkup / 100);
+    targetCmv = suggestedPrice > 0 ? (costPerPortion / suggestedPrice) * 100 : 0;
   }
-  return { sfCosts, total, portions, costPerPortion, suggestedPrice, cmv, markup };
+  // Preço de VENDA real: override do user se setado, senão o sugerido
+  const hasPriceOverride = typeof dish.sale_price === 'number' && dish.sale_price > 0;
+  const salePrice = hasPriceOverride ? dish.sale_price : suggestedPrice;
+  // CMV e Markup EFETIVOS baseados no preço de venda real
+  const cmv = salePrice > 0 ? (costPerPortion / salePrice) * 100 : 0;
+  const markup = costPerPortion > 0 ? ((salePrice / costPerPortion) - 1) * 100 : 0;
+  return { sfCosts, total, portions, costPerPortion, suggestedPrice, salePrice, hasPriceOverride, cmv, markup, targetCmv, targetMarkup };
 }
 function parsePortions(rendStr) {
   if (!rendStr) return 1;
@@ -2776,25 +2761,50 @@ function renderClienteHome(cid) {
     return;
   }
   const listWrap = el('div', { class: 'cardapio-list' });
+  const canEditPrice = canEditInsumoPrice(cid);
   visibleDishes.forEach((dish, idx) => {
     const costInfo = dishCost(dish);
-    const { costPerPortion, suggestedPrice, cmv, markup } = costInfo;
-    const lastSf = (dish.sub_fichas || [])[dish.sub_fichas.length - 1];
-    const rendDisplay = lastSf?.rendimento ? formatRendimento(lastSf.rendimento) : '—';
-    const showCost = canEditInsumoPrice(cid);
+    const { salePrice, cmv, markup, hasPriceOverride, targetCmv } = costInfo;
+    const showCost = canEditPrice;
     const dishGroup = el('details', { class: 'dish-group' });
-    const summary = el('summary', { class: 'dish-head dish-summary' },
-      el('span', { class: 'dish-chev' }, '▸'),
-      el('span', { class: 'dish-title-compact' },
-        el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
-        el('span', { class: 'dish-name' }, dish.name)
+    // Cor da badge CMV: verde se <= target, vermelho se > target, neutro se sem target
+    const cmvStatus = (() => {
+      if (!showCost || !targetCmv) return 'neutral';
+      if (cmv <= targetCmv) return 'good';
+      if (cmv <= targetCmv + 5) return 'warn';
+      return 'bad';
+    })();
+    // Preço/CMV/Markup editáveis pra master/staff/dono/admin (mesmo critério de canEditInsumoPrice)
+    const priceBadge = showCost ? el('span', { class: 'dish-price-badge' + (hasPriceOverride ? ' is-override' : '') + (canEditPrice ? ' is-editable' : ''),
+      title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
+    },
+      fmtBRL(salePrice),
+      hasPriceOverride ? el('span', { class: 'dish-price-pin', title: 'Preço fixado pelo restaurante' }, '📌') : null
+    ) : null;
+    const cmvBadge = showCost ? el('span', { class: 'dish-metric dish-metric-cmv dish-metric-' + cmvStatus + (canEditPrice ? ' is-editable' : ''),
+      title: (canEditPrice ? 'Clique pra editar. ' : '') + (targetCmv ? `Alvo: ${fmtNum(targetCmv, 1)}%` : '')
+    },
+      el('span', { class: 'dish-metric-label' }, 'CMV'),
+      el('span', { class: 'dish-metric-value' }, fmtNum(cmv, 1) + '%')
+    ) : null;
+    const markupBadge = showCost ? el('span', { class: 'dish-metric dish-metric-markup' + (canEditPrice ? ' is-editable' : '') },
+      el('span', { class: 'dish-metric-label' }, 'Markup'),
+      el('span', { class: 'dish-metric-value' }, fmtNum(markup, 0) + '%')
+    ) : null;
+    if (canEditPrice) {
+      const openEditor = (e) => { e.preventDefault(); e.stopPropagation(); openDishPriceEditor(cid, dish); };
+      [priceBadge, cmvBadge, markupBadge].forEach(b => b && b.addEventListener('click', openEditor));
+    }
+    const summary = el('summary', { class: 'dish-head dish-summary v2' },
+      el('div', { class: 'dish-summary-top' },
+        el('span', { class: 'dish-chev' }, '▸'),
+        el('span', { class: 'dish-title-compact' },
+          el('span', { class: 'dish-number' }, String(idx + 1).padStart(2, '0')),
+          el('span', { class: 'dish-name' }, dish.name)
+        ),
+        priceBadge
       ),
-      el('div', { class: 'dish-meta' },
-        el('span', { class: 'meta-item' }, el('em', {}, 'rendimento '), rendDisplay),
-        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'custo/porção '), fmtBRL(costPerPortion)) : null,
-        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'preço '), fmtBRL(suggestedPrice)) : null,
-        showCost ? el('span', { class: 'meta-item' }, el('em', {}, 'CMV '), fmtNum(cmv, 1) + '%') : null
-      )
+      showCost ? el('div', { class: 'dish-summary-bottom' }, cmvBadge, markupBadge) : null
     );
     dishGroup.appendChild(summary);
     const body = el('div', { class: 'dish-body' });
@@ -2817,6 +2827,120 @@ function renderClienteHome(cid) {
     listWrap.appendChild(dishGroup);
   });
   app.appendChild(listWrap);
+}
+
+// Editor inline de preço/CMV/markup — abre como modal pequeno
+function openDishPriceEditor(cid, dish) {
+  const existing = document.getElementById('dish-price-editor');
+  if (existing) existing.remove();
+  const c = dishCost(dish);
+  const fmtVal = (n) => (n || 0).toFixed(2).replace('.', ',');
+  const parseDec = (s) => parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+
+  const priceInput = el('input', { type: 'text', inputmode: 'decimal', value: fmtVal(c.salePrice) });
+  const cmvInput = el('input', { type: 'text', inputmode: 'decimal', value: fmtVal(c.cmv) });
+  const markupInput = el('input', { type: 'text', inputmode: 'decimal', value: fmtVal(c.markup) });
+  let driver = null; // qual campo o user editou por último (define a fonte da verdade)
+  const cost = c.costPerPortion || 0;
+
+  function syncFromPrice() {
+    driver = 'price';
+    const p = parseDec(priceInput.value);
+    if (!isFinite(p) || p <= 0 || cost <= 0) return;
+    cmvInput.value = fmtVal((cost / p) * 100);
+    markupInput.value = fmtVal(((p / cost) - 1) * 100);
+  }
+  function syncFromCmv() {
+    driver = 'cmv';
+    const cmvVal = parseDec(cmvInput.value);
+    if (!isFinite(cmvVal) || cmvVal <= 0 || cost <= 0) return;
+    const p = cost / (cmvVal / 100);
+    priceInput.value = fmtVal(p);
+    markupInput.value = fmtVal(((p / cost) - 1) * 100);
+  }
+  function syncFromMarkup() {
+    driver = 'markup';
+    const m = parseDec(markupInput.value);
+    if (!isFinite(m) || cost <= 0) return;
+    const p = cost * (1 + m / 100);
+    priceInput.value = fmtVal(p);
+    cmvInput.value = fmtVal((cost / p) * 100);
+  }
+  priceInput.addEventListener('input', syncFromPrice);
+  cmvInput.addEventListener('input', syncFromCmv);
+  markupInput.addEventListener('input', syncFromMarkup);
+
+  const resetBtn = el('button', { class: 'btn btn-small' }, '↺ Voltar ao sugerido');
+  resetBtn.addEventListener('click', () => {
+    delete dish.sale_price;
+    dish.target_cmv = 30;
+    const fresh = dishCost(dish);
+    priceInput.value = fmtVal(fresh.suggestedPrice);
+    cmvInput.value = fmtVal(fresh.targetCmv);
+    markupInput.value = fmtVal(fresh.targetMarkup);
+    driver = 'cmv';
+  });
+
+  async function saveAndClose() {
+    const priceVal = parseDec(priceInput.value);
+    const cmvVal = parseDec(cmvInput.value);
+    if (!isFinite(priceVal) || priceVal <= 0) { alert('Preço inválido'); return; }
+    if (!isFinite(cmvVal) || cmvVal <= 0) { alert('CMV inválido'); return; }
+    // Política:
+    //   - driver === 'price' ou 'markup' → grava sale_price override + target_cmv consistente
+    //   - driver === 'cmv' (ou null) → grava target_cmv, REMOVE sale_price override (volta a derivar)
+    const patch = {};
+    if (driver === 'price' || driver === 'markup') {
+      patch.sale_price = priceVal;
+      patch.target_cmv = cmvVal;
+    } else {
+      patch.target_cmv = cmvVal;
+      patch.sale_price = deleteField();
+    }
+    try {
+      await setDoc(dishDoc(cid, dish.id), patch, { merge: true });
+      // Atualiza state local pra UI refletir antes do snapshot voltar
+      if (patch.sale_price === deleteField()) delete dish.sale_price;
+      else if (typeof patch.sale_price === 'number') dish.sale_price = patch.sale_price;
+      dish.target_cmv = patch.target_cmv;
+      toast('Preço atualizado');
+      modal.remove();
+      renderClienteHome(cid);
+    } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+  }
+
+  const modal = el('div', { class: 'modal', id: 'dish-price-editor' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content', style: 'max-width:420px;' },
+      el('h2', {}, 'Preço · ' + (dish.name || '')),
+      el('p', { class: 'modal-subtitle' },
+        'Custo derivado da ficha: ',
+        el('strong', {}, fmtBRL(cost)),
+        ' / porção. Edite preço, CMV ou markup — os outros recalculam.'
+      ),
+      el('div', { class: 'price-editor-grid' },
+        el('label', { class: 'field' },
+          el('span', { class: 'label-text' }, 'Preço de venda (R$)'),
+          priceInput
+        ),
+        el('label', { class: 'field' },
+          el('span', { class: 'label-text' }, 'CMV (%)'),
+          cmvInput
+        ),
+        el('label', { class: 'field' },
+          el('span', { class: 'label-text' }, 'Markup (%)'),
+          markupInput
+        )
+      ),
+      el('div', { style: 'margin-top:0.6rem;' }, resetBtn),
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+        el('button', { class: 'btn btn-primary', onclick: saveAndClose }, 'Salvar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
+  setTimeout(() => priceInput.focus(), 50);
 }
 
 function renderClienteContext(cid) {
@@ -3050,16 +3174,14 @@ function renderFicha(cid, dishId, initialSfId = null) {
   );
   app.appendChild(scaleBar);
 
-  // Quick-nav anchors — ordem invertida: prato final primeiro, preparações depois
+  // Quick-nav anchors — ordem direta: preparação 1 → prato final
   // IMPORTANTE: usa click handler com scrollIntoView em vez de href="#sf-X" porque
   // o router escuta hashchange e jogaria o user pra rota base (bug anterior).
   const quickNav = el('nav', { class: 'sf-quicknav' });
-  const subFichasReversed = [...(dish.sub_fichas || [])].reverse();
-  subFichasReversed.forEach((sf) => {
-    const originalIdx = dish.sub_fichas.indexOf(sf);
-    const isFinal = originalIdx === dish.sub_fichas.length - 1;
+  (dish.sub_fichas || []).forEach((sf, idx) => {
+    const isFinal = idx === dish.sub_fichas.length - 1;
     const link = el('a', { href: '#', class: isFinal ? 'is-final' : '' },
-      `${originalIdx + 1}. ${sf.name}`
+      `${idx + 1}. ${sf.name}`
     );
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -3070,7 +3192,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
   });
   app.appendChild(quickNav);
 
-  // Body (all sub-fichas stacked — ordem invertida no modo trabalho)
+  // Body (sub-fichas em ordem direta: preparação 1 → prato final)
   const body = el('div', { id: 'ficha-body-container' });
   app.appendChild(body);
 
@@ -3080,10 +3202,9 @@ function renderFicha(cid, dishId, initialSfId = null) {
     renderCostSummary();
     body.innerHTML = '';
     if (state.view === 'trabalho') {
-      // Ordem invertida: prato final primeiro, depois preparações
-      [...(dish.sub_fichas || [])].reverse().forEach((sf) => {
-        const originalIdx = dish.sub_fichas.indexOf(sf);
-        const card = renderFichaTrabalho(dish, sf, state, originalIdx);
+      // Ordem direta: preparação 1 primeiro, prato final por último
+      (dish.sub_fichas || []).forEach((sf, idx) => {
+        const card = renderFichaTrabalho(dish, sf, state, idx);
         card.id = `sf-${sf.id}`;
         body.appendChild(card);
       });
@@ -3380,6 +3501,24 @@ async function prodPlanFinalize(cid, totalCost, totalPortions) {
   PROD_PLAN.finalizedAt = snapshot.finalizedAt;
   PROD_PLAN.finalizedBy = snapshot.finalizedByName;
   PROD_PLAN.planId = planId;
+  // Memória de produção: atualiza dish.production_memory pra cada prato planejado
+  // (item 4 — pré-carrega config na próxima vez que adicionar o prato ao plano)
+  try {
+    await Promise.all(PROD_PLAN.items.map(async (it) => {
+      if (!it.dishId) return;
+      const memory = {
+        lastTargetQty: Number(it.targetQty) || 0,
+        lastTargetUnit: it.targetUnit || '',
+        lastExcludedSfIds: Array.from(it.excludedSfIds || new Set()),
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        await setDoc(dishDoc(cid, it.dishId), { production_memory: memory }, { merge: true });
+        const local = STATE.dishes.find(d => d.id === it.dishId);
+        if (local) local.production_memory = memory;
+      } catch (e) { console.warn('[ProdMemory]', it.dishId, e?.code); }
+    }));
+  } catch (e) { console.warn('[ProdMemory] batch:', e); }
   return planId;
 }
 
@@ -4983,19 +5122,28 @@ function openAddDishToPlanModal(cid) {
       if (inPlan.has(dish.id)) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const rend = finalSf?.rendimento || '—';
-      const btn = el('button', { class: 'copy-sf-item', onclick: () => {
+      // Memória de produção: pré-preenche com a última config do prato (item 4)
+      const mem = dish.production_memory || null;
+      const hasMemory = mem && (mem.lastTargetQty > 0 || (Array.isArray(mem.lastExcludedSfIds) && mem.lastExcludedSfIds.length > 0));
+      const btn = el('button', { class: 'copy-sf-item' + (hasMemory ? ' has-memory' : ''), onclick: () => {
         const finalR = getSfRendimento(finalSf);
         PROD_PLAN.items.push({
           dishId: dish.id,
-          targetQty: 0, // começa em 0 — usuário define via +10 ou digitando
-          targetUnit: finalR.unit || '',
-          excludedSfIds: new Set()
+          targetQty: mem?.lastTargetQty || 0,
+          targetUnit: mem?.lastTargetUnit || finalR.unit || '',
+          excludedSfIds: new Set(mem?.lastExcludedSfIds || [])
         });
         modal.remove();
         renderProducao(cid);
       } },
-        el('div', { class: 'copy-sf-item-name' }, dish.name),
-        el('div', { class: 'copy-sf-item-meta' }, `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
+        el('div', { class: 'copy-sf-item-name' }, dish.name,
+          hasMemory ? el('span', { class: 'copy-sf-memory-tag', title: 'Usa a última configuração de produção' }, '★ pré-carregado') : null
+        ),
+        el('div', { class: 'copy-sf-item-meta' },
+          hasMemory && mem.lastTargetQty > 0
+            ? `${fmtNum(mem.lastTargetQty, 0)} ${mem.lastTargetUnit || ''} · ${(dish.sub_fichas || []).length - (mem.lastExcludedSfIds || []).length}/${(dish.sub_fichas || []).length} sub-fichas`
+            : `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`
+        )
       );
       list.appendChild(btn);
     });
@@ -7080,9 +7228,8 @@ function exportFichaPDF(dish, state) {
       y = docPdf.lastAutoTable.finalY + 10;
     }
 
-    // --- 2. Cada sub-ficha em sequência (ordem invertida: final primeiro) ---
-    [...dish.sub_fichas].reverse().forEach((s) => {
-      const idx = dish.sub_fichas.indexOf(s);
+    // --- 2. Cada sub-ficha em sequência (ordem direta: preparação 1 → final) ---
+    dish.sub_fichas.forEach((s, idx) => {
       if (y > 230) { docPdf.addPage(); y = margin; }
       const scale = scales[s.id] || 1;
       // Título da sub-ficha
@@ -7279,8 +7426,7 @@ function exportFichaXLSX(dish, state) {
   // Sequência completa de sub-fichas escaladas
   if (scaleChanged && state?.view === 'trabalho') {
     const scaledAll = [[`PRODUÇÃO ESCALADA — alvo final ${fmtNum(state.finalTargetQty, 2)} ${state.finalUnit}`], []];
-    [...dish.sub_fichas].reverse().forEach((s) => {
-      const idx = dish.sub_fichas.indexOf(s);
+    dish.sub_fichas.forEach((s, idx) => {
       const sScale = scales[s.id] || 1;
       scaledAll.push([`${idx+1}. ${s.name}${sScale !== 1 ? ` (× ${fmtNum(sScale, 2)})` : ''}`]);
       scaledAll.push(['Rendimento', sfRendimentoText(s, sScale)]);
