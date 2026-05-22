@@ -2755,6 +2755,17 @@ label.field textarea { min-height: 90px; resize: vertical; }
   border-radius: var(--r-md);
   padding: 0.9rem 1rem;
   margin-bottom: 0.85rem;
+  overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.edit-cliente-section > * { max-width: 100%; }
+.edit-cliente-section .form-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+@media (max-width: 540px) {
+  .edit-cliente-section .form-grid { grid-template-columns: 1fr; }
 }
 .edit-cliente-section-head {
   display: flex;
@@ -2786,15 +2797,30 @@ label.field textarea { min-height: 90px; resize: vertical; }
 /* Toggle inline (checkbox + texto) — substitui o style inline antigo */
 .toggle-inline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.55rem;
   margin-top: 0.85rem;
   cursor: pointer;
   font-size: 0.88rem;
   color: var(--text2);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
-.toggle-inline input[type="checkbox"] { flex-shrink: 0; accent-color: var(--accent); }
-.toggle-inline span { line-height: 1.4; }
+.toggle-inline input[type="checkbox"] {
+  flex-shrink: 0;
+  flex-grow: 0;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.toggle-inline span {
+  line-height: 1.4;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
 
 /* Trial — status + ações rápidas */
 .trial-status-line {
@@ -3921,10 +3947,10 @@ label.field textarea { min-height: 90px; resize: vertical; }
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0.75rem;
 }
-/* Labels com display:flex (checkbox + texto longo) precisam de min-width 0 e quebra de palavra */
-.modal-content label { min-width: 0; }
+/* Labels com display:flex (checkbox + texto longo) precisam de min-width 0 */
+.modal-content label { min-width: 0; max-width: 100%; }
 .modal-content label > * { min-width: 0; }
-.modal-content label span { overflow-wrap: anywhere; word-break: break-word; flex: 1 1 auto; }
+.modal-content label span { overflow-wrap: break-word; }
 .modal-content h2 { margin-top: 0; margin-bottom: 0.25rem; font-size: 1.2rem; }
 .modal-subtitle {
   color: var(--text3);
