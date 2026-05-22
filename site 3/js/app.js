@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2355';
+const APP_BUILD = '20260522-0010';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -1031,18 +1031,35 @@ async function offerPendingEnrollment({ email, name, role, clienteIds, whatsapp 
 function showPreClaimSuccessModal(email, name) {
   const existing = $('#pre-claim-success-modal');
   if (existing) existing.remove();
+  const emailBtn = el('button', { class: 'btn' }, '📧 Enviar link por email');
+  emailBtn.addEventListener('click', async () => {
+    if (!confirm(`Enviar email pra ${email} com link pra definir a senha?\n\nA pessoa recebe um link do Firebase, clica e já entra direto com a senha que ela escolher.`)) return;
+    emailBtn.disabled = true;
+    emailBtn.textContent = 'Enviando...';
+    try {
+      await sendPasswordResetEmail(auth, email);
+      emailBtn.textContent = '✓ Email enviado';
+      toast('Email enviado pra ' + email);
+    } catch (err) {
+      emailBtn.disabled = false;
+      emailBtn.textContent = '📧 Enviar link por email';
+      alert('Erro ao enviar email: ' + (err.message || err.code));
+    }
+  });
   const modal = el('div', { class: 'modal', id: 'pre-claim-success-modal' },
     el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
     el('div', { class: 'modal-content' },
       el('h2', {}, '✓ Pré-cadastro salvo'),
       el('p', {}, `${name || email} ficou na fila de pendentes.`),
       el('p', { class: 'muted', style: 'font-size:0.88rem;' },
-        'Avise a pessoa que ela pode entrar no sistema com o email ',
+        'Você pode mandar um email automático com link pra definir a senha (botão abaixo), ',
+        'ou avisar manualmente que ela entra com o email ',
         el('strong', {}, email),
-        ' e a senha que ela já usava. Se esqueceu, pode usar "Esqueci senha" no login.'
+        ' e a senha que ela já usava. Se esqueceu, use "Esqueci senha" no login.'
       ),
       el('div', { class: 'modal-actions' },
-        el('button', { class: 'btn btn-primary', onclick: () => modal.remove() }, 'Entendi')
+        emailBtn,
+        el('button', { class: 'btn btn-primary', onclick: () => modal.remove() }, 'Fechar')
       )
     )
   );
@@ -1594,21 +1611,30 @@ async function renderUsuariosAdmin() {
     el('span', { class: 'label-text' }, 'Restaurantes autorizados (obrigatório para Equipe e Cliente)'),
     clienteChecks
   ));
-  invitePanel.appendChild(el('div', { class: 'panel-actions' },
-    el('button', { class: 'btn btn-primary', onclick: async () => {
-      const email = emailInput.value.trim();
-      const name = nameInput.value.trim() || email.split('@')[0];
-      const whatsapp = whatsInput.value.trim();
-      const role = roleSelect.value;
-      const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
-      if (!name) { alert('Informe o nome'); return; }
-      if (!email) { alert('Informe o email'); return; }
-      if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
-      try {
-        await inviteUser(email, name, role, selected, whatsapp);
-      } catch (err) { alert('Erro: ' + err.message); }
-    } }, 'Criar usuário')
-  ));
+  const submitMasterBtn = el('button', { class: 'btn btn-primary' }, 'Criar usuário');
+  submitMasterBtn.addEventListener('click', async () => {
+    if (submitMasterBtn.disabled) return;
+    const email = emailInput.value.trim();
+    const name = nameInput.value.trim() || email.split('@')[0];
+    const whatsapp = whatsInput.value.trim();
+    const role = roleSelect.value;
+    const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
+    if (!name) { alert('Informe o nome'); return; }
+    if (!email) { alert('Informe o email'); return; }
+    if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+    submitMasterBtn.disabled = true;
+    const orig = submitMasterBtn.textContent;
+    submitMasterBtn.textContent = 'Criando...';
+    try {
+      await inviteUser(email, name, role, selected, whatsapp);
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      submitMasterBtn.disabled = false;
+      submitMasterBtn.textContent = orig;
+    }
+  });
+  invitePanel.appendChild(el('div', { class: 'panel-actions' }, submitMasterBtn));
   app.appendChild(invitePanel);
 
   // Pré-cadastros pendentes (esperando primeiro login)
@@ -5851,18 +5877,29 @@ async function renderClientTeamAdmin(cid) {
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'WhatsApp'), whatsInput),
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
   ));
-  invitePanel.appendChild(el('div', { class: 'panel-actions' },
-    el('button', { class: 'btn btn-primary', onclick: async () => {
-      const email = emailInput.value.trim();
-      const name = nameInput.value.trim() || email.split('@')[0];
-      if (!name) { alert('Informe o nome'); return; }
-      if (!email) { alert('Informe o email'); return; }
-      try {
-        await inviteUser(email, name, roleSelect.value, [cid], whatsInput.value.trim());
-      } catch (err) { alert('Erro: ' + (err.message || err.code)); }
-      renderClientTeamAdmin(cid);
-    } }, 'Adicionar à equipe')
-  ));
+  const submitBtn = el('button', { class: 'btn btn-primary' }, 'Adicionar à equipe');
+  submitBtn.addEventListener('click', async () => {
+    if (submitBtn.disabled) return; // proteção extra contra duplo-click
+    const email = emailInput.value.trim();
+    const name = nameInput.value.trim() || email.split('@')[0];
+    if (!name) { alert('Informe o nome'); return; }
+    if (!email) { alert('Informe o email'); return; }
+    submitBtn.disabled = true;
+    const origLabel = submitBtn.textContent;
+    submitBtn.textContent = 'Adicionando...';
+    try {
+      await inviteUser(email, name, roleSelect.value, [cid], whatsInput.value.trim());
+      // inviteUser/offerPendingEnrollment já chamam refreshTeamView() em sucesso
+      // (modal de credenciais ou pre-claim aparece em cima). Não re-renderizamos aqui
+      // pra preservar os modais abertos. Re-habilita pro caso de erro silencioso.
+    } catch (err) {
+      alert('Erro: ' + (err.message || err.code));
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origLabel;
+    }
+  });
+  invitePanel.appendChild(el('div', { class: 'panel-actions' }, submitBtn));
   app.appendChild(invitePanel);
 
   // Lista
@@ -5943,7 +5980,24 @@ async function renderClientTeamAdmin(cid) {
         ),
         el('span', { class: 'role-badge role-' + (p.role || 'none') }, roleLabel(p.role))
       ));
+      const resendBtn = el('button', { class: 'btn btn-small' }, '📧 Enviar link');
+      resendBtn.addEventListener('click', async () => {
+        if (!confirm(`Enviar email pra ${p.email} com link pra definir a senha?`)) return;
+        resendBtn.disabled = true;
+        const orig = resendBtn.textContent;
+        resendBtn.textContent = 'Enviando...';
+        try {
+          await sendPasswordResetEmail(auth, p.email);
+          resendBtn.textContent = '✓ Enviado';
+          toast('Email enviado pra ' + p.email);
+        } catch (err) {
+          resendBtn.disabled = false;
+          resendBtn.textContent = orig;
+          alert('Erro: ' + (err.message || err.code));
+        }
+      });
       const actions = el('div', { class: 'user-actions' },
+        resendBtn,
         el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
           if (!confirm(`Cancelar o pré-cadastro de ${p.email}?\n\nA pessoa não vai mais conseguir entrar com esse acesso. Você pode pré-cadastrar de novo depois se quiser.`)) return;
           try {
