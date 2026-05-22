@@ -488,33 +488,74 @@ function openEditClienteModal(cliente) {
 
   const nameInput = el('input', { type: 'text', value: cliente.name || '' });
   const consultorNameInput = el('input', { type: 'text', value: cliente.consultor_name || '', placeholder: 'Ex: Gustavo Rodrigues' });
-  const consultorInfoInput = el('input', { type: 'text', value: cliente.consultor_info || '', placeholder: 'Ex: Consultoria Gastronômica · contato@quibebe.com.br' });
+  const consultorInfoInput = el('input', { type: 'text', value: cliente.consultor_info || '', placeholder: 'Ex: contato@quibebe.com.br' });
   const showToggle = el('input', { type: 'checkbox' });
   if (cliente.show_consultor !== false) showToggle.setAttribute('checked', ''); // default true
 
+  // Painel "Identidade"
+  const identityCard = el('div', { class: 'edit-cliente-section' },
+    el('div', { class: 'edit-cliente-section-head' },
+      el('span', { class: 'edit-cliente-section-icon' }, '🏷'),
+      el('div', {},
+        el('h3', { class: 'edit-cliente-section-title' }, 'Identidade'),
+        el('p', { class: 'edit-cliente-section-desc' }, 'Nome que aparece nas telas e PDFs.')
+      )
+    ),
+    el('label', { class: 'field' },
+      el('span', { class: 'label-text' }, 'Nome do restaurante'), nameInput)
+  );
+
+  // Painel "Consultoria"
+  const consultoriaCard = el('div', { class: 'edit-cliente-section' },
+    el('div', { class: 'edit-cliente-section-head' },
+      el('span', { class: 'edit-cliente-section-icon' }, '✍'),
+      el('div', {},
+        el('h3', { class: 'edit-cliente-section-title' }, 'Consultoria'),
+        el('p', { class: 'edit-cliente-section-desc' }, 'Aparece discretamente no cardápio, fichas e rodapé dos PDFs.')
+      )
+    ),
+    el('div', { class: 'form-grid' },
+      el('label', { class: 'field' },
+        el('span', { class: 'label-text' }, 'Nome do consultor'), consultorNameInput),
+      el('label', { class: 'field' },
+        el('span', { class: 'label-text' }, 'Info adicional'), consultorInfoInput)
+    ),
+    el('label', { class: 'toggle-inline' },
+      showToggle,
+      el('span', {}, 'Exibir info da consultoria no site e exports')
+    )
+  );
+
+  // Painel "Assinatura" — usa o helper buildTrialBlock que tem auto-save
+  const subscriptionCard = el('div', { class: 'edit-cliente-section' },
+    el('div', { class: 'edit-cliente-section-head' },
+      el('span', { class: 'edit-cliente-section-icon' }, '⏱'),
+      el('div', {},
+        el('h3', { class: 'edit-cliente-section-title' }, 'Assinatura'),
+        el('p', { class: 'edit-cliente-section-desc' }, 'Período de avaliação e ativação da conta.')
+      )
+    ),
+    buildTrialBlock(cliente, () => {
+      // callback após auto-save (Iniciar hoje / Resetar): fecha modal
+      modal.remove();
+      if (typeof renderClientesAdmin === 'function') {
+        if (location.hash === '#/admin/clientes') renderClientesAdmin();
+        else route();
+      }
+    })
+  );
+
   const modal = el('div', { class: 'modal', id: 'edit-cliente-modal' },
     el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
-    el('div', { class: 'modal-content modal-content-wide' },
-      el('h2', {}, 'Editar restaurante'),
-      el('p', { class: 'modal-subtitle' }, cliente.id),
-      el('div', { class: 'form-grid' },
-        el('label', { class: 'field field-wide' },
-          el('span', { class: 'label-text' }, 'Nome do restaurante'), nameInput)
+    el('div', { class: 'modal-content modal-content-wide edit-cliente-modal' },
+      el('div', { class: 'edit-cliente-header' },
+        el('h2', {}, 'Editar restaurante'),
+        el('p', { class: 'modal-subtitle' }, cliente.id)
       ),
-      el('h3', { style: 'margin-top:1.5rem;margin-bottom:0.5rem;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:#888;font-family:Inter,sans-serif;font-weight:500;' }, 'Consultoria'),
-      el('p', { class: 'muted', style: 'font-size:0.85rem;margin-bottom:1rem;' }, 'Aparece discretamente no cardápio, nas fichas e no rodapé dos PDFs exportados.'),
-      el('div', { class: 'form-grid' },
-        el('label', { class: 'field' },
-          el('span', { class: 'label-text' }, 'Nome do consultor'), consultorNameInput),
-        el('label', { class: 'field' },
-          el('span', { class: 'label-text' }, 'Info adicional'), consultorInfoInput)
-      ),
-      el('label', { class: 'field', style: 'display:flex;flex-direction:row;align-items:center;gap:0.6rem;margin-top:0.75rem;' },
-        showToggle,
-        el('span', { style: 'font-size:0.9rem;color:#4a4a4a;' }, 'Exibir info da consultoria no site e exports')
-      ),
-      buildTrialBlock(cliente),
-      el('div', { class: 'modal-actions' },
+      identityCard,
+      consultoriaCard,
+      subscriptionCard,
+      el('div', { class: 'modal-actions edit-cliente-actions' },
         el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
         el('button', { class: 'btn btn-primary', onclick: async () => {
           const trialBlock = modal.querySelector('.trial-block-fields');
@@ -531,9 +572,10 @@ function openEditClienteModal(cliente) {
             await saveCliente(updated);
             toast('Restaurante atualizado');
             modal.remove();
-            renderClientesAdmin();
+            if (location.hash === '#/admin/clientes') renderClientesAdmin();
+            else route();
           } catch (err) { toast('Erro: ' + err.message); }
-        } }, 'Salvar')
+        } }, 'Salvar tudo')
       )
     )
   );
@@ -541,16 +583,16 @@ function openEditClienteModal(cliente) {
 }
 
 // Bloco editável de trial/assinatura no modal de cliente (master)
-function buildTrialBlock(cliente) {
+// onQuickAction: callback chamado após Iniciar hoje / Resetar (auto-save no Firestore)
+function buildTrialBlock(cliente, onQuickAction) {
   const wrap = el('div', { class: 'trial-block-fields' });
-  wrap.appendChild(el('h3', { style: 'margin-top:1.5rem;margin-bottom:0.5rem;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.14em;color:#888;font-family:Inter,sans-serif;font-weight:500;' }, 'Assinatura'));
   const status = getTrialStatus(cliente);
-  let statusLine;
-  if (status.paid) statusLine = el('span', { style: 'color:#177c4a;font-weight:600;' }, '● Assinatura ativa (sem expiração)');
-  else if (!status.started) statusLine = el('span', { style: 'color:#888;' }, '○ Avaliação não iniciada');
-  else if (status.isBlocked) statusLine = el('span', { style: 'color:#b1272e;font-weight:600;' }, `✕ Avaliação expirada em ${new Date(status.endsAt).toLocaleDateString('pt-BR')}`);
-  else statusLine = el('span', { style: 'color:#8a6b40;font-weight:600;' }, `● Em avaliação · ${status.daysLeft} dia(s) restantes (até ${new Date(status.endsAt).toLocaleDateString('pt-BR')})`);
-  wrap.appendChild(el('p', { class: 'muted', style: 'font-size:0.9rem;margin-bottom:0.75rem;' }, statusLine));
+  let statusClass, statusText;
+  if (status.paid) { statusClass = 'trial-status-paid'; statusText = '● Assinatura ativa (sem expiração)'; }
+  else if (!status.started) { statusClass = 'trial-status-none'; statusText = '○ Avaliação não iniciada'; }
+  else if (status.isBlocked) { statusClass = 'trial-status-expired'; statusText = `✕ Avaliação expirada em ${new Date(status.endsAt).toLocaleDateString('pt-BR')}`; }
+  else { statusClass = 'trial-status-active'; statusText = `● Em avaliação · ${status.daysLeft} dia(s) restantes (até ${new Date(status.endsAt).toLocaleDateString('pt-BR')})`; }
+  wrap.appendChild(el('div', { class: 'trial-status-line ' + statusClass }, statusText));
 
   const daysInput = el('input', { type: 'number', min: '1', step: '1', value: (typeof cliente.trial_days === 'number' && cliente.trial_days > 0) ? cliente.trial_days : TRIAL_DEFAULT_DAYS });
   const subToggle = el('input', { type: 'checkbox' });
@@ -563,13 +605,40 @@ function buildTrialBlock(cliente) {
     el('label', { class: 'field' },
       el('span', { class: 'label-text' }, 'Avaliação iniciada em'), startedInput)
   ));
-  wrap.appendChild(el('div', { style: 'display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;' },
-    el('button', { class: 'btn btn-small', onclick: (e) => { e.preventDefault(); startedInput.value = new Date().toISOString().slice(0, 10); } }, 'Iniciar hoje'),
-    el('button', { class: 'btn btn-small btn-danger', onclick: (e) => { e.preventDefault(); if (confirm('Resetar avaliação? O cliente será bloqueado até você reiniciar.')) { startedInput.value = ''; subToggle.checked = false; } } }, 'Resetar')
+
+  // Ação rápida "Iniciar hoje": salva DIRETO no Firestore + fecha
+  async function quickStart() {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      await saveCliente({
+        ...cliente,
+        trial_started_at: new Date(today + 'T12:00:00').toISOString(),
+        trial_days: parseInt(daysInput.value, 10) || TRIAL_DEFAULT_DAYS,
+        subscription_active: false
+      });
+      toast('Avaliação iniciada hoje');
+      if (typeof onQuickAction === 'function') onQuickAction('started');
+    } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+  }
+  async function quickReset() {
+    if (!confirm('Resetar avaliação?\n\nO cliente fica bloqueado até você iniciar de novo. O registro do plano não é apagado.')) return;
+    try {
+      await saveCliente({
+        ...cliente,
+        trial_started_at: deleteField(),
+        subscription_active: false
+      });
+      toast('Avaliação resetada');
+      if (typeof onQuickAction === 'function') onQuickAction('reset');
+    } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+  }
+  wrap.appendChild(el('div', { class: 'trial-quick-actions' },
+    el('button', { class: 'btn btn-small btn-primary', onclick: (e) => { e.preventDefault(); quickStart(); }, title: 'Salva e fecha imediatamente' }, '▶ Iniciar avaliação hoje'),
+    el('button', { class: 'btn btn-small btn-danger', onclick: (e) => { e.preventDefault(); quickReset(); } }, '↻ Resetar')
   ));
-  wrap.appendChild(el('label', { class: 'field', style: 'display:flex;flex-direction:row;align-items:center;gap:0.6rem;margin-top:0.75rem;' },
+  wrap.appendChild(el('label', { class: 'toggle-inline' },
     subToggle,
-    el('span', { style: 'font-size:0.9rem;color:#4a4a4a;' }, 'Assinatura ativa (pago — libera sem expiração)')
+    el('span', {}, 'Assinatura paga ativa (libera sem expiração)')
   ));
   wrap.__getValues = () => ({
     trial_days: parseInt(daysInput.value, 10) || TRIAL_DEFAULT_DAYS,
