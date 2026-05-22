@@ -2989,12 +2989,34 @@ function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
 
 async function prodPlanFinalize(cid, totalCost, totalPortions) {
   const snapshot = prodPlanBuildSnapshot(cid, totalCost, totalPortions);
-  const ref = await addDoc(collection(db, 'clientes', cid, 'production_plans'), snapshot);
+  let planId;
+  if (PROD_PLAN.planId) {
+    // Atualiza doc existente (caso de "reaberto pra editar")
+    snapshot.reopenedAt = deleteField();
+    await setDoc(doc(db, 'clientes', cid, 'production_plans', PROD_PLAN.planId), snapshot, { merge: true });
+    planId = PROD_PLAN.planId;
+  } else {
+    // Novo doc
+    const ref = await addDoc(collection(db, 'clientes', cid, 'production_plans'), snapshot);
+    planId = ref.id;
+  }
   PROD_PLAN.status = 'finalized';
   PROD_PLAN.finalizedAt = snapshot.finalizedAt;
   PROD_PLAN.finalizedBy = snapshot.finalizedByName;
-  PROD_PLAN.planId = ref.id;
-  return ref.id;
+  PROD_PLAN.planId = planId;
+  return planId;
+}
+
+// Reabre um plano finalizado como rascunho editável (mesmo doc é atualizado ao re-finalizar)
+async function prodPlanReopen(cid, planId) {
+  try {
+    await setDoc(doc(db, 'clientes', cid, 'production_plans', planId),
+      { status: 'draft', reopenedAt: new Date().toISOString() }, { merge: true });
+  } catch (err) { console.warn('reopen status update failed', err); }
+  PROD_PLAN.status = 'draft';
+  PROD_PLAN.finalizedAt = null;
+  PROD_PLAN.finalizedBy = null;
+  // mantém PROD_PLAN.planId pra próxima finalização atualizar o mesmo doc
 }
 
 // ============================================================================
@@ -4028,6 +4050,29 @@ function renderProducao(cid) {
     ),
     el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
       el('a', { class: 'btn', href: `#/c/${cid}/producao/historico` }, '↺ Histórico'),
+      locked && PROD_PLAN.planId
+        ? el('button', { class: 'btn', onclick: async () => {
+            if (!confirm('Reabrir como rascunho?\n\nVocê poderá editar o planejamento e finalizar de novo. O mesmo registro no histórico será atualizado quando você finalizar.')) return;
+            try {
+              await prodPlanReopen(cid, PROD_PLAN.planId);
+              toast('Reaberto como rascunho');
+              renderProducao(cid);
+            } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+          } }, '✎ Editar') : null,
+      locked && PROD_PLAN.items.length > 0
+        ? el('button', { class: 'btn', onclick: () => {
+            if (!confirm('Duplicar esse planejamento como um novo?\n\nOs pratos e quantidades atuais viram um novo rascunho. O plano original continua no histórico.')) return;
+            const snapshot = PROD_PLAN.items.map(it => ({
+              dishId: it.dishId,
+              targetQty: it.targetQty,
+              targetUnit: it.targetUnit,
+              excludedSfIds: new Set(Array.from(it.excludedSfIds || new Set()))
+            }));
+            prodPlanReset();
+            PROD_PLAN.items = snapshot;
+            renderProducao(cid);
+            toast('Planejamento duplicado');
+          } }, '⧉ Duplicar') : null,
       locked
         ? el('button', { class: 'btn btn-primary', onclick: () => {
             if (!confirm('Iniciar um novo planejamento? O plano atual já foi salvo no histórico.')) return;
@@ -4228,6 +4273,47 @@ function renderProducao(cid) {
         'Relatórios PDF e Excel serão liberados após finalizar.'
       );
       actions.appendChild(lockedHint);
+    }
+    // Lista compacta de preparações pra confirmação (antes ou depois de finalizar)
+    if (PROD_PLAN.items.some(it => Number(it.targetQty) > 0)) {
+      const confirmBox = el('div', { class: 'prod-confirm-list' });
+      confirmBox.appendChild(el('div', { class: 'prod-confirm-label' },
+        isLocked ? 'Preparações a produzir' : 'Confira antes de finalizar'
+      ));
+      PROD_PLAN.items.forEach(item => {
+        if (!(item.targetQty > 0)) return;
+        const dish = STATE.dishes.find(d => d.id === item.dishId);
+        if (!dish) return;
+        const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+        const origRend = getSfRendimento(finalSf);
+        let scale = 1;
+        if (origRend.qty > 0) {
+          const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
+          scale = qConv / origRend.qty;
+        }
+        const itemScales = computeCascadeScales(dish, scale * origRend.qty);
+        const activeSfs = dish.sub_fichas.filter(sf => !item.excludedSfIds.has(sf.id));
+        const dishBlock = el('div', { class: 'prod-confirm-dish' });
+        dishBlock.appendChild(el('div', { class: 'prod-confirm-dish-name' },
+          dish.name,
+          el('span', { class: 'prod-confirm-dish-qty' }, ` · ${fmtNum(item.targetQty, 0)} ${item.targetUnit}`)
+        ));
+        if (activeSfs.length > 0) {
+          const ul = el('ul', { class: 'prod-confirm-sfs' });
+          activeSfs.forEach(sf => {
+            const sfScale = itemScales[sf.id] || 1;
+            const sfR = getSfRendimento(sf);
+            const sn = normUnitForDisplay(sfR.qty * sfScale, sfR.unit);
+            ul.appendChild(el('li', {},
+              el('span', { class: 'prod-confirm-sf-name' }, sf.name),
+              el('span', { class: 'prod-confirm-sf-qty' }, `${sn.text} ${sn.unit}`.trim())
+            ));
+          });
+          dishBlock.appendChild(ul);
+        }
+        confirmBox.appendChild(dishBlock);
+      });
+      summaryCard.appendChild(confirmBox);
     }
     summaryCard.appendChild(actions);
     summary.appendChild(summaryCard);
