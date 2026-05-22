@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0200';
+const APP_BUILD = '20260522-V2-0210';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2870,17 +2870,6 @@ function openDishPriceEditor(cid, dish) {
   cmvInput.addEventListener('input', syncFromCmv);
   markupInput.addEventListener('input', syncFromMarkup);
 
-  const resetBtn = el('button', { class: 'btn btn-small' }, '↺ Voltar ao sugerido');
-  resetBtn.addEventListener('click', () => {
-    delete dish.sale_price;
-    dish.target_cmv = 30;
-    const fresh = dishCost(dish);
-    priceInput.value = fmtVal(fresh.suggestedPrice);
-    cmvInput.value = fmtVal(fresh.targetCmv);
-    markupInput.value = fmtVal(fresh.targetMarkup);
-    driver = 'cmv';
-  });
-
   async function saveAndClose() {
     const priceVal = parseDec(priceInput.value);
     const cmvVal = parseDec(cmvInput.value);
@@ -2932,7 +2921,6 @@ function openDishPriceEditor(cid, dish) {
           markupInput
         )
       ),
-      el('div', { style: 'margin-top:0.6rem;' }, resetBtn),
       el('div', { class: 'modal-actions' },
         el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
         el('button', { class: 'btn btn-primary', onclick: saveAndClose }, 'Salvar')

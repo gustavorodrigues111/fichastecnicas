@@ -72,7 +72,7 @@ service cloud.firestore {
     }
     function onlyDishPricingFields() {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
-      return affected.hasOnly(['target_cmv']);
+      return affected.hasOnly(['target_cmv', 'sale_price', 'markup']);
     }
     function onlyInactiveFields() {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
