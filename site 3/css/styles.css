@@ -2684,6 +2684,36 @@ label.field textarea { min-height: 90px; resize: vertical; }
 .lock-toggle-box strong { display: block; color: #8a6b40; font-size: 0.95rem; margin-bottom: 0.2rem; }
 .lock-toggle-box .muted { font-size: 0.82rem; line-height: 1.4; color: #6a6a6a; margin: 0; }
 
+/* Pílula de bloqueio direto na lista de fichas (admin) */
+.lock-pill {
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  border-radius: var(--r-md);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.lock-pill-on {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.lock-pill-on:hover {
+  background: #fde68a;
+  color: #78350f;
+  border-color: #f59e0b;
+}
+.lock-pill-off {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: var(--border);
+}
+.lock-pill-off:hover {
+  background: var(--bg2);
+  color: var(--text2);
+  border-color: var(--border2);
+}
+
 /* Lista de usuários — seções por papel */
 .user-role-section {
   margin-bottom: 2.5rem;

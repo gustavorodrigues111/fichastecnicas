@@ -5602,15 +5602,43 @@ function renderAdminList(cid) {
   STATE.dishes.forEach(dish => {
     const canEdit = canEditDish(cid, dish);
     const lockedByConsultor = !!dish.locked && !isFullAdmin;
+    const canTogglLock = canToggleDishLock(cid);
+    // Toggle de lock pra master/staff — botão pequeno que alterna direto na lista
+    let lockToggleBtn = null;
+    if (canTogglLock) {
+      lockToggleBtn = el('button', {
+        class: 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off'),
+        title: dish.locked
+          ? 'Cliente NÃO pode editar esta ficha — clique pra desbloquear'
+          : 'Cliente PODE editar esta ficha — clique pra bloquear'
+      }, dish.locked ? '🔒 Bloqueada' : '🔓 Liberada');
+      lockToggleBtn.addEventListener('click', async () => {
+        const wasLocked = !!dish.locked;
+        dish.locked = !wasLocked;
+        // Update UI imediato (otimista)
+        lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
+        lockToggleBtn.textContent = dish.locked ? '🔒 Bloqueada' : '🔓 Liberada';
+        try {
+          await saveDish(cid, dish);
+          toast(dish.locked ? 'Ficha bloqueada' : 'Ficha liberada');
+        } catch (err) {
+          // Reverte em caso de erro
+          dish.locked = wasLocked;
+          lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
+          lockToggleBtn.textContent = dish.locked ? '🔒 Bloqueada' : '🔓 Liberada';
+          alert('Erro: ' + (err.message || err.code));
+        }
+      });
+    }
     const item = el('div', { class: 'dish-admin-item' + (lockedByConsultor ? ' dish-locked' : '') },
       el('div', { class: 'info' },
         el('h4', {}, dish.name,
-          dish.locked && isFullAdmin ? el('span', { class: 'lock-badge lock-by-master', title: 'Bloqueada pra edição pelo cliente' }, '🔒 travada') : null,
           lockedByConsultor ? el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 bloqueada pelo consultor') : null
         ),
         el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
       el('div', { class: 'dish-admin-actions' },
+        lockToggleBtn,
         el('a', { class: 'btn btn-small', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver'),
         canEdit
           ? el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar')
