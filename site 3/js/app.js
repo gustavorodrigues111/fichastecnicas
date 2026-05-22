@@ -4040,6 +4040,11 @@ function renderProducao(cid) {
   app.appendChild(renderClienteContext(cid));
 
   const locked = prodPlanIsLocked();
+  // Quem pode ver preços (master/staff/cliente/cliente_admin) tem acesso a custos
+  // cliente_op fica restrito à view de produção sem custos
+  const canSeeCost = canEditInsumoPrice(cid);
+  if (!STATE.prodView) STATE.prodView = canSeeCost ? 'custo' : 'producao';
+  if (!canSeeCost) STATE.prodView = 'producao';
 
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
@@ -4082,6 +4087,23 @@ function renderProducao(cid) {
         : el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
     )
   ));
+
+  // Toggle Produção / Custo — só aparece pra quem pode ver custos
+  if (canSeeCost) {
+    const viewToggle = el('div', { class: 'view-toggle', style: 'margin-bottom: 1rem;' },
+      el('button', { 'data-view': 'producao' }, 'Produção'),
+      el('button', { 'data-view': 'custo' }, 'Custo')
+    );
+    $$('button', viewToggle).forEach(b => {
+      if (b.dataset.view === STATE.prodView) b.classList.add('active');
+      b.addEventListener('click', () => {
+        if (STATE.prodView === b.dataset.view) return;
+        STATE.prodView = b.dataset.view;
+        renderProducao(cid);
+      });
+    });
+    app.appendChild(viewToggle);
+  }
 
   const container = el('div', { class: 'producao-wrap' });
   const planList = el('div', { class: 'prod-plan-list' });
@@ -4176,7 +4198,7 @@ function renderProducao(cid) {
           })(),
           el('span', { class: 'prod-unit-fixed' }, origRend.unit || ''),
           el('span', { class: 'prod-scale muted' }, scale > 0 ? `${fmtNum(scale, 2)}×` : '—'),
-          el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)),
+          STATE.prodView === 'custo' ? el('span', { class: 'prod-item-cost' }, fmtBRL(itemTotalCost)) : null,
           prodPlanIsLocked()
             ? null
             : el('button', { class: 'btn btn-small btn-danger', title: 'Remover do plano', onclick: () => {
@@ -4224,14 +4246,18 @@ function renderProducao(cid) {
     const canFinalize = !isLocked && PROD_PLAN.items.length > 0
       && PROD_PLAN.items.every(it => Number(it.targetQty) > 0);
     const summaryCard = el('div', { class: 'prod-summary-card' },
-      el('div', { class: 'prod-sum-row' },
+      STATE.prodView === 'custo' ? el('div', { class: 'prod-sum-row' },
         el('span', { class: 'muted' }, 'Custo total estimado'),
         el('strong', {}, fmtBRL(totalCost))
-      ),
+      ) : null,
       totalPortions > 0 ? el('div', { class: 'prod-sum-row' },
         el('span', { class: 'muted' }, 'Porções'),
         el('strong', {}, fmtNum(totalPortions, 0))
-      ) : null
+      ) : null,
+      el('div', { class: 'prod-sum-row' },
+        el('span', { class: 'muted' }, 'Pratos'),
+        el('strong', {}, fmtNum(PROD_PLAN.items.length, 0))
+      )
     );
     const actions = el('div', { class: 'prod-actions' });
     if (isLocked) {
