@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2330';
+const APP_BUILD = '20260521-2345';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -1449,6 +1449,11 @@ function buildRestaurantManagementActions(cliente, opts) {
 }
 
 async function renderClientesAdmin() {
+  if (!isMaster()) {
+    console.error('[SECURITY] non-master tentou abrir renderClientesAdmin — bloqueado. role:', STATE.userDoc?.role, 'uid:', STATE.user?.uid);
+    renderNoAccess();
+    return;
+  }
   const app = $('#app');
   renderLoadingScreen();
   await loadClientesList();
@@ -1529,7 +1534,11 @@ function refreshTeamView() {
 
 // ---------- Views: Usuários Admin (master only) ----------
 async function renderUsuariosAdmin() {
-  if (!isMaster()) { renderNoAccess(); return; }
+  if (!isMaster()) {
+    console.error('[SECURITY] non-master tentou abrir renderUsuariosAdmin — bloqueado. role:', STATE.userDoc?.role, 'uid:', STATE.user?.uid);
+    renderNoAccess();
+    return;
+  }
   const app = $('#app');
   renderLoadingScreen();
   const [usersSnap, pendingSnap] = await Promise.all([
@@ -1760,6 +1769,13 @@ function renderUserCard(u) {
 }
 
 function openEditUserModal(u) {
+  // Guard: editar user via essa modal só pra master (cliente_dono tem fluxo próprio
+  // em renderClientTeamAdmin que respeita escopo dos restaurantes dele)
+  if (!isMaster()) {
+    console.error('[SECURITY] non-master tentou abrir openEditUserModal — bloqueado. role:', STATE.userDoc?.role, 'target uid:', u?.uid);
+    alert('Você não tem permissão pra editar usuários por esta tela.');
+    return;
+  }
   // Create modal dynamically
   const existing = $('#edit-user-modal');
   if (existing) existing.remove();
@@ -5757,8 +5773,16 @@ async function renderClientTeamAdmin(cid) {
       q = query(collection(db, 'users'), where('clienteIds', 'array-contains-any', myCids));
     }
     const snap = await getDocs(q);
-    teamUsers = snap.docs
-      .map(d => ({ uid: d.id, ...d.data() }))
+    const rawUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    // SEGURANÇA: filtragem em duas etapas. (1) Defensiva: descarta master/staff
+    // que possam escapar do filtro da query — cliente_dono NÃO deve ver consultoria
+    // em nenhuma hipótese. (2) Funcional: matchea cid + role da equipe.
+    const leakedConsultoria = rawUsers.filter(u => u.role === 'master' || u.role === 'staff');
+    if (leakedConsultoria.length > 0 && !isMaster()) {
+      console.error('[SECURITY] cliente_dono recebeu', leakedConsultoria.length, 'doc(s) de consultoria via list — descartados no client. Investigue a rule.');
+    }
+    teamUsers = rawUsers
+      .filter(u => u.role !== 'master' && u.role !== 'staff')
       .filter(u => (u.clienteIds || []).includes(cid))
       .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
     console.info('[Equipe] ok ·', teamUsers.length, 'membros');

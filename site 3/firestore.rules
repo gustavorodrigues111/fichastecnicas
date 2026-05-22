@@ -94,7 +94,10 @@ service cloud.firestore {
     // ---------- users collection ----------
     match /users/{uid} {
       // GET (leitura de um doc específico): regra completa por doc.
-      // Próprio user, master, OU cliente (dono) lendo doc onde clienteIds cruza com o dele.
+      // - Próprio user: sempre
+      // - Master: tudo
+      // - Cliente (dono): só docs onde clienteIds cruza E role NÃO É master/staff
+      //   (camada de segurança: cliente NUNCA acessa docs da consultoria)
       allow get: if isSignedIn() && (
         request.auth.uid == uid
         || isMaster()
@@ -103,13 +106,13 @@ service cloud.firestore {
           && userDoc().role == 'cliente'
           && resource.data.clienteIds is list
           && resource.data.clienteIds.hasAny(userDoc().clienteIds)
+          && !(resource.data.role in ['master', 'staff'])
         )
       );
-      // LIST (query): o Firestore não casa hasAny(get()) com array-contains-any
-      // (rules-as-filters precisa de expressão estática). Aceitamos LIST de master
-      // e de cliente (dono) — o app sempre passa a query filtrada por clienteIds.
-      // Risco: cliente_dono malicioso poderia listar TODOS users via DevTools;
-      // mitigação: nenhum dado sensível (sem senha) e contexto de consultoria controlada.
+      // LIST (query): rules-as-filters não casa hasAny(get()) com array-contains-any.
+      // Solução: list é permissivo (master OU cliente), mas o app SEMPRE filtra
+      // role no client (renderClientTeamAdmin descarta master/staff que escapem).
+      // Get individual (linha acima) bloqueia leitura direta de doc master/staff.
       allow list: if isSignedIn() && hasUserDoc()
                   && (userDoc().role == 'master' || userDoc().role == 'cliente')
                   && userDoc().clienteIds is list;
