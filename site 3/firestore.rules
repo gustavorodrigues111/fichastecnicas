@@ -84,7 +84,18 @@ service cloud.firestore {
 
     // ---------- users collection ----------
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isMaster());
+      // Próprio user, master, OU cliente (dono) lendo membros da equipe dos restaurantes dele
+      // (resource.data.clienteIds cruza com userDoc().clienteIds do cliente logado)
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid
+        || isMaster()
+        || (
+          hasUserDoc()
+          && userDoc().role == 'cliente'
+          && resource.data.clienteIds is list
+          && resource.data.clienteIds.hasAny(userDoc().clienteIds)
+        )
+      );
       // Bootstrap do master (auto-criação no primeiro login do master email)
       allow create: if isSignedIn()
                     && request.auth.uid == uid
@@ -105,6 +116,22 @@ service cloud.firestore {
       allow update: if isSignedIn()
                     && request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword', 'passwordChangedAt']);
+      // Cliente (dono) gerencia membros da equipe dos restaurantes dele:
+      // - Pode criar usuários cliente_admin/cliente_op com clienteIds nos restaurantes dele
+      // - Pode atualizar (promover/rebaixar entre admin/op, desativar, reativar)
+      allow create: if isSignedIn()
+                    && hasUserDoc()
+                    && userDoc().role == 'cliente'
+                    && request.resource.data.role in ['cliente_admin', 'cliente_op']
+                    && request.resource.data.clienteIds is list
+                    && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
+      allow update: if isSignedIn()
+                    && hasUserDoc()
+                    && userDoc().role == 'cliente'
+                    && resource.data.clienteIds is list
+                    && resource.data.clienteIds.hasAny(userDoc().clienteIds)
+                    && request.resource.data.role in ['cliente_admin', 'cliente_op', 'equipe']
+                    && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
       // Master cria/atualiza/deleta qualquer user
       allow create, update, delete: if isMaster();
     }

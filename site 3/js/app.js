@@ -5579,11 +5579,32 @@ async function renderClientTeamAdmin(cid) {
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   renderLoadingScreen();
-  const allUsersSnap = await getDocs(collection(db, 'users'));
-  const teamUsers = allUsersSnap.docs
-    .map(d => ({ uid: d.id, ...d.data() }))
-    .filter(u => (u.clienteIds || []).includes(cid))
-    .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
+  // Cliente comum não pode listar TODA a collection users — usa query filtrada
+  // (a Firestore rule permite quando o doc retornado tem clienteIds em comum)
+  let teamUsers = [];
+  try {
+    const q = isMaster()
+      ? collection(db, 'users')
+      : query(collection(db, 'users'), where('clienteIds', 'array-contains', cid));
+    const snap = await getDocs(q);
+    teamUsers = snap.docs
+      .map(d => ({ uid: d.id, ...d.data() }))
+      .filter(u => (u.clienteIds || []).includes(cid))
+      .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
+  } catch (err) {
+    app.innerHTML = '';
+    app.appendChild(renderClienteContext(cid));
+    app.appendChild(el('div', { class: 'page-header' },
+      el('h1', {}, 'Equipe do restaurante')
+    ));
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', { style: 'color:var(--danger);' }, 'Erro ao carregar a equipe: ' + (err.message || err.code)),
+      el('p', { class: 'muted', style: 'font-size:0.85rem;' },
+        'Provavelmente as regras do Firestore precisam de redeploy. Avise o consultor.'),
+      el('button', { class: 'btn', onclick: () => location.reload() }, 'Tentar de novo')
+    ));
+    return;
+  }
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   app.appendChild(el('div', { class: 'page-header' },
