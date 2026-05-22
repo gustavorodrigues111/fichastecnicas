@@ -1,6 +1,8 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
+const APP_BUILD = '20260521-2305';
+console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
@@ -5686,13 +5688,15 @@ async function renderClientTeamAdmin(cid) {
   // então a QUERY tem que usar array-contains-any com o MESMO array — caso contrário
   // a regra "as filter" não casa e o Firestore rejeita.
   let teamUsers = [];
+  const myCids = (STATE.userDoc?.clienteIds || []).slice(0, 10);
+  const myRole = STATE.userDoc?.role || '(sem role)';
+  console.info('[Equipe] build', APP_BUILD, '· role:', myRole, '· clienteIds:', myCids, '· cid:', cid);
   try {
     let q;
     if (isMaster()) {
       q = collection(db, 'users');
     } else {
-      const myCids = (STATE.userDoc?.clienteIds || []).slice(0, 10); // array-contains-any limita a 10
-      if (!myCids.length) throw new Error('Seu usuário não tem restaurantes vinculados.');
+      if (!myCids.length) throw new Error('Seu usuário não tem restaurantes vinculados (clienteIds vazio).');
       q = query(collection(db, 'users'), where('clienteIds', 'array-contains-any', myCids));
     }
     const snap = await getDocs(q);
@@ -5700,16 +5704,28 @@ async function renderClientTeamAdmin(cid) {
       .map(d => ({ uid: d.id, ...d.data() }))
       .filter(u => (u.clienteIds || []).includes(cid))
       .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
+    console.info('[Equipe] ok ·', teamUsers.length, 'membros');
   } catch (err) {
+    console.error('[Equipe] FALHOU:', err);
     app.innerHTML = '';
     app.appendChild(renderClienteContext(cid));
     app.appendChild(el('div', { class: 'page-header' },
       el('h1', {}, 'Equipe do restaurante')
     ));
+    const debugBox = el('div', { style: 'background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:1rem;margin:1rem 0;font-family:ui-monospace,monospace;font-size:0.78rem;line-height:1.5;' },
+      el('div', { style: 'color:#a31e1e;font-weight:600;margin-bottom:0.4rem;' }, 'Erro Firestore'),
+      el('div', {}, 'code: ' + (err.code || '—')),
+      el('div', {}, 'message: ' + (err.message || '—')),
+      el('div', { style: 'margin-top:0.6rem;color:#6b7280;' }, 'build: ' + APP_BUILD),
+      el('div', {}, 'role: ' + myRole),
+      el('div', {}, 'meus clienteIds: ' + JSON.stringify(myCids)),
+      el('div', {}, 'cid atual: ' + cid)
+    );
     app.appendChild(el('div', { class: 'empty-state' },
-      el('p', { style: 'color:var(--danger);' }, 'Erro ao carregar a equipe: ' + (err.message || err.code)),
+      el('p', { style: 'color:var(--danger);' }, 'Não foi possível carregar a equipe.'),
+      debugBox,
       el('p', { class: 'muted', style: 'font-size:0.85rem;' },
-        'Provavelmente as regras do Firestore precisam de redeploy. Avise o consultor.'),
+        'Tire um print dessa caixa e mande pro consultor.'),
       el('button', { class: 'btn', onclick: () => location.reload() }, 'Tentar de novo')
     ));
     return;
