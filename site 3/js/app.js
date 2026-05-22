@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2320';
+const APP_BUILD = '20260521-2330';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -999,7 +999,7 @@ async function offerPendingEnrollment({ email, name, role, clienteIds, whatsapp 
         toast('Pré-cadastro salvo');
         showPreClaimSuccessModal(email, name);
         modal.remove();
-        renderUsuariosAdmin();
+        refreshTeamView();
         resolve();
       } catch (err) { alert('Erro ao pré-cadastrar: ' + (err.message || err.code)); }
     }
@@ -1515,8 +1515,21 @@ async function renderClientesAdmin() {
   app.appendChild(grid);
 }
 
+// Helper: depois de inviteUser/reativar/pre-claim, volta pra tela de equipe certa
+// (master vai pra global; cliente_dono volta pra equipe do restaurante atual)
+function refreshTeamView() {
+  if (isMaster()) {
+    renderUsuariosAdmin();
+  } else if (STATE.currentCliente?.id) {
+    renderClientTeamAdmin(STATE.currentCliente.id);
+  } else {
+    location.hash = '#/';
+  }
+}
+
 // ---------- Views: Usuários Admin (master only) ----------
 async function renderUsuariosAdmin() {
+  if (!isMaster()) { renderNoAccess(); return; }
   const app = $('#app');
   renderLoadingScreen();
   const [usersSnap, pendingSnap] = await Promise.all([
@@ -1899,7 +1912,7 @@ async function inviteUser(email, name, role, clienteIds, whatsapp) {
           reactivatedAt: new Date().toISOString()
         }, { merge: true });
         toast('Usuário reativado com novos dados');
-        renderUsuariosAdmin();
+        refreshTeamView();
         return;
       } else {
         alert(`Este email já tem conta ATIVA no sistema. Use o botão "Editar" no card do usuário para alterar dados, ou "Enviar reset de senha".`);
@@ -1939,7 +1952,7 @@ async function inviteUser(email, name, role, clienteIds, whatsapp) {
   });
   toast('Usuário criado');
   showInviteCredentialsModal({ name, email, password: tempPw, whatsapp });
-  renderUsuariosAdmin();
+  refreshTeamView();
 }
 
 // Modal com credenciais geradas — admin copia ou envia pelo WhatsApp
@@ -1989,9 +2002,26 @@ function showInviteCredentialsModal({ name, email, password, whatsapp }) {
   const waPhone = waDigits.startsWith('55') || waDigits.length < 11 ? waDigits : ('55' + waDigits);
   const waLink = waPhone ? `https://wa.me/${waPhone}?text=${encodeURIComponent(message)}` : null;
 
+  const emailBtn = el('button', { class: 'btn' }, '📧 Enviar link por email');
+  emailBtn.addEventListener('click', async () => {
+    if (!confirm(`Enviar email pra ${email} com link pra definir a senha?\n\nA pessoa recebe um link do Firebase, clica, escolhe a senha dela e já consegue entrar — sem precisar da senha temporária.`)) return;
+    emailBtn.disabled = true;
+    emailBtn.textContent = 'Enviando...';
+    try {
+      await sendPasswordResetEmail(auth, email);
+      emailBtn.textContent = '✓ Email enviado';
+      toast('Email enviado pra ' + email);
+    } catch (err) {
+      emailBtn.disabled = false;
+      emailBtn.textContent = '📧 Enviar link por email';
+      alert('Erro ao enviar email: ' + (err.message || err.code));
+    }
+  });
+
   const actions = el('div', { class: 'invite-cred-actions' },
     el('button', { class: 'btn btn-primary', onclick: () => copyText(message, 'Mensagem') }, '⧉ Copiar mensagem'),
     el('button', { class: 'btn', onclick: () => copyText(password, 'Senha') }, '⧉ Só a senha'),
+    emailBtn,
     waLink
       ? el('a', { class: 'btn btn-accent', href: waLink, target: '_blank', rel: 'noopener' }, '✉ Enviar pelo WhatsApp')
       : el('button', { class: 'btn btn-accent', disabled: '', title: 'Cadastre o WhatsApp do usuário pra usar este botão' }, '✉ WhatsApp (sem número)')
@@ -2001,7 +2031,7 @@ function showInviteCredentialsModal({ name, email, password, whatsapp }) {
     el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
     el('div', { class: 'modal-content modal-content-wide' },
       el('h2', {}, '✓ Usuário criado: ' + name),
-      el('p', { class: 'modal-subtitle' }, 'Envie estas credenciais pelo canal que preferir. A pessoa será obrigada a trocar a senha no primeiro login.'),
+      el('p', { class: 'modal-subtitle' }, 'Escolha como enviar: mensagem pronta (com senha temp), email com link pra definir a senha (Firebase manda), ou WhatsApp. A pessoa troca a senha no primeiro login se usar a temp.'),
       credBox,
       el('p', { class: 'muted', style: 'margin:0.8rem 0 0.3rem;font-size:0.85rem;' }, 'Mensagem pronta:'),
       msgTextarea,
