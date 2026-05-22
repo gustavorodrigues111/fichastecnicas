@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0370';
+const APP_BUILD = '20260522-V2-0380';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2911,12 +2911,9 @@ function renderClienteHome(cid) {
 
     // PREÇO DE VENDA — único badge que abre o editor (preço, CMV, markup)
     const priceBadge = showCost ? el('span', {
-      class: 'dish-price-badge' + (hasPriceOverride ? ' is-override' : '') + (canEditPrice ? ' is-editable' : ''),
+      class: 'dish-price-badge' + (canEditPrice ? ' is-editable' : ''),
       title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
-    },
-      fmtBRL(salePrice),
-      hasPriceOverride ? el('span', { class: 'dish-price-pin', title: 'Preço fixado pelo restaurante' }, '📌') : null
-    ) : null;
+    }, fmtBRL(salePrice)) : null;
     if (priceBadge && canEditPrice) {
       priceBadge.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();

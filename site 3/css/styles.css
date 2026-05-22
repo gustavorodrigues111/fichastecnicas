@@ -3504,12 +3504,6 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   align-items: baseline;
   gap: 0.3rem;
 }
-.dish-price-badge.is-override { color: var(--accent-hover); }
-.dish-price-pin {
-  font-size: 0.65rem;
-  position: relative;
-  top: -2px;
-}
 .dish-summary.v2 .dish-summary-bottom {
   display: flex;
   flex-wrap: wrap;
