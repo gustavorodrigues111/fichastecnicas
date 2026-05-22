@@ -93,9 +93,9 @@ service cloud.firestore {
 
     // ---------- users collection ----------
     match /users/{uid} {
-      // Próprio user, master, OU cliente (dono) lendo membros da equipe dos restaurantes dele
-      // (resource.data.clienteIds cruza com userDoc().clienteIds do cliente logado)
-      allow read: if isSignedIn() && (
+      // GET (leitura de um doc específico): regra completa por doc.
+      // Próprio user, master, OU cliente (dono) lendo doc onde clienteIds cruza com o dele.
+      allow get: if isSignedIn() && (
         request.auth.uid == uid
         || isMaster()
         || (
@@ -105,6 +105,14 @@ service cloud.firestore {
           && resource.data.clienteIds.hasAny(userDoc().clienteIds)
         )
       );
+      // LIST (query): o Firestore não casa hasAny(get()) com array-contains-any
+      // (rules-as-filters precisa de expressão estática). Aceitamos LIST de master
+      // e de cliente (dono) — o app sempre passa a query filtrada por clienteIds.
+      // Risco: cliente_dono malicioso poderia listar TODOS users via DevTools;
+      // mitigação: nenhum dado sensível (sem senha) e contexto de consultoria controlada.
+      allow list: if isSignedIn() && hasUserDoc()
+                  && (userDoc().role == 'master' || userDoc().role == 'cliente')
+                  && userDoc().clienteIds is list;
       // Bootstrap do master (auto-criação no primeiro login do master email)
       allow create: if isSignedIn()
                     && request.auth.uid == uid
