@@ -1511,6 +1511,54 @@ async function renderClientesList() {
 }
 
 // ---------- Views: Admin Clientes (master only) ----------
+// Helper compartilhado: bloco de ações administrativas de um restaurante
+// (Editar / Importar Excel / Atualizar arquivo / Backup / Excluir).
+// Usado em renderClientesAdmin (master) e em renderAdminList (dentro do restaurante).
+function buildRestaurantManagementActions(cliente, opts) {
+  opts = opts || {};
+  const onAfter = opts.onAfter || (() => {});
+  const wrap = el('div', { class: 'cc-menu' });
+  wrap.appendChild(el('button', { class: 'btn btn-small', onclick: () => openEditClienteModal(cliente), title: 'Editar nome, consultor e configurações' }, '✎ Editar'));
+  wrap.appendChild(el('button', { class: 'btn btn-small', onclick: () => openImportExcelModal(cliente.id, cliente.name), title: 'Importar/adicionar fichas e insumos via planilha Excel' }, '↑ Importar Excel'));
+  wrap.appendChild(el('button', { class: 'btn btn-small btn-accent', onclick: () => openUpdateFromFileModal(cliente), title: 'Sincronizar do arquivo data.json' }, '↻ Atualizar do arquivo'));
+  wrap.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
+    try {
+      const [dSnap, iSnap, cfgSnap] = await Promise.all([
+        getDocs(dishesCol(cliente.id)),
+        getDocs(insumosCol(cliente.id)),
+        getDoc(configDoc(cliente.id, 'equipamentos'))
+      ]);
+      const payload = {
+        cliente: cliente,
+        dishes: dSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        insumos: iSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        equipamentos_disponiveis: cfgSnap.exists() ? (cfgSnap.data().list || []) : []
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `backup-${cliente.id}-${new Date().toISOString().slice(0,10)}.json`;
+      a.click(); URL.revokeObjectURL(url);
+      toast('Backup baixado');
+    } catch (err) { toast('Erro: ' + err.message); }
+  }, title: 'Baixar JSON com tudo deste cliente' }, '↓ Backup'));
+  wrap.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+    if (!confirm(`EXCLUIR "${cliente.name}"?\n\nIsso apaga fichas, insumos e configs. Baixe um backup antes se houver dados importantes.`)) return;
+    try {
+      const [dSnap, iSnap] = await Promise.all([getDocs(dishesCol(cliente.id)), getDocs(insumosCol(cliente.id))]);
+      let batch = writeBatch(db), cnt = 0;
+      for (const d of dSnap.docs) { batch.delete(dishDoc(cliente.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
+      for (const d of iSnap.docs) { batch.delete(insumoDoc(cliente.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
+      batch.delete(configDoc(cliente.id, 'equipamentos'));
+      batch.delete(clienteDoc(cliente.id));
+      await batch.commit();
+      toast('Restaurante excluído');
+      onAfter('deleted');
+    } catch (err) { toast('Erro: ' + err.message); }
+  } }, '× Excluir'));
+  return wrap;
+}
+
 async function renderClientesAdmin() {
   const app = $('#app');
   renderLoadingScreen();
@@ -1521,7 +1569,7 @@ async function renderClientesAdmin() {
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar restaurantes'),
-      el('p', {}, 'Crie novos restaurantes, importe dados, sincronize preços ou exclua.')
+      el('p', {}, 'Crie novos restaurantes. Pra editar dados, importar ou fazer backup, abra o restaurante e use a aba Gerenciar.')
     )
   ));
 
@@ -1570,47 +1618,7 @@ async function renderClientesAdmin() {
         el('span', { class: 'cc-id' }, c.id)
       ),
       el('div', { class: 'cc-actions' },
-        el('a', { class: 'btn btn-primary btn-block', href: `#/c/${c.id}` }, 'Abrir restaurante →'),
-        el('div', { class: 'cc-menu' },
-          el('button', { class: 'btn btn-small', onclick: () => openEditClienteModal(c), title: 'Editar nome, consultor e configurações' }, '✎ Editar'),
-          el('button', { class: 'btn btn-small', onclick: () => openImportExcelModal(c.id, c.name), title: 'Importar/adicionar fichas e insumos via planilha Excel' }, '↑ Importar Excel'),
-          el('button', { class: 'btn btn-small btn-accent', onclick: () => openUpdateFromFileModal(c), title: 'Sincronizar do arquivo data.json' }, '↻ Atualizar do arquivo'),
-          el('button', { class: 'btn btn-small', onclick: async () => {
-            // Backup do cliente (precisa garantir que estamos subscritos a ele)
-            try {
-              const [dSnap, iSnap, cfgSnap] = await Promise.all([
-                getDocs(dishesCol(c.id)),
-                getDocs(insumosCol(c.id)),
-                getDoc(configDoc(c.id, 'equipamentos'))
-              ]);
-              const payload = {
-                cliente: c,
-                dishes: dSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                insumos: iSnap.docs.map(d => ({ id: d.id, ...d.data() })),
-                equipamentos_disponiveis: cfgSnap.exists() ? (cfgSnap.data().list || []) : []
-              };
-              const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url; a.download = `backup-${c.id}-${new Date().toISOString().slice(0,10)}.json`;
-              a.click(); URL.revokeObjectURL(url);
-              toast('Backup baixado');
-            } catch (err) { toast('Erro: ' + err.message); }
-          }, title: 'Baixar JSON com tudo deste cliente' }, '↓ Backup'),
-          el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-            if (!confirm(`EXCLUIR "${c.name}"?\n\nIsso apaga fichas, insumos e configs. Baixe um backup antes se houver dados importantes.`)) return;
-            try {
-              const [dSnap, iSnap] = await Promise.all([getDocs(dishesCol(c.id)), getDocs(insumosCol(c.id))]);
-              let batch = writeBatch(db), cnt = 0;
-              for (const d of dSnap.docs) { batch.delete(dishDoc(c.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
-              for (const d of iSnap.docs) { batch.delete(insumoDoc(c.id, d.id)); if (++cnt >= 400) { await batch.commit(); batch = writeBatch(db); cnt = 0; } }
-              batch.delete(configDoc(c.id, 'equipamentos'));
-              batch.delete(clienteDoc(c.id));
-              await batch.commit();
-              toast('Restaurante excluído'); renderClientesAdmin();
-            } catch (err) { toast('Erro: ' + err.message); }
-          } }, '× Excluir')
-        )
+        el('a', { class: 'btn btn-primary btn-block', href: `#/c/${c.id}` }, 'Abrir restaurante →')
       )
     );
     grid.appendChild(card);
@@ -5613,6 +5621,7 @@ function renderAdminList(cid) {
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   const isFullAdmin = canEditCliente(cid);
+  const isMasterUser = isMaster();
   const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Gerenciar fichas'),
@@ -5623,6 +5632,27 @@ function renderAdminList(cid) {
     el('a', { class: 'btn btn-primary', href: `#/c/${cid}/admin/new` }, '+ Nova ficha')
   );
   app.appendChild(header);
+
+  // Painel de configurações do restaurante (só master)
+  if (isMasterUser && STATE.currentCliente) {
+    const cfgPanel = el('section', { class: 'restaurant-config-panel' },
+      el('div', { class: 'restaurant-config-head' },
+        el('div', {},
+          el('h3', {}, 'Configurações do restaurante'),
+          el('p', { class: 'muted' }, 'Edição de dados, importação de planilha, sincronização do arquivo, backup e exclusão.')
+        )
+      )
+    );
+    cfgPanel.appendChild(buildRestaurantManagementActions(STATE.currentCliente, {
+      onAfter: (action) => {
+        if (action === 'deleted') {
+          // restaurante apagado — vai pra lista
+          location.hash = '#/admin/clientes';
+        }
+      }
+    }));
+    app.appendChild(cfgPanel);
+  }
   const panel = el('div', { class: 'admin-panel' });
   const list = el('div', { class: 'dish-admin-list' });
   STATE.dishes.forEach(dish => {

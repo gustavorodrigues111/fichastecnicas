@@ -2714,6 +2714,36 @@ label.field textarea { min-height: 90px; resize: vertical; }
   border-color: var(--border2);
 }
 
+/* Painel de configurações do restaurante (dentro da aba Gerenciar) */
+.restaurant-config-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+.restaurant-config-head {
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.restaurant-config-head h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.3rem;
+}
+.restaurant-config-head .muted {
+  font-size: 0.85rem;
+  margin: 0;
+  color: var(--text3);
+}
+.restaurant-config-panel .cc-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* Lista de usuários — seções por papel */
 .user-role-section {
   margin-bottom: 2.5rem;
