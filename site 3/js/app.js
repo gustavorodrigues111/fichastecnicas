@@ -4017,8 +4017,10 @@ function renderProducao(cid) {
       if (!dish) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const origRend = getSfRendimento(finalSf);
-      // Escala: qty alvo / rendimento original (se unidades batem)
-      let scale = 1;
+      // Escala: qty alvo / rendimento original. Se targetQty=0, escala=0
+      // (tudo zerado — custo, ingredientes, sub-fichas). Quando user clica
+      // +10 ou digita um valor, recalcula.
+      let scale = 0;
       if (item.targetQty > 0 && origRend.qty > 0) {
         const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
         scale = qConv / origRend.qty;
@@ -4256,7 +4258,7 @@ function renderProducao(cid) {
       if (!dish) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const origRend = getSfRendimento(finalSf);
-      let scale = 1;
+      let scale = 0;
       if (item.targetQty > 0 && origRend.qty > 0) {
         const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
         scale = qConv / origRend.qty;
@@ -4323,7 +4325,7 @@ function renderProducao(cid) {
       if (!dish) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const origRend = getSfRendimento(finalSf);
-      let scale = 1;
+      let scale = 0;
       if (item.targetQty > 0 && origRend.qty > 0) {
         const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
         scale = qConv / origRend.qty;
@@ -4991,7 +4993,7 @@ function exportProducaoXLSX(cid) {
     if (!dish) return;
     const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
     const origRend = getSfRendimento(finalSf);
-    let scale = 1;
+    let scale = 0;
     if (item.targetQty > 0 && origRend.qty > 0) {
       const [qConv] = normalizeSubrefQty(item.targetQty, item.targetUnit, origRend.unit);
       scale = qConv / origRend.qty;
