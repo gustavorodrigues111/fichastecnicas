@@ -3871,21 +3871,37 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   vertical-align: middle;
 }
 
-/* Mobile: cards compactos */
+/* Mobile: cards compactos — empilha nome em cima, preço+custo embaixo */
 @media (max-width: 720px) {
-  .dish-summary.v2 { padding: 0.9rem 1rem; gap: 0.4rem; }
+  .dish-summary.v2 { padding: 0.9rem 1rem; gap: 0.5rem; }
   .dish-summary.v2 .dish-name {
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
-    line-height: 1.2;
+    line-height: 1.25;
   }
-  .dish-summary.v2 .dish-title-compact { align-items: flex-start; }
-  .dish-price-block { gap: 0.8rem; align-items: flex-start; }
+  /* Linha 1 (top) vira column: título cheio em cima, preço+custo numa linha embaixo */
+  .dish-summary.v2 .dish-summary-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .dish-summary.v2 .dish-title-compact {
+    align-items: baseline;
+    width: 100%;
+  }
+  /* Preço+custo alinhados à esquerda no mobile (não mais à direita) */
+  .dish-price-block {
+    gap: 1.5rem;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding-left: 2.2rem; /* alinha com início do nome (depois do chevron) */
+  }
+  .dish-price-col { align-items: flex-start; }
   .dish-price-label { font-size: 0.55rem; letter-spacing: 0.06em; }
-  .dish-price-badge { font-size: 1.05rem; }
-  .dish-cost-value { font-size: 0.88rem; }
+  .dish-price-badge { font-size: 1.15rem; }
+  .dish-cost-value { font-size: 0.95rem; }
   /* CMV/Markup sempre em 1 linha consistente — sem flex-wrap */
   .dish-summary.v2 .dish-summary-bottom {
     padding-left: 0;
