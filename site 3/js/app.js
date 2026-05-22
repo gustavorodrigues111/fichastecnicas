@@ -5140,11 +5140,85 @@ function renderInsumos(cid) {
   app.appendChild(renderClienteContext(cid));
   const canEdit = canEditInsumoPrice(cid);
   const canFullEdit = canEditCliente(cid);
+
+  // ── Buffer de alterações ──
+  // Snapshot dos insumos no momento que a tela carrega (deep clone leve).
+  // Mudanças vão pro STATE.insumos direto, mas só salvam ao clicar "Salvar".
+  // dirtyIds rastreia quais foram editados.
+  const snapshot = new Map(STATE.insumos.map(i => [i.id, JSON.parse(JSON.stringify(i))]));
+  const dirtyIds = new Set();
+  let saveBar, dirtyCountSpan, saveBtn, discardBtn;
+  function markDirty(insumoId) {
+    dirtyIds.add(insumoId);
+    updateSaveBar();
+  }
+  function updateSaveBar() {
+    if (!saveBar) return;
+    if (dirtyIds.size === 0) {
+      saveBar.style.display = 'none';
+    } else {
+      saveBar.style.display = '';
+      if (dirtyCountSpan) dirtyCountSpan.textContent = `${dirtyIds.size} alteração${dirtyIds.size > 1 ? 'ões' : ''} não salva${dirtyIds.size > 1 ? 's' : ''}`;
+    }
+  }
+  // Intercepta navegação pra confirmar descarte
+  function unsavedGuard(e) {
+    if (dirtyIds.size === 0) return;
+    const msg = `Você tem ${dirtyIds.size} alteração(ões) não salva(s) na lista de insumos.\n\nDescartar e sair?`;
+    if (!confirm(msg)) {
+      // Volta pra rota anterior
+      history.go(1);
+      e?.preventDefault?.();
+    } else {
+      dirtyIds.clear();
+      window.removeEventListener('hashchange', onHashLeave);
+    }
+  }
+  function onHashLeave() {
+    if (dirtyIds.size > 0) {
+      // Já saiu, mostra confirmação retroativa
+      const msg = `Você tinha ${dirtyIds.size} alteração(ões) não salvas. Foram descartadas.`;
+      console.warn(msg);
+    }
+    window.removeEventListener('hashchange', onHashLeave);
+  }
+  // Beforeunload pra navegação direta (fechar aba)
+  function beforeUnloadGuard(e) {
+    if (dirtyIds.size > 0) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  }
+  window.addEventListener('beforeunload', beforeUnloadGuard);
+  // Intercepta cliques em <a href="#..."> dentro da página
+  function captureClicks(e) {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    if (dirtyIds.size === 0) return;
+    const targetHref = a.getAttribute('href');
+    if (targetHref === location.hash) return;
+    if (!confirm(`Há ${dirtyIds.size} alteração(ões) não salva(s). Descartar e sair?`)) {
+      e.preventDefault();
+      e.stopPropagation();
+    } else {
+      dirtyIds.clear();
+      // navegação prossegue normal
+    }
+  }
+  document.addEventListener('click', captureClicks, true);
+  // Cleanup quando muda de rota
+  const origRoute = window._origRouteForInsumos = window._origRouteForInsumos || (() => {});
+  window._cleanupInsumos = () => {
+    window.removeEventListener('beforeunload', beforeUnloadGuard);
+    document.removeEventListener('click', captureClicks, true);
+  };
+
   const header = el('div', { class: 'page-header' },
     el('div', {},
       el('h1', {}, 'Insumos'),
       el('p', {}, canEdit
-        ? 'Atualize os preços — salva automaticamente e todas as fichas recalculam.'
+        ? 'Edite os preços, unidades e marque rateio. Clique em "Salvar alterações" no rodapé pra confirmar.'
         : 'Preços dos insumos.')
     ),
     el('div', { class: 'insumos-actions' },
@@ -5212,11 +5286,11 @@ function renderInsumos(cid) {
             toast('⚠ Categoria da unidade mudou — revise o preço');
           }
           insumo.unit = newUnit;
-          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+          markDirty(insumo.id);
         });
         priceInput.addEventListener('input', () => {
           insumo.price = parseFloat(priceInput.value) || 0;
-          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+          markDirty(insumo.id);
         });
         const varCount = (insumo.variations || []).length;
         const varBtn = el('button', {
@@ -5228,12 +5302,9 @@ function renderInsumos(cid) {
         if (insumo.reutilizavel) reutInput.setAttribute('checked', '');
         if (!canFullEdit) reutInput.disabled = true;
         reutInput.addEventListener('change', () => {
-          if (reutInput.checked) {
-            insumo.reutilizavel = true;
-          } else {
-            delete insumo.reutilizavel;
-          }
-          scheduleSave('ins-' + insumo.id, () => saveInsumo(cid, insumo));
+          // Setar false (não delete) garante que merge:true do Firestore atualiza o campo
+          insumo.reutilizavel = reutInput.checked;
+          markDirty(insumo.id);
         });
         const usedIn = usageMap[insumo.id] ? Array.from(usageMap[insumo.id]).sort() : [];
         const usageTooltip = el('div', { class: 'usage-tooltip' },
@@ -5273,6 +5344,49 @@ function renderInsumos(cid) {
     $$('.chip-filter', filterBar).forEach(x => x.classList.toggle('active', x === b));
     buildRows();
   });
+
+  // ── Sticky save bar — só aparece com alterações pendentes ──
+  if (canEdit) {
+    dirtyCountSpan = el('span', { class: 'save-bar-count' }, '');
+    discardBtn = el('button', { class: 'btn', onclick: () => {
+      if (!confirm(`Descartar ${dirtyIds.size} alteração(ões)?`)) return;
+      // Restaura insumos do snapshot
+      STATE.insumos = STATE.insumos.map(i => snapshot.get(i.id) ? JSON.parse(JSON.stringify(snapshot.get(i.id))) : i);
+      dirtyIds.clear();
+      buildRows();
+      updateSaveBar();
+      toast('Alterações descartadas');
+    } }, 'Descartar');
+    saveBtn = el('button', { class: 'btn btn-primary btn-dirty', onclick: async () => {
+      if (dirtyIds.size === 0) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Salvando…';
+      try {
+        const ids = Array.from(dirtyIds);
+        await Promise.all(ids.map(id => {
+          const insumo = STATE.insumos.find(i => i.id === id);
+          if (!insumo) return;
+          return saveInsumo(cid, insumo);
+        }));
+        // Atualiza snapshot pros novos valores
+        STATE.insumos.forEach(i => snapshot.set(i.id, JSON.parse(JSON.stringify(i))));
+        dirtyIds.clear();
+        updateSaveBar();
+        toast(`${ids.length} insumo${ids.length > 1 ? 's' : ''} salvo${ids.length > 1 ? 's' : ''}`);
+      } catch (err) {
+        alert('Erro ao salvar: ' + (err.message || err.code));
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Salvar alterações';
+      }
+    } }, 'Salvar alterações');
+    saveBar = el('div', { class: 'insumos-save-bar', style: 'display:none;' },
+      el('span', { class: 'save-bar-dot' }, '●'),
+      dirtyCountSpan,
+      el('div', { class: 'save-bar-actions' }, discardBtn, saveBtn)
+    );
+    app.appendChild(saveBar);
+  }
 }
 
 // Modal pra copiar sub-ficha de outra receita do mesmo restaurante
