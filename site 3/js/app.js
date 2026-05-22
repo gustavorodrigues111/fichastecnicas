@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0310';
+const APP_BUILD = '20260522-V2-0320';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -5720,30 +5720,38 @@ function openAddDishToPlanModal(cid) {
     list.innerHTML = '';
     const q = searchInput.value.toLowerCase().trim();
     const inPlan = new Set(PROD_PLAN.items.map(i => i.dishId));
+    let count = 0;
     STATE.dishes.forEach(dish => {
       if (dish.inactive) return;
       if (q && !dish.name.toLowerCase().includes(q)) return;
-      if (inPlan.has(dish.id)) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const rend = finalSf?.rendimento || '—';
-      const btn = el('button', { class: 'copy-sf-item', onclick: () => {
-        const finalR = getSfRendimento(finalSf);
-        PROD_PLAN.items.push({
-          dishId: dish.id,
-          targetQty: 0,
-          targetUnit: finalR.unit || '',
-          excludedSfIds: new Set()
-        });
-        prodPlanAutosave(cid);
-        modal.remove();
-        renderProducao(cid);
-      } },
-        el('div', { class: 'copy-sf-item-name' }, dish.name),
+      const already = inPlan.has(dish.id);
+      const btn = el('button', {
+        class: 'copy-sf-item' + (already ? ' is-already-added' : ''),
+        disabled: already ? '' : null,
+        onclick: already ? null : () => {
+          const finalR = getSfRendimento(finalSf);
+          PROD_PLAN.items.push({
+            dishId: dish.id,
+            targetQty: 0,
+            targetUnit: finalR.unit || '',
+            excludedSfIds: new Set()
+          });
+          prodPlanAutosave(cid);
+          modal.remove();
+          renderProducao(cid);
+        }
+      },
+        el('div', { class: 'copy-sf-item-name' }, dish.name,
+          already ? el('span', { class: 'copy-sf-added-badge' }, '✓ já no plano') : null
+        ),
         el('div', { class: 'copy-sf-item-meta' }, `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
       );
       list.appendChild(btn);
+      count++;
     });
-    if (!list.children.length) list.appendChild(el('p', { class: 'muted' }, inPlan.size >= STATE.dishes.length ? 'Todos os pratos já estão no plano.' : 'Nenhum prato encontrado.'));
+    if (count === 0) list.appendChild(el('p', { class: 'muted' }, 'Nenhum prato encontrado.'));
   }
   renderList();
   searchInput.addEventListener('input', renderList);
