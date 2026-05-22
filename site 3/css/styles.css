@@ -3551,13 +3551,71 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
 .dish-metric.is-editable:hover { filter: brightness(0.95); }
 
 .dish-metric-trend {
-  margin-left: 0.25rem;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.3rem;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 0.75rem;
   font-weight: 700;
-  cursor: help;
+  cursor: pointer;
+  border: none;
+  background: rgba(0,0,0,0.04);
+  font-family: inherit;
+  padding: 0;
+  transition: transform 0.1s, background 0.15s;
 }
+.dish-metric-trend:hover { transform: scale(1.15); background: rgba(0,0,0,0.08); }
 .dish-metric-trend.trend-up { color: #dc2626; }
 .dish-metric-trend.trend-down { color: #16a34a; }
+
+/* Modal de histórico de preço */
+.price-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 0.5rem 0;
+}
+.price-history-entry {
+  padding: 0.7rem 0.85rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.price-history-date {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text3);
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+.price-history-trigger {
+  font-size: 0.78rem;
+  color: var(--text2);
+  margin-bottom: 0.4rem;
+}
+.price-history-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.price-history-sep { color: var(--text4); opacity: 0.5; }
+.price-history-delta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 0.2rem;
+}
+.price-history-delta.delta-up { color: #dc2626; }
+.price-history-delta.delta-down { color: #16a34a; }
 
 .price-editor-grid {
   display: grid;
@@ -4634,38 +4692,49 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   .insumos-header h1 { font-size: 1.8rem; }
   .insumos-search { width: 100%; }
 
-  /* Insumos mobile — formato tabela (com scroll horizontal se precisar) */
+  /* Insumos mobile — esconde colunas pesadas, layout compacto sem scroll */
   .insumos-table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 -1rem;
-    padding: 0 1rem 0.5rem;
+    overflow-x: visible;
+    margin: 0;
+    padding: 0;
   }
   .insumos-table {
-    min-width: 520px;
     width: 100%;
+    table-layout: fixed;
     background: var(--bg);
     border: 1px solid var(--border);
     font-size: 0.85rem;
   }
+  /* Esconde colunas "Variações" (4ª) e "Usado em" (5ª) */
+  .insumos-table th:nth-child(4),
+  .insumos-table th:nth-child(5),
+  .insumos-table td:nth-child(4),
+  .insumos-table td:nth-child(5) { display: none; }
+  /* Colunas restantes: Nome (45%) · Unidade (25%) · Preço (30%) */
+  .insumos-table th:nth-child(1), .insumos-table td:nth-child(1) { width: 45%; }
+  .insumos-table th:nth-child(2), .insumos-table td:nth-child(2) { width: 25%; }
+  .insumos-table th:nth-child(3), .insumos-table td:nth-child(3) { width: 30%; }
   .insumos-table th {
-    padding: 0.55rem 0.55rem;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    background: #f7f5ee;
+    padding: 0.5rem 0.45rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    background: var(--bg2);
   }
   .insumos-table td {
-    padding: 0.5rem 0.55rem;
+    padding: 0.5rem 0.45rem;
     vertical-align: middle;
+    word-break: break-word;
   }
   .insumos-table td:first-child {
     font-weight: 500;
     color: var(--text);
-    min-width: 160px;
+    font-size: 0.85rem;
+    line-height: 1.25;
   }
-  .insumos-table input.unit-input { width: 55px; font-size: 0.9rem; padding: 0.3rem 0.4rem; }
-  .insumos-table input[type=number] { width: 85px; font-size: 0.9rem; padding: 0.3rem 0.4rem; font-weight: 500; }
-  .insumos-table .btn-small { padding: 0.3rem 0.55rem; font-size: 0.68rem; }
+  .insumos-table input.unit-input,
+  .insumos-table .unit-select { width: 100%; font-size: 0.82rem; padding: 0.3rem 0.35rem; }
+  .insumos-table input[type=number] { width: 100%; font-size: 0.9rem; padding: 0.35rem 0.4rem; font-weight: 600; }
+  .insumos-table .btn-small { padding: 0.3rem 0.45rem; font-size: 0.65rem; }
 
   /* Admin page */
   .admin-panel { padding: 1.25rem; }
@@ -4953,8 +5022,24 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   .prod-item-cost { margin-left: auto; }
   .prod-sf-box { flex-direction: column !important; gap: 0.3rem; }
   .prod-sf-check { padding: 0.5rem 0.6rem; font-size: 0.85rem; }
-  .prod-actions { flex-direction: column; gap: 0.5rem; }
-  .prod-actions .btn { width: 100%; }
+  .prod-summary-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+  }
+  .prod-summary-card .prod-sum-row { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+  .prod-summary-card .prod-sum-row strong { font-size: 1.2rem; }
+  .prod-actions {
+    margin-left: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .prod-actions .btn { width: 100%; margin: 0; padding: 0.65rem 0.6rem; font-size: 0.85rem; }
+  /* Botão primário ocupa linha cheia */
+  .prod-actions .btn.btn-primary { grid-column: 1 / -1; padding: 0.8rem; font-size: 0.95rem; }
 
   /* Lista de admin: cards compactos */
   .cliente-admin-grid,

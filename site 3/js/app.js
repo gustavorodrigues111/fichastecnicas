@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0340';
+const APP_BUILD = '20260522-V2-0350';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2863,14 +2863,6 @@ function renderClienteHome(cid) {
       if (Math.abs(diff) < 0.5) return null;
       return { dir: diff > 0 ? 'up' : 'down', amount: Math.abs(diff) };
     }
-    function buildHistoryTooltip() {
-      if (history.length === 0) return 'Sem histórico de variações';
-      return 'Últimas variações:\n' + history.slice(-5).reverse().map(h => {
-        const d = new Date(h.at);
-        const dateStr = isNaN(d) ? '' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        return `${dateStr} · custo R$${fmtNum(h.costPerPortion || 0, 2)} · CMV ${fmtNum(h.cmv || 0, 1)}% · Markup ${fmtNum(h.markup || 0, 0)}%`;
-      }).join('\n');
-    }
     const cmvT = cmvTrend();
     const markupT = markupTrend();
 
@@ -2881,26 +2873,46 @@ function renderClienteHome(cid) {
       fmtBRL(salePrice),
       hasPriceOverride ? el('span', { class: 'dish-price-pin', title: 'Preço fixado pelo restaurante' }, '📌') : null
     ) : null;
+    const cmvTrendIcon = cmvT ? el('button', {
+      class: 'dish-metric-trend trend-' + cmvT.dir,
+      type: 'button',
+      title: 'Ver histórico de variações',
+      'aria-label': 'Ver histórico de variações'
+    }, cmvT.dir === 'up' ? '↑' : '↓') : null;
+    const markupTrendIcon = markupT ? el('button', {
+      class: 'dish-metric-trend trend-' + (markupT.dir === 'up' ? 'down' : 'up'),
+      type: 'button',
+      title: 'Ver histórico de variações',
+      'aria-label': 'Ver histórico de variações'
+    }, markupT.dir === 'up' ? '↑' : '↓') : null;
+    // Clique no ícone abre modal de histórico (funciona em mobile e desktop)
+    if (cmvTrendIcon) cmvTrendIcon.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openPriceHistoryModal(dish);
+    });
+    if (markupTrendIcon) markupTrendIcon.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openPriceHistoryModal(dish);
+    });
     const cmvBadge = showCost ? el('span', { class: 'dish-metric dish-metric-cmv dish-metric-' + cmvStatus + (canEditPrice ? ' is-editable' : ''),
       title: (canEditPrice ? 'Clique pra editar. ' : '') + (targetCmv ? `Alvo: ${fmtNum(targetCmv, 1)}%` : '')
     },
       el('span', { class: 'dish-metric-label' }, 'CMV'),
       el('span', { class: 'dish-metric-value' }, fmtNum(cmv, 1) + '%'),
-      cmvT ? el('span', {
-        class: 'dish-metric-trend trend-' + cmvT.dir,
-        title: buildHistoryTooltip()
-      }, cmvT.dir === 'up' ? '↑' : '↓') : null
+      cmvTrendIcon
     ) : null;
     const markupBadge = showCost ? el('span', { class: 'dish-metric dish-metric-markup' + (canEditPrice ? ' is-editable' : '') },
       el('span', { class: 'dish-metric-label' }, 'Markup'),
       el('span', { class: 'dish-metric-value' }, fmtNum(markup, 0) + '%'),
-      markupT ? el('span', {
-        class: 'dish-metric-trend trend-' + (markupT.dir === 'up' ? 'down' : 'up'), // markup invertido: subir markup = bom (verde)
-        title: buildHistoryTooltip()
-      }, markupT.dir === 'up' ? '↑' : '↓') : null
+      markupTrendIcon
     ) : null;
     if (canEditPrice) {
-      const openEditor = (e) => { e.preventDefault(); e.stopPropagation(); openDishPriceEditor(cid, dish); };
+      const openEditor = (e) => {
+        // Não abre editor se o click foi no ícone de trend (que é um button separado)
+        if (e.target.closest('.dish-metric-trend')) return;
+        e.preventDefault(); e.stopPropagation();
+        openDishPriceEditor(cid, dish);
+      };
       [priceBadge, cmvBadge, markupBadge].forEach(b => b && b.addEventListener('click', openEditor));
     }
     const summary = el('summary', { class: 'dish-head dish-summary v2' },
@@ -2935,6 +2947,76 @@ function renderClienteHome(cid) {
     listWrap.appendChild(dishGroup);
   });
   app.appendChild(listWrap);
+}
+
+// Modal de histórico de variações de preço/CMV/markup
+function openPriceHistoryModal(dish) {
+  const existing = document.getElementById('dish-history-modal');
+  if (existing) existing.remove();
+  const history = Array.isArray(dish.price_history) ? dish.price_history.slice().reverse() : [];
+
+  function describeTrigger(t) {
+    if (!t) return 'edição';
+    if (t === 'manual') return 'edição manual de preço/CMV';
+    if (t.startsWith('insumo:')) return 'mudança no preço do insumo "' + t.slice(7) + '"';
+    return t;
+  }
+
+  function dateLong(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+      + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const list = el('div', { class: 'price-history-list' });
+  if (history.length === 0) {
+    list.appendChild(el('p', { class: 'muted', style: 'text-align:center;padding:1rem;' },
+      'Sem variações registradas ainda. As mudanças aparecem aqui automaticamente.'));
+  } else {
+    history.forEach((h, idx) => {
+      const prev = history[idx + 1]; // próximo na lista reversa = anterior no tempo
+      const cmvDiff = prev ? (h.cmv - prev.cmv) : null;
+      const costDiff = prev ? (h.costPerPortion - prev.costPerPortion) : null;
+      const row = el('div', { class: 'price-history-entry' },
+        el('div', { class: 'price-history-date' }, dateLong(h.at)),
+        el('div', { class: 'price-history-trigger' }, describeTrigger(h.trigger) + (h.by ? ' · por ' + h.by : '')),
+        el('div', { class: 'price-history-metrics' },
+          el('span', {}, 'Custo R$ ' + fmtNum(h.costPerPortion || 0, 2),
+            costDiff !== null && Math.abs(costDiff) > 0.01
+              ? el('span', { class: 'price-history-delta ' + (costDiff > 0 ? 'delta-up' : 'delta-down') },
+                  ` ${costDiff > 0 ? '+' : ''}${fmtNum(costDiff, 2)}`)
+              : null
+          ),
+          el('span', { class: 'price-history-sep' }, '·'),
+          el('span', {}, 'CMV ' + fmtNum(h.cmv || 0, 1) + '%',
+            cmvDiff !== null && Math.abs(cmvDiff) > 0.1
+              ? el('span', { class: 'price-history-delta ' + (cmvDiff > 0 ? 'delta-up' : 'delta-down') },
+                  ` ${cmvDiff > 0 ? '+' : ''}${fmtNum(cmvDiff, 1)}pp`)
+              : null
+          ),
+          el('span', { class: 'price-history-sep' }, '·'),
+          el('span', {}, 'Markup ' + fmtNum(h.markup || 0, 0) + '%'),
+          el('span', { class: 'price-history-sep' }, '·'),
+          el('span', {}, 'Preço R$ ' + fmtNum(h.salePrice || 0, 2))
+        )
+      );
+      list.appendChild(row);
+    });
+  }
+
+  const modal = el('div', { class: 'modal', id: 'dish-history-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content', style: 'max-width:520px;' },
+      el('h2', {}, 'Histórico de variações'),
+      el('p', { class: 'modal-subtitle' }, dish.name + ' · últimas 5 alterações registradas'),
+      list,
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn btn-primary', onclick: () => modal.remove() }, 'Fechar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // Editor inline de preço/CMV/markup — abre como modal pequeno
