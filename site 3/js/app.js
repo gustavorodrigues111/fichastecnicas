@@ -2632,30 +2632,53 @@ function renderFicha(cid, dishId, initialSfId = null) {
     app.appendChild(gallery);
   }
 
-  // Scale bar — só em modo trabalho
+  // Scale bar — só em modo trabalho. Simula uma produção maior multiplicando
+  // os ingredientes em escala (não cria registro no histórico — pra planejar
+  // produção real, use a tela "Produção" no menu).
   const scaleBar = el('div', { class: 'rend-bar dish-scale-bar' },
     el('div', { class: 'rend-info' },
       el('span', { class: 'rend-label' }, 'Rendimento original'),
       el('span', { class: 'rend-value' }, formatRendimento(finalSf?.rendimento || '—'))
     ),
     el('div', { class: 'scale-ctrl' },
-      el('span', { class: 'scale-label' }, 'Produzir:'),
+      el('span', { class: 'scale-label' }, 'Visualizar para:'),
       (() => {
+        // Stepper igual ao da tela de Produção (−10 / N / +10 com snap ao múltiplo)
+        const stepper = el('div', { class: 'prod-qty-stepper' });
+        const minusBtn = el('button', { class: 'qty-step-btn', title: 'Diminuir 10 (Shift+click: 1)', type: 'button' }, '−10');
         const input = el('input', {
           type: 'text',
-          inputmode: 'decimal',
+          inputmode: 'numeric',
           autocomplete: 'off',
-          value: String(state.finalTargetQty).replace('.', ',')
+          class: 'prod-qty-input',
+          value: state.finalTargetQty > 0 ? String(state.finalTargetQty) : ''
         });
+        const plusBtn = el('button', { class: 'qty-step-btn', title: 'Aumentar 10 (Shift+click: 1)', type: 'button' }, '+10');
         input.addEventListener('input', () => {
-          // Aceita vírgula ou ponto. Filtra tudo que não é dígito/separador
-          const cleaned = input.value.replace(/[^\d,.]/g, '').replace(',', '.');
+          const cleaned = input.value.replace(/[^0-9.]/g, '');
+          if (cleaned !== input.value) input.value = cleaned;
           const v = parseFloat(cleaned);
           if (isNaN(v) || v <= 0) return;
           state.finalTargetQty = v;
           updateBody();
         });
-        return input;
+        function bump(delta, fine) {
+          const cur = Number(state.finalTargetQty) || 0;
+          let next;
+          if (fine) next = cur + delta;
+          else if (delta > 0) next = (cur % 10 === 0) ? cur + 10 : Math.ceil(cur / 10) * 10;
+          else next = (cur % 10 === 0) ? cur - 10 : Math.floor(cur / 10) * 10;
+          next = Math.max(0.01, next); // não vai a 0 (1 mínimo)
+          state.finalTargetQty = next;
+          input.value = next || '';
+          updateBody();
+        }
+        minusBtn.addEventListener('click', (e) => bump(-10, e.shiftKey));
+        plusBtn.addEventListener('click', (e) => bump(10, e.shiftKey));
+        stepper.appendChild(minusBtn);
+        stepper.appendChild(input);
+        stepper.appendChild(plusBtn);
+        return stepper;
       })(),
       el('span', { class: 'scale-unit' }, state.finalUnit || '')
     )
