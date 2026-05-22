@@ -485,6 +485,34 @@ main { padding: 3rem 0 4rem; flex: 1; }
 .cost-metric-accent { background: var(--accent-bg); }
 .cost-metric-accent .cost-metric-label { color: var(--accent-text); }
 .cost-metric-accent .cost-metric-value { color: var(--accent-text); }
+
+/* Inputs editáveis dentro do .cost-metric (CMV/Markup/Preço) */
+.cost-metric-input-wrap { cursor: text; }
+.cost-metric-input {
+  font-family: 'DM Mono', monospace !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  width: 100%;
+  min-height: 0 !important;
+  text-align: left;
+  box-shadow: none !important;
+}
+.cost-metric-input:focus {
+  outline: 2px dashed var(--accent) !important;
+  outline-offset: 2px;
+  background: var(--bg) !important;
+  border-radius: 2px;
+  box-shadow: none !important;
+}
+.cost-metric-accent .cost-metric-input { color: var(--accent-text) !important; }
+.cost-metric-input:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
 @media (max-width: 640px) {
   .cost-summary-bar { flex-direction: column; }
   .cost-metric {
