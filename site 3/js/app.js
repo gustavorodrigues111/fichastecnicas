@@ -192,27 +192,43 @@ const canViewProducao = (cid) => canViewCliente(cid); // todos veem produção
 const canManageClientTeam = (cid) => isMaster() || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
 
 // Edição de uma ficha específica (considera lock):
-//   - Ficha locked (default pra fichas criadas por master/staff): só master e staff editam
-//   - Ficha unlocked: master, staff e cliente (dono) editam
-//   - cliente_admin, cliente_op: nunca editam fichas (só veem)
+//   - Ficha locked: só master, staff e — se locked pelo próprio lado do cliente — cliente (dono/admin)
+//   - Ficha unlocked: master, staff, cliente (dono), cliente_admin editam
+//   - cliente_op: nunca edita (só vê)
 function canEditDish(cid, dish) {
   if (!canViewCliente(cid)) return false;
   if (isMaster() || (isStaff() && hasClientAccess(cid))) return true;
-  if (isClienteUser() && hasClientAccess(cid)) {
-    // Cliente pode editar se a ficha NÃO está locked
-    return !dish.locked;
+  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
+    if (!dish || !dish.locked) return true;
+    // Ficha locked: só pode editar se o lock foi posto pelo lado do cliente (lockedBy !== 'consultoria')
+    return dish.lockedBy && dish.lockedBy !== 'consultoria';
   }
   return false;
 }
 function canCreateDish(cid) {
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
-  if (isClienteUser() && hasClientAccess(cid)) return true; // cliente cria fichas próprias
+  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) return true;
   return false;
 }
-function canToggleDishLock(cid) {
-  // Só master e staff travam/destravam fichas
-  return isMaster() || (isStaff() && hasClientAccess(cid));
+function canToggleDishLock(cid, dish) {
+  if (isMaster()) return true;
+  if (isStaff() && hasClientAccess(cid)) return true;
+  // Cliente (dono e admin) pode travar/destravar fichas que NÃO foram travadas pela consultoria
+  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
+    if (!dish) return true; // sem ficha (criação): ok
+    return !dish.locked || (dish.lockedBy && dish.lockedBy !== 'consultoria');
+  }
+  return false;
+}
+function canDeleteDish(cid, dish) {
+  if (isMaster()) return true;
+  if (isStaff() && hasClientAccess(cid)) return true;
+  // Cliente (dono e admin) pode deletar fichas criadas pelo lado do cliente
+  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
+    return dish && dish.createdBy === 'cliente';
+  }
+  return false;
 }
 
 const canManageUsers = () => isMaster();
@@ -5489,7 +5505,7 @@ function renderAdminList(cid) {
       el('h1', {}, 'Gerenciar fichas'),
       el('p', {}, isFullAdmin
         ? 'Adicione, edite ou exclua pratos. Salva automaticamente.'
-        : 'Crie fichas próprias ou edite as que estão desbloqueadas. Fichas bloqueadas pela consultoria só podem ser visualizadas.')
+        : 'Crie fichas próprias, bloqueie pra equipe operacional e exclua as que você criou. Fichas bloqueadas pela consultoria só podem ser visualizadas.')
     ),
     el('a', { class: 'btn btn-primary', href: `#/c/${cid}/admin/new` }, '+ Nova ficha')
   );
@@ -5519,39 +5535,55 @@ function renderAdminList(cid) {
   const list = el('div', { class: 'dish-admin-list' });
   STATE.dishes.forEach(dish => {
     const canEdit = canEditDish(cid, dish);
-    const lockedByConsultor = !!dish.locked && !isFullAdmin;
-    const canTogglLock = canToggleDishLock(cid);
-    // Toggle de lock pra master/staff — botão pequeno que alterna direto na lista
+    const canTogglLock = canToggleDishLock(cid, dish);
+    const canDelete = canDeleteDish(cid, dish);
+    const consultoriaSide = isMaster() || isStaff();
+    const lockedByConsultor = !!dish.locked && dish.lockedBy === 'consultoria';
+    const lockedByCliente = !!dish.locked && dish.lockedBy === 'cliente';
+    // Locked sem lockedBy explícito (fichas antigas): trata como consultoria (compat)
+    const lockedByLegacy = !!dish.locked && !dish.lockedBy;
+    const showLockedByConsultorBadge = lockedByConsultor || lockedByLegacy;
+    // Toggle de lock — botão pequeno que alterna direto na lista
     let lockToggleBtn = null;
     if (canTogglLock) {
+      const btnLabel = () => {
+        if (!dish.locked) return '🔓 Liberada';
+        if (dish.lockedBy === 'cliente') return '🔒 Pelo restaurante';
+        return '🔒 Bloqueada';
+      };
       lockToggleBtn = el('button', {
         class: 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off'),
         title: dish.locked
-          ? 'Cliente NÃO pode editar esta ficha — clique pra desbloquear'
-          : 'Cliente PODE editar esta ficha — clique pra bloquear'
-      }, dish.locked ? '🔒 Bloqueada' : '🔓 Liberada');
+          ? 'Equipe operacional NÃO pode editar esta ficha — clique pra liberar'
+          : 'Equipe operacional PODE editar esta ficha — clique pra bloquear'
+      }, btnLabel());
       lockToggleBtn.addEventListener('click', async () => {
         const wasLocked = !!dish.locked;
+        const wasLockedBy = dish.lockedBy || null;
         dish.locked = !wasLocked;
+        dish.lockedBy = dish.locked ? (consultoriaSide ? 'consultoria' : 'cliente') : null;
         // Update UI imediato (otimista)
         lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
-        lockToggleBtn.textContent = dish.locked ? '🔒 Bloqueada' : '🔓 Liberada';
+        lockToggleBtn.textContent = btnLabel();
         try {
           await saveDish(cid, dish);
           toast(dish.locked ? 'Ficha bloqueada' : 'Ficha liberada');
+          renderAdminList(cid);
         } catch (err) {
           // Reverte em caso de erro
           dish.locked = wasLocked;
+          dish.lockedBy = wasLockedBy;
           lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
-          lockToggleBtn.textContent = dish.locked ? '🔒 Bloqueada' : '🔓 Liberada';
+          lockToggleBtn.textContent = btnLabel();
           alert('Erro: ' + (err.message || err.code));
         }
       });
     }
-    const item = el('div', { class: 'dish-admin-item' + (lockedByConsultor ? ' dish-locked' : '') },
+    const item = el('div', { class: 'dish-admin-item' + (dish.locked ? ' dish-locked' : '') },
       el('div', { class: 'info' },
         el('h4', {}, dish.name,
-          lockedByConsultor ? el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 bloqueada pelo consultor') : null
+          showLockedByConsultorBadge ? el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 bloqueada pelo consultor') : null,
+          lockedByCliente ? el('span', { class: 'lock-badge lock-by-cliente', title: 'Bloqueada pelo dono do restaurante' }, '🔒 bloqueada pelo dono') : null
         ),
         el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
@@ -5561,10 +5593,10 @@ function renderAdminList(cid) {
         canEdit
           ? el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar')
           : el('button', { class: 'btn btn-small', disabled: '', title: 'Esta ficha foi bloqueada pela consultoria' }, 'Editar 🔒'),
-        isFullAdmin
+        canDelete
           ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
               if (!confirm(`Excluir "${dish.name}"?`)) return;
-              try { await deleteDish(cid, dish.id); toast('Excluída'); } catch (e) { toast('Erro: ' + e.message); }
+              try { await deleteDish(cid, dish.id); toast('Excluída'); renderAdminList(cid); } catch (e) { toast('Erro: ' + e.message); }
             } }, 'Excluir')
           : null
       )
@@ -5729,28 +5761,41 @@ function renderAdminEdit(cid, dishId) {
     }
     dish = JSON.parse(JSON.stringify(existing));
   } else {
-    // Nova ficha: master/staff cria locked por default; cliente cria desbloqueada
-    const defaultLocked = isMaster() || isStaff();
+    // Nova ficha: master/staff cria locked por default (lockedBy=consultoria);
+    //            cliente_dono/admin cria desbloqueada (pode trancar depois como lockedBy=cliente)
+    const consultoriaSide = isMaster() || isStaff();
+    const defaultLocked = consultoriaSide;
     dish = { id: 'new-' + uid(), name: '', description: '', photos: [], louca: '', equipamentos: [],
       sub_fichas: [{ id: uid(), name: 'Preparação 1', rendimento: '', ingredientes: [], modo_preparo: '' }],
       markup: 300,
       locked: defaultLocked,
-      createdBy: isClienteUser() ? 'cliente' : 'consultoria'
+      lockedBy: defaultLocked ? 'consultoria' : null,
+      createdBy: consultoriaSide ? 'consultoria' : 'cliente'
     };
   }
   app.appendChild(el('a', { href: `#/c/${cid}/admin`, class: 'back-link' }, '← Voltar'));
   app.appendChild(el('h1', {}, dishId ? 'Editar ficha' : 'Nova ficha'));
   const panel = el('div', { class: 'admin-panel' });
-  // Switch de bloqueio (só master/staff vê)
-  if (canToggleDishLock(cid)) {
+  // Switch de bloqueio
+  // - master/staff: trava como "consultoria" (cliente não destrava)
+  // - cliente_dono/admin: trava como "cliente" (consultoria pode destrancar; cliente também)
+  if (canToggleDishLock(cid, dish)) {
+    const consultoriaSide = isMaster() || isStaff();
     const lockToggle = el('input', { type: 'checkbox' });
     if (dish.locked) lockToggle.setAttribute('checked', '');
-    lockToggle.addEventListener('change', () => { dish.locked = lockToggle.checked; });
+    lockToggle.addEventListener('change', () => {
+      dish.locked = lockToggle.checked;
+      dish.lockedBy = lockToggle.checked ? (consultoriaSide ? 'consultoria' : 'cliente') : null;
+    });
     panel.appendChild(el('div', { class: 'lock-toggle-box' },
       lockToggle,
       el('div', {},
-        el('strong', {}, '🔒 Bloquear edição pelo cliente'),
-        el('p', { class: 'muted' }, 'Quando ativo, o dono do restaurante e a equipe dele não conseguem editar esta ficha — só visualizar. Use pra fichas que você entrega como parte da consultoria e quer manter o controle.')
+        el('strong', {}, consultoriaSide
+          ? '🔒 Bloquear edição pelo cliente'
+          : '🔒 Bloquear edição (ficha do restaurante)'),
+        el('p', { class: 'muted' }, consultoriaSide
+          ? 'Quando ativo, o dono do restaurante e a equipe dele não conseguem editar esta ficha — só visualizar. Use pra fichas que você entrega como parte da consultoria e quer manter o controle.'
+          : 'Quando ativo, a equipe operacional não edita esta ficha — só visualiza. Você (dono e admin) pode destravar a qualquer momento.')
       )
     ));
   }
@@ -6174,10 +6219,19 @@ async function saveDishAction(cid, dish, originalId) {
   if (!dish.name.trim()) { alert('Nome do prato é obrigatório'); return; }
   const newId = slugify(dish.name);
   dish.id = newId;
-  // Cliente não pode alterar lock — força ao valor original
-  if (!canToggleDishLock(cid)) {
-    const orig = originalId ? STATE.dishes.find(d => d.id === originalId) : null;
-    dish.locked = orig ? !!orig.locked : false; // nova ficha do cliente nasce desbloqueada
+  const orig = originalId ? STATE.dishes.find(d => d.id === originalId) : null;
+  // Preserva createdBy original (se já existir); senão deriva do usuário
+  if (!dish.createdBy) {
+    dish.createdBy = orig?.createdBy || ((isMaster() || isStaff()) ? 'consultoria' : 'cliente');
+  }
+  // Se quem está salvando NÃO pode alterar lock, força ao valor original
+  if (!canToggleDishLock(cid, orig)) {
+    dish.locked = orig ? !!orig.locked : false;
+    dish.lockedBy = orig?.lockedBy || null;
+  } else {
+    // Garante coerência: se locked=false, zera lockedBy
+    if (!dish.locked) dish.lockedBy = null;
+    else if (!dish.lockedBy) dish.lockedBy = (isMaster() || isStaff()) ? 'consultoria' : 'cliente';
   }
   try {
     // Coleta nomes de subprodutos (global + da ficha atual) pra evitar criar insumo pra eles
