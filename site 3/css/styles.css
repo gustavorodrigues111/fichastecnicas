@@ -3889,9 +3889,13 @@ label.field textarea { min-height: 90px; resize: vertical; }
 .modal-content textarea { width: 100%; }
 .modal-content .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
 }
+@media (max-width: 540px) {
+  .modal-content .form-grid { grid-template-columns: 1fr; }
+}
+.modal-content .form-grid .field-wide { grid-column: 1 / -1; }
 /* Labels com display:flex (checkbox + texto longo) precisam de min-width 0 */
 .modal-content label { min-width: 0; max-width: 100%; }
 .modal-content label > * { min-width: 0; }
