@@ -71,14 +71,20 @@ service cloud.firestore {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
       return affected.hasOnly(['target_cmv']);
     }
+    function onlyInactiveFields() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['inactive', 'inactivatedAt', 'inactivatedBy']);
+    }
     // Update da ficha pelo cliente (dono/admin): permitido SE
     //   - a ficha não está locked, OU
     //   - a ficha foi locked pelo próprio lado do cliente (lockedBy != 'consultoria'), OU
-    //   - o update afeta só target_cmv (pricing)
+    //   - o update afeta só target_cmv (pricing), OU
+    //   - o update afeta só inactive/inactivatedAt/inactivatedBy E a ficha é do cliente
     function clienteCanUpdateDish() {
       return resource.data.locked != true
         || resource.data.lockedBy != 'consultoria'
-        || onlyDishPricingFields();
+        || onlyDishPricingFields()
+        || (resource.data.createdBy == 'cliente' && onlyInactiveFields());
     }
     // Usuário desativado é bloqueado em tudo (exceto leitura do próprio doc)
     function userIsActive() {
@@ -170,10 +176,11 @@ service cloud.firestore {
                           && request.resource.data.lockedBy != 'consultoria');
         // Exclusão:
         //   - master/staff: sempre
-        //   - cliente (dono/admin): só fichas que ele próprio criou (createdBy == 'cliente')
+        //   - cliente DONO (não admin): só fichas que o lado dele criou E já inativadas
         allow delete: if isStaffOf(cid)
-                      || ((isClienteOwnerOf(cid) || isClienteAdminOf(cid))
-                          && resource.data.createdBy == 'cliente');
+                      || (isClienteOwnerOf(cid)
+                          && resource.data.createdBy == 'cliente'
+                          && resource.data.inactive == true);
         // Update:
         //   - staff/master: tudo
         //   - cliente (dono/admin): se ficha NÃO está locked OU lockedBy != consultoria,

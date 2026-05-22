@@ -2668,6 +2668,9 @@ label.field textarea { min-height: 90px; resize: vertical; }
 .lock-by-master { background: #efece4; color: #8a6b40; }
 .lock-by-consultor { background: #fbd8d5; color: #a31e1e; }
 .lock-by-cliente { background: #dde9ff; color: #1d4ed8; }
+.lock-inactive { background: #e8e7eb; color: #5a5663; }
+.dish-inactive { opacity: 0.6; background: repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,0.02) 6px 12px); }
+.dish-inactive .info h4 { color: #6a6a6a; text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.25); }
 .dish-locked { opacity: 0.75; }
 .dish-locked .info h4 { color: #6a6a6a; }
 
