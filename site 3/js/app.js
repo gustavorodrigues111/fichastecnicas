@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0410';
+const APP_BUILD = '20260522-V2-0420';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2899,7 +2899,7 @@ function renderClienteHome(cid) {
     const cmvT = cmvTrend();
     const markupT = markupTrend();
 
-    // PREÇO DE VENDA — bloco compacto com label em cima (na linha do nome do prato)
+    // PREÇO DE VENDA + CUSTO — lado a lado, com label em cima (na linha do nome do prato)
     let priceBlock = null;
     if (showCost) {
       const priceBadgeInner = el('div', {
@@ -2912,10 +2912,15 @@ function renderClienteHome(cid) {
           openDishPriceEditor(cid, dish);
         });
       }
-      priceBlock = el('div', { class: 'dish-price-row' },
+      const priceCol = el('div', { class: 'dish-price-col' },
         el('span', { class: 'dish-price-label' }, 'Preço de venda'),
         priceBadgeInner
       );
+      const custoCol = el('div', { class: 'dish-price-col dish-price-col-custo dish-cost-' + cmvStatus },
+        el('span', { class: 'dish-price-label' }, 'Custo / porção'),
+        el('div', { class: 'dish-cost-value' }, fmtBRL(costInfo.costPerPortion))
+      );
+      priceBlock = el('div', { class: 'dish-price-block' }, priceCol, custoCol);
     }
 
     // CMV — badge inteiro abre histórico. Seta inline mostra direção da última variação.
@@ -2951,14 +2956,6 @@ function renderClienteHome(cid) {
       openPriceHistoryModal(dish);
     });
 
-    // CUSTO — badge na linha 2, mesma cor do CMV
-    const custoBadge = showCost ? el('span', {
-      class: 'dish-metric dish-metric-custo dish-metric-' + cmvStatus,
-      title: 'Custo por porção (derivado da ficha)'
-    },
-      el('span', { class: 'dish-metric-label' }, 'Custo'),
-      el('span', { class: 'dish-metric-value' }, fmtBRL(costInfo.costPerPortion))
-    ) : null;
     const summary = el('summary', { class: 'dish-head dish-summary v2' },
       el('div', { class: 'dish-summary-top' },
         el('span', { class: 'dish-chev' }, '▸'),
@@ -2968,7 +2965,7 @@ function renderClienteHome(cid) {
         ),
         priceBlock
       ),
-      showCost ? el('div', { class: 'dish-summary-bottom' }, custoBadge, cmvBadge, markupBadge) : null
+      showCost ? el('div', { class: 'dish-summary-bottom' }, cmvBadge, markupBadge) : null
     );
     dishGroup.appendChild(summary);
     const body = el('div', { class: 'dish-body' });

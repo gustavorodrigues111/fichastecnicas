@@ -3469,12 +3469,19 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   align-self: center;
   margin-right: 0.1rem;
 }
-.dish-price-row {
+/* Bloco de Preço + Custo lado a lado no topo do card */
+.dish-price-block {
+  display: flex;
+  gap: 1.5rem;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+.dish-price-col {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   line-height: 1.1;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .dish-price-label {
   font-size: 0.6rem;
@@ -3482,7 +3489,8 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   letter-spacing: 0.08em;
   color: var(--text3);
   font-weight: 600;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
+  white-space: nowrap;
 }
 .dish-price-badge {
   font-family: inherit;
@@ -3493,13 +3501,18 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   white-space: nowrap;
   line-height: 1.1;
 }
-/* Badge de Custo na linha 2 (mesma família de .dish-metric, mas cor herdada do CMV) */
-.dish-metric-custo.dish-metric-good   { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-.dish-metric-custo.dish-metric-good   .dish-metric-label { color: #059669; }
-.dish-metric-custo.dish-metric-warn   { background: #fefce8; color: #a16207; border-color: #fde68a; }
-.dish-metric-custo.dish-metric-warn   .dish-metric-label { color: #ca8a04; }
-.dish-metric-custo.dish-metric-bad    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-.dish-metric-custo.dish-metric-bad    .dish-metric-label { color: #dc2626; }
+.dish-cost-value {
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.1;
+  color: var(--text2);
+}
+.dish-price-col-custo.dish-cost-good .dish-cost-value { color: #047857; }
+.dish-price-col-custo.dish-cost-warn .dish-cost-value { color: #a16207; }
+.dish-price-col-custo.dish-cost-bad  .dish-cost-value { color: #b91c1c; }
 .dish-summary.v2 .dish-summary-bottom {
   display: flex;
   flex-wrap: wrap;
@@ -3862,11 +3875,31 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
 @media (max-width: 720px) {
   .dish-summary.v2 { padding: 0.9rem 1rem; gap: 0.4rem; }
   .dish-summary.v2 .dish-name { font-size: 1.05rem; }
+  .dish-price-block { gap: 0.8rem; }
   .dish-price-label { font-size: 0.55rem; letter-spacing: 0.06em; }
-  .dish-price-badge { font-size: 1.1rem; }
-  .dish-summary.v2 .dish-summary-bottom { padding-left: 0; gap: 0.35rem; }
-  .dish-metric { font-size: 0.68rem; padding: 2px 7px; }
+  .dish-price-badge { font-size: 1.05rem; }
+  .dish-cost-value { font-size: 0.88rem; }
+  /* CMV/Markup sempre em 1 linha consistente — sem flex-wrap */
+  .dish-summary.v2 .dish-summary-bottom {
+    padding-left: 0;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+  }
+  .dish-metric {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
   .dish-metric-label { font-size: 0.58rem; }
+  .dish-metric-value { white-space: nowrap; }
+}
+/* Mobile ultra-compacto: telas <380px (iPhone SE) */
+@media (max-width: 380px) {
+  .dish-price-block { gap: 0.6rem; }
+  .dish-price-badge { font-size: 0.95rem; }
+  .dish-cost-value { font-size: 0.82rem; }
+  .dish-metric { font-size: 0.64rem; padding: 2px 6px; gap: 0.2rem; }
 }
 
 .subficha-sublist {
