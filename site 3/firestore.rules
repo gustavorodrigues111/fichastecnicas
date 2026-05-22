@@ -184,11 +184,9 @@ service cloud.firestore {
                           && request.resource.data.lockedBy != 'consultoria');
         // Exclusão:
         //   - master/staff: sempre
-        //   - cliente DONO (não admin): só fichas que o lado dele criou E já inativadas
+        //   - cliente DONO (não admin): qualquer ficha inativada do restaurante dele
         allow delete: if isStaffOf(cid)
-                      || (isClienteOwnerOf(cid)
-                          && resource.data.createdBy == 'cliente'
-                          && resource.data.inactive == true);
+                      || (isClienteOwnerOf(cid) && resource.data.inactive == true);
         // Update:
         //   - staff/master: tudo
         //   - cliente (dono/admin): se ficha NÃO está locked OU lockedBy != consultoria,

@@ -2697,6 +2697,54 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
 .lock-by-consultor { background: #fbd8d5; color: #a31e1e; }
 .lock-by-cliente { background: #dde9ff; color: #1d4ed8; }
 .lock-inactive { background: #e8e7eb; color: #5a5663; }
+.lock-meta { background: #f3f4f6; color: #6b7280; font-weight: 500; }
+
+/* Accordion de fichas inativas no fim da página */
+.inactive-dishes-section {
+  margin-top: 2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  overflow: hidden;
+}
+.inactive-dishes-section[open] { box-shadow: var(--shadow-sm); }
+.inactive-dishes-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text2);
+  user-select: none;
+  transition: background 0.15s;
+}
+.inactive-dishes-summary::-webkit-details-marker { display: none; }
+.inactive-dishes-summary:hover { background: var(--bg2); }
+.inactive-dishes-summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+.inactive-dishes-section[open] .inactive-dishes-summary::before { transform: rotate(90deg); }
+.inactive-dishes-count {
+  margin-left: auto;
+  background: #e8e7eb;
+  color: #5a5663;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.inactive-dishes-list {
+  padding: 0 1.2rem 1.2rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
 .dish-inactive { opacity: 0.6; background: repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,0.02) 6px 12px); }
 .dish-inactive .info h4 { color: #6a6a6a; text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.25); }
 .dish-locked { opacity: 0.75; }

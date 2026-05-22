@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2310';
+const APP_BUILD = '20260521-2320';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -234,12 +234,12 @@ function canInactivateDish(cid, dish) {
   }
   return false;
 }
-// Exclusão definitiva: somente master/staff sempre; cliente DONO (não admin) só após inativação
+// Exclusão definitiva: master/staff sempre; cliente DONO só ficha inativa (de qualquer origem)
 function canDeleteDish(cid, dish) {
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
   if (isClienteUser() && hasClientAccess(cid)) {
-    return !!dish && dish.createdBy === 'cliente' && dish.inactive === true;
+    return !!dish && dish.inactive === true;
   }
   return false;
 }
@@ -5555,127 +5555,153 @@ function renderAdminList(cid) {
     app.appendChild(cfgPanel);
   }
   const panel = el('div', { class: 'admin-panel' });
+  const activeDishes = STATE.dishes.filter(d => !d.inactive);
+  const inactiveDishes = STATE.dishes.filter(d => !!d.inactive);
+
   const list = el('div', { class: 'dish-admin-list' });
-  // Ordena: ativas primeiro, inativas no fim
-  const sortedDishes = [...STATE.dishes].sort((a, b) => {
-    const ai = a.inactive ? 1 : 0;
-    const bi = b.inactive ? 1 : 0;
-    if (ai !== bi) return ai - bi;
-    return 0;
-  });
-  sortedDishes.forEach(dish => {
-    const canEdit = canEditDish(cid, dish);
-    const canTogglLock = canToggleDishLock(cid, dish);
-    const canDelete = canDeleteDish(cid, dish);
-    const canInactivate = canInactivateDish(cid, dish);
-    const consultoriaSide = isMaster() || isStaff();
-    const lockedByConsultor = !!dish.locked && dish.lockedBy === 'consultoria';
-    const lockedByCliente = !!dish.locked && dish.lockedBy === 'cliente';
-    const lockedByLegacy = !!dish.locked && !dish.lockedBy;
-    const showLockedByConsultorBadge = lockedByConsultor || lockedByLegacy;
-    const isInactive = !!dish.inactive;
-    // Toggle de lock — desativado se a ficha está inativa
-    let lockToggleBtn = null;
-    if (canTogglLock && !isInactive) {
-      const btnLabel = () => {
-        if (!dish.locked) return '🔓 Liberada';
-        if (dish.lockedBy === 'cliente') return '🔒 Pelo administrador';
-        return '🔒 Bloqueada';
-      };
-      lockToggleBtn = el('button', {
-        class: 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off'),
-        title: dish.locked
-          ? 'Equipe operacional NÃO pode editar esta ficha — clique pra liberar'
-          : 'Equipe operacional PODE editar esta ficha — clique pra bloquear'
-      }, btnLabel());
-      lockToggleBtn.addEventListener('click', async () => {
-        const wasLocked = !!dish.locked;
-        const wasLockedBy = dish.lockedBy || null;
-        dish.locked = !wasLocked;
-        dish.lockedBy = dish.locked ? (consultoriaSide ? 'consultoria' : 'cliente') : null;
-        lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
-        lockToggleBtn.textContent = btnLabel();
-        try {
-          await saveDish(cid, dish);
-          toast(dish.locked ? 'Ficha bloqueada' : 'Ficha liberada');
-          renderAdminList(cid);
-        } catch (err) {
-          dish.locked = wasLocked;
-          dish.lockedBy = wasLockedBy;
-          lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
-          lockToggleBtn.textContent = btnLabel();
-          alert('Erro: ' + (err.message || err.code));
-        }
-      });
-    }
-
-    // Botão Inativar / Reativar
-    let inactivateBtn = null;
-    if (canInactivate) {
-      if (isInactive) {
-        inactivateBtn = el('button', { class: 'btn btn-small', onclick: async () => {
-          try {
-            dish.inactive = false;
-            dish.inactivatedAt = null;
-            dish.inactivatedBy = null;
-            await saveDish(cid, dish);
-            toast('Ficha reativada');
-            renderAdminList(cid);
-          } catch (err) {
-            dish.inactive = true;
-            alert('Erro: ' + (err.message || err.code));
-          }
-        } }, '↺ Reativar');
-      } else {
-        inactivateBtn = el('button', { class: 'btn btn-small', onclick: async () => {
-          if (!confirm(`Inativar "${dish.name}"?\n\nA ficha some do cardápio e do plano de produção, mas continua aqui na lista de gerenciamento. Você pode reativar quando quiser.`)) return;
-          try {
-            dish.inactive = true;
-            dish.inactivatedAt = new Date().toISOString();
-            dish.inactivatedBy = isClienteUser() ? 'cliente' : (isClienteAdmin() ? 'cliente_admin' : 'consultoria');
-            await saveDish(cid, dish);
-            toast('Ficha inativada');
-            renderAdminList(cid);
-          } catch (err) {
-            dish.inactive = false;
-            alert('Erro: ' + (err.message || err.code));
-          }
-        } }, '⊘ Inativar');
-      }
-    }
-
-    const badges = [];
-    if (isInactive) badges.push(el('span', { class: 'lock-badge lock-inactive', title: 'Ficha inativada — não aparece no cardápio nem no plano' }, '⊘ inativa'));
-    if (!isInactive && showLockedByConsultorBadge) badges.push(el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 consultor'));
-    if (!isInactive && lockedByCliente) badges.push(el('span', { class: 'lock-badge lock-by-cliente', title: 'Bloqueada pelo administrador do restaurante' }, '🔒 administrador'));
-    const item = el('div', { class: 'dish-admin-item' + (dish.locked ? ' dish-locked' : '') + (isInactive ? ' dish-inactive' : '') },
-      el('div', { class: 'info' },
-        el('h4', {}, dish.name),
-        badges.length ? el('div', { class: 'dish-badges' }, ...badges) : null,
-        el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
-      ),
-      el('div', { class: 'dish-admin-actions' },
-        lockToggleBtn,
-        el('a', { class: 'btn btn-small', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver'),
-        canEdit && !isInactive
-          ? el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar')
-          : null,
-        !canEdit && !isInactive
-          ? el('button', { class: 'btn btn-small', disabled: '', title: 'Esta ficha foi bloqueada pela consultoria' }, 'Editar 🔒')
-          : null,
-        inactivateBtn,
-        canDelete
-          ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-              if (!confirm(`Excluir "${dish.name}" DEFINITIVAMENTE?\n\nEsta ação não pode ser desfeita.`)) return;
-              try { await deleteDish(cid, dish.id); toast('Excluída'); renderAdminList(cid); } catch (e) { toast('Erro: ' + e.message); }
-            } }, 'Excluir')
-          : null
-      )
-    );
-    list.appendChild(item);
-  });
+  if (activeDishes.length === 0) {
+    list.appendChild(el('p', { class: 'muted', style: 'grid-column:1/-1;text-align:center;padding:1rem;' },
+      'Nenhuma ficha ativa. ' + (inactiveDishes.length ? 'Veja o histórico de inativas abaixo.' : 'Crie a primeira clicando em "+ Nova ficha".')));
+  } else {
+    activeDishes.forEach(dish => list.appendChild(buildDishAdminCard(cid, dish)));
+  }
   panel.appendChild(list);
   app.appendChild(panel);
+
+  // Accordion de inativas no fim
+  if (inactiveDishes.length > 0) {
+    const inactiveSection = el('details', { class: 'inactive-dishes-section' },
+      el('summary', { class: 'inactive-dishes-summary' },
+        el('span', { class: 'inactive-dishes-title' }, '⊘ Histórico de inativas'),
+        el('span', { class: 'inactive-dishes-count' }, String(inactiveDishes.length))
+      )
+    );
+    const inactiveList = el('div', { class: 'dish-admin-list inactive-dishes-list' });
+    inactiveDishes.forEach(dish => inactiveList.appendChild(buildDishAdminCard(cid, dish)));
+    inactiveSection.appendChild(inactiveList);
+    app.appendChild(inactiveSection);
+  }
+}
+
+// Card de ficha pra admin list — usado tanto pelo grid de ativas quanto pelo accordion de inativas
+function buildDishAdminCard(cid, dish) {
+  const canEdit = canEditDish(cid, dish);
+  const canTogglLock = canToggleDishLock(cid, dish);
+  const canDelete = canDeleteDish(cid, dish);
+  const canInactivate = canInactivateDish(cid, dish);
+  const consultoriaSide = isMaster() || isStaff();
+  const lockedByConsultor = !!dish.locked && dish.lockedBy === 'consultoria';
+  const lockedByCliente = !!dish.locked && dish.lockedBy === 'cliente';
+  const lockedByLegacy = !!dish.locked && !dish.lockedBy;
+  const showLockedByConsultorBadge = lockedByConsultor || lockedByLegacy;
+  const isInactive = !!dish.inactive;
+
+  // Toggle de lock — só aparece em fichas ATIVAS
+  let lockToggleBtn = null;
+  if (canTogglLock && !isInactive) {
+    const btnLabel = () => {
+      if (!dish.locked) return '🔓 Liberada';
+      if (dish.lockedBy === 'cliente') return '🔒 Pelo administrador';
+      return '🔒 Bloqueada';
+    };
+    lockToggleBtn = el('button', {
+      class: 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off'),
+      title: dish.locked
+        ? 'Equipe operacional NÃO pode editar esta ficha — clique pra liberar'
+        : 'Equipe operacional PODE editar esta ficha — clique pra bloquear'
+    }, btnLabel());
+    lockToggleBtn.addEventListener('click', async () => {
+      const wasLocked = !!dish.locked;
+      const wasLockedBy = dish.lockedBy || null;
+      dish.locked = !wasLocked;
+      dish.lockedBy = dish.locked ? (consultoriaSide ? 'consultoria' : 'cliente') : null;
+      lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
+      lockToggleBtn.textContent = btnLabel();
+      try {
+        await saveDish(cid, dish);
+        toast(dish.locked ? 'Ficha bloqueada' : 'Ficha liberada');
+        renderAdminList(cid);
+      } catch (err) {
+        dish.locked = wasLocked;
+        dish.lockedBy = wasLockedBy;
+        lockToggleBtn.className = 'btn btn-small lock-pill ' + (dish.locked ? 'lock-pill-on' : 'lock-pill-off');
+        lockToggleBtn.textContent = btnLabel();
+        alert('Erro: ' + (err.message || err.code));
+      }
+    });
+  }
+
+  // Botão Inativar (ativa) / Reativar (inativa)
+  let inactivateBtn = null;
+  if (canInactivate) {
+    if (isInactive) {
+      inactivateBtn = el('button', { class: 'btn btn-small', onclick: async () => {
+        try {
+          dish.inactive = false;
+          dish.inactivatedAt = null;
+          dish.inactivatedBy = null;
+          await saveDish(cid, dish);
+          toast('Ficha reativada');
+          renderAdminList(cid);
+        } catch (err) {
+          dish.inactive = true;
+          alert('Erro: ' + (err.message || err.code));
+        }
+      } }, '↺ Reativar');
+    } else {
+      inactivateBtn = el('button', { class: 'btn btn-small', onclick: async () => {
+        if (!confirm(`Inativar "${dish.name}"?\n\nA ficha some do cardápio e do plano de produção, mas continua no histórico de inativas. Você pode reativar quando quiser.`)) return;
+        try {
+          dish.inactive = true;
+          dish.inactivatedAt = new Date().toISOString();
+          dish.inactivatedBy = isClienteUser() ? 'cliente' : (isClienteAdmin() ? 'cliente_admin' : 'consultoria');
+          await saveDish(cid, dish);
+          toast('Ficha inativada');
+          renderAdminList(cid);
+        } catch (err) {
+          dish.inactive = false;
+          alert('Erro: ' + (err.message || err.code));
+        }
+      } }, '⊘ Inativar');
+    }
+  }
+
+  const badges = [];
+  if (isInactive) {
+    badges.push(el('span', { class: 'lock-badge lock-inactive', title: 'Ficha inativada — não aparece no cardápio nem no plano' }, '⊘ inativa'));
+    if (dish.inactivatedAt) {
+      const d = new Date(dish.inactivatedAt);
+      const dateStr = !isNaN(d.getTime()) ? d.toLocaleDateString('pt-BR') : '';
+      if (dateStr) badges.push(el('span', { class: 'lock-badge lock-meta', title: 'Data da inativação' }, 'em ' + dateStr));
+    }
+  }
+  if (!isInactive && showLockedByConsultorBadge) badges.push(el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 consultor'));
+  if (!isInactive && lockedByCliente) badges.push(el('span', { class: 'lock-badge lock-by-cliente', title: 'Bloqueada pelo administrador do restaurante' }, '🔒 administrador'));
+
+  return el('div', { class: 'dish-admin-item' + (dish.locked ? ' dish-locked' : '') + (isInactive ? ' dish-inactive' : '') },
+    el('div', { class: 'info' },
+      el('h4', {}, dish.name),
+      badges.length ? el('div', { class: 'dish-badges' }, ...badges) : null,
+      el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
+    ),
+    el('div', { class: 'dish-admin-actions' },
+      lockToggleBtn,
+      el('a', { class: 'btn btn-small', href: `#/c/${cid}/ficha/${dish.id}` }, 'Ver'),
+      canEdit && !isInactive
+        ? el('a', { class: 'btn btn-small btn-primary', href: `#/c/${cid}/admin/edit/${dish.id}` }, 'Editar')
+        : null,
+      !canEdit && !isInactive
+        ? el('button', { class: 'btn btn-small', disabled: '', title: 'Esta ficha foi bloqueada pela consultoria' }, 'Editar 🔒')
+        : null,
+      inactivateBtn,
+      canDelete
+        ? el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+            if (!confirm(`Excluir "${dish.name}" DEFINITIVAMENTE?\n\nEsta ação não pode ser desfeita.`)) return;
+            try { await deleteDish(cid, dish.id); toast('Excluída'); renderAdminList(cid); } catch (e) { toast('Erro: ' + e.message); }
+          } }, 'Excluir')
+        : null
+    )
+  );
 }
 
 // Cliente (dono) gerencia a própria equipe (admin + op) do restaurante atual
