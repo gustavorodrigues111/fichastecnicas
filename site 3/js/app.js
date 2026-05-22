@@ -4156,8 +4156,29 @@ function renderProducao(cid) {
         scale = qConv / origRend.qty;
       }
       const scales = computeCascadeScales(dish, scale * origRend.qty);
-      const cost = dishCost(dish);
-      const itemTotalCost = cost.total * scale;
+      if (!item.excludedSfIds) item.excludedSfIds = new Set();
+      // Custo "ativo": só ingredientes diretos das sub-fichas NÃO excluídas.
+      // Quando o user desmarca uma sub-ficha, significa que ela já está pronta
+      // (não vai produzir agora) — portanto seus ingredientes não vão ser
+      // comprados e não contam no custo desta produção.
+      let itemTotalCost = 0;
+      for (const sf of dish.sub_fichas) {
+        if (item.excludedSfIds.has(sf.id)) continue;
+        const sfScale = scales[sf.id] || 0;
+        if (sfScale === 0) continue;
+        for (const ing of (sf.ingredientes || [])) {
+          if (ing.subref_id) continue; // subref é resolvida via sub-ficha-filha
+          // Pula subprodutos (custo zero — fica na produção principal)
+          const subprodHit = findSubproduto(ing.insumo_name);
+          if (subprodHit && !(subprodHit.dish.id === dish.id && subprodHit.sf.id === sf.id)) continue;
+          const insumo = findInsumo(ing.insumo_id);
+          if (!insumo) continue;
+          const [qn, pn] = normalizeQtyPrice(ing, insumo);
+          if (qn == null || pn == null) continue;
+          const fc = ing.fc || 1;
+          itemTotalCost += qn * pn * sfScale * fc;
+        }
+      }
       totalCost += itemTotalCost;
 
       const itemCard = el('article', { class: 'prod-item' });
