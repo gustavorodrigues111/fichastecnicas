@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0210';
+const APP_BUILD = '20260522-V2-0300';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -1553,7 +1553,13 @@ async function route() {
       if (!canViewProducao(cid)) { renderNoAccess(); return; }
       if (rest[1] === 'historico') { renderProducaoHistorico(cid); return; }
       if (rest[1] === 'plano' && rest[2]) { renderProducaoDetalhe(cid, rest[2]); return; }
-      renderProducao(cid); return;
+      if (rest[1] === 'templates') {
+        if (rest[2] === 'novo') { renderTemplateEdit(cid, null); return; }
+        if (rest[2] === 'edit' && rest[3]) { renderTemplateEdit(cid, rest[3]); return; }
+        renderTemplatesList(cid); return;
+      }
+      if (rest[1] === 'draft' && rest[2]) { renderProducaoDraftEdit(cid, rest[2]); return; }
+      renderProducaoHub(cid); return;
     }
     if (rest[0] === 'estoque') {
       // Aba Estoque desativada — redireciona pro cardápio
@@ -3429,36 +3435,67 @@ function categorizeInsumo(ins) {
 // Estado do plano de produção (sessão apenas; ao finalizar é persistido em production_plans)
 const PROD_PLAN = {
   items: [],
-  status: 'draft',       // 'draft' | 'finalized'
+  status: 'draft',       // 'draft' | 'ready' | 'finalized'
+  name: '',
   finalizedAt: null,
   finalizedBy: null,
-  planId: null
+  planId: null,
+  createdAt: null,
+  createdBy: null,
+  createdByName: null
 };
 // item: { dishId, targetQty, targetUnit, excludedSfIds: Set<string> }
 
 function prodPlanReset() {
   PROD_PLAN.items = [];
   PROD_PLAN.status = 'draft';
+  PROD_PLAN.name = '';
   PROD_PLAN.finalizedAt = null;
   PROD_PLAN.finalizedBy = null;
   PROD_PLAN.planId = null;
+  PROD_PLAN.createdAt = null;
+  PROD_PLAN.createdBy = null;
+  PROD_PLAN.createdByName = null;
 }
 
 function prodPlanIsLocked() {
   return PROD_PLAN.status === 'finalized';
 }
 
-// Constrói o snapshot que vai pro Firestore quando finaliza
-function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
+// Carrega um plano do Firestore pra PROD_PLAN local (ao abrir um draft existente)
+async function prodPlanLoad(cid, planId) {
+  const snap = await getDoc(doc(db, 'clientes', cid, 'production_plans', planId));
+  if (!snap.exists()) { prodPlanReset(); return false; }
+  const data = snap.data();
+  PROD_PLAN.items = (data.items || []).map(it => ({
+    dishId: it.dishId,
+    targetQty: Number(it.targetQty) || 0,
+    targetUnit: it.targetUnit || '',
+    excludedSfIds: new Set(it.excludedSfIds || [])
+  }));
+  PROD_PLAN.status = data.status || 'draft';
+  PROD_PLAN.name = data.name || '';
+  PROD_PLAN.finalizedAt = data.finalizedAt || null;
+  PROD_PLAN.finalizedBy = data.finalizedByName || null;
+  PROD_PLAN.planId = planId;
+  PROD_PLAN.createdAt = data.createdAt || null;
+  PROD_PLAN.createdBy = data.createdBy || null;
+  PROD_PLAN.createdByName = data.createdByName || null;
+  return true;
+}
+
+// Constrói payload do plano (status livre — usado por finalize, save de draft, e ready)
+function prodPlanBuildPayload(cid, statusOverride) {
   return {
     cid,
     createdAt: PROD_PLAN.createdAt || new Date().toISOString(),
-    finalizedAt: new Date().toISOString(),
-    finalizedBy: STATE.user?.uid || null,
-    finalizedByName: STATE.userDoc?.name || STATE.user?.email || '',
-    status: 'finalized',
-    totalCost: Number(totalCost) || 0,
-    totalPortions: Number(totalPortions) || 0,
+    createdBy: PROD_PLAN.createdBy || STATE.user?.uid || null,
+    createdByName: PROD_PLAN.createdByName || STATE.userDoc?.name || STATE.user?.email || '',
+    updatedAt: new Date().toISOString(),
+    updatedBy: STATE.user?.uid || null,
+    updatedByName: STATE.userDoc?.name || STATE.user?.email || '',
+    status: statusOverride || PROD_PLAN.status || 'draft',
+    name: PROD_PLAN.name || '',
     items: PROD_PLAN.items.map(it => {
       const d = STATE.dishes.find(x => x.id === it.dishId);
       return {
@@ -3472,16 +3509,82 @@ function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
   };
 }
 
+// Backwards-compat (renderProducaoDetalhe usa esse nome ainda)
+function prodPlanBuildSnapshot(cid, totalCost, totalPortions) {
+  const payload = prodPlanBuildPayload(cid, 'finalized');
+  payload.finalizedAt = new Date().toISOString();
+  payload.finalizedBy = STATE.user?.uid || null;
+  payload.finalizedByName = STATE.userDoc?.name || STATE.user?.email || '';
+  payload.totalCost = Number(totalCost) || 0;
+  payload.totalPortions = Number(totalPortions) || 0;
+  return payload;
+}
+
+// Cria um novo draft no Firestore — usado quando user clica "+ Novo planejamento"
+async function prodPlanCreateDraft(cid, opts) {
+  opts = opts || {};
+  prodPlanReset();
+  PROD_PLAN.name = opts.name || '';
+  if (opts.items) PROD_PLAN.items = opts.items;
+  PROD_PLAN.createdAt = new Date().toISOString();
+  PROD_PLAN.createdBy = STATE.user?.uid || null;
+  PROD_PLAN.createdByName = STATE.userDoc?.name || STATE.user?.email || '';
+  PROD_PLAN.status = 'draft';
+  const payload = prodPlanBuildPayload(cid, 'draft');
+  const ref = await addDoc(collection(db, 'clientes', cid, 'production_plans'), payload);
+  PROD_PLAN.planId = ref.id;
+  return ref.id;
+}
+
+// Autosave: re-grava o draft atual (debounced). Chamar após edits no PROD_PLAN.
+let _prodAutosaveTimer = null;
+function prodPlanAutosave(cid) {
+  if (!PROD_PLAN.planId || PROD_PLAN.status === 'finalized') return;
+  if (_prodAutosaveTimer) clearTimeout(_prodAutosaveTimer);
+  _prodAutosaveTimer = setTimeout(async () => {
+    try {
+      const payload = prodPlanBuildPayload(cid);
+      await setDoc(doc(db, 'clientes', cid, 'production_plans', PROD_PLAN.planId), payload, { merge: true });
+    } catch (err) { console.warn('[ProdAutosave]', err?.code || err?.message); }
+  }, 600);
+}
+
+// Marca como "pronto" (planejamento feito, aguardando produção)
+async function prodPlanMarkReady(cid) {
+  if (!PROD_PLAN.planId) return;
+  try {
+    await setDoc(doc(db, 'clientes', cid, 'production_plans', PROD_PLAN.planId),
+      { status: 'ready', readyAt: new Date().toISOString(), readyBy: STATE.user?.uid, readyByName: STATE.userDoc?.name || STATE.user?.email },
+      { merge: true });
+    PROD_PLAN.status = 'ready';
+  } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+}
+
+// Volta de "pronto" pra "em aberto" (caso queira reabrir pra editar)
+async function prodPlanMarkDraftAgain(cid) {
+  if (!PROD_PLAN.planId) return;
+  try {
+    await setDoc(doc(db, 'clientes', cid, 'production_plans', PROD_PLAN.planId),
+      { status: 'draft' }, { merge: true });
+    PROD_PLAN.status = 'draft';
+  } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+}
+
+// Deleta um draft (não pode deletar finalized — ai já está no histórico)
+async function prodPlanDeleteDraft(cid, planId) {
+  await deleteDoc(doc(db, 'clientes', cid, 'production_plans', planId));
+  if (PROD_PLAN.planId === planId) prodPlanReset();
+}
+
 async function prodPlanFinalize(cid, totalCost, totalPortions) {
   const snapshot = prodPlanBuildSnapshot(cid, totalCost, totalPortions);
   let planId;
   if (PROD_PLAN.planId) {
-    // Atualiza doc existente (caso de "reaberto pra editar")
+    // Atualiza doc existente (draft ou ready vira finalized)
     snapshot.reopenedAt = deleteField();
     await setDoc(doc(db, 'clientes', cid, 'production_plans', PROD_PLAN.planId), snapshot, { merge: true });
     planId = PROD_PLAN.planId;
   } else {
-    // Novo doc
     const ref = await addDoc(collection(db, 'clientes', cid, 'production_plans'), snapshot);
     planId = ref.id;
   }
@@ -3489,24 +3592,6 @@ async function prodPlanFinalize(cid, totalCost, totalPortions) {
   PROD_PLAN.finalizedAt = snapshot.finalizedAt;
   PROD_PLAN.finalizedBy = snapshot.finalizedByName;
   PROD_PLAN.planId = planId;
-  // Memória de produção: atualiza dish.production_memory pra cada prato planejado
-  // (item 4 — pré-carrega config na próxima vez que adicionar o prato ao plano)
-  try {
-    await Promise.all(PROD_PLAN.items.map(async (it) => {
-      if (!it.dishId) return;
-      const memory = {
-        lastTargetQty: Number(it.targetQty) || 0,
-        lastTargetUnit: it.targetUnit || '',
-        lastExcludedSfIds: Array.from(it.excludedSfIds || new Set()),
-        updatedAt: new Date().toISOString()
-      };
-      try {
-        await setDoc(dishDoc(cid, it.dishId), { production_memory: memory }, { merge: true });
-        const local = STATE.dishes.find(d => d.id === it.dishId);
-        if (local) local.production_memory = memory;
-      } catch (e) { console.warn('[ProdMemory]', it.dishId, e?.code); }
-    }));
-  } catch (e) { console.warn('[ProdMemory] batch:', e); }
   return planId;
 }
 
@@ -4537,6 +4622,394 @@ function renderStockTemplateEdit(cid, templateId, app) {
   app.appendChild(panel);
 }
 
+// ============================================================
+// PRODUCTION TEMPLATES — CRUD + modal de salvar a partir do plano
+// ============================================================
+
+// Lista de templates do restaurante
+async function renderTemplatesList(cid) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  renderLoadingScreen();
+  let templates = [];
+  try {
+    const snap = await getDocs(collection(db, 'clientes', cid, 'production_templates'));
+    templates = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } catch (err) { console.error('[Templates] erro:', err); }
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  app.appendChild(el('a', { href: `#/c/${cid}/producao`, class: 'back-link' }, '← Produção'));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Templates de planejamento'),
+      el('p', {}, 'Cadastre planejamentos recorrentes (ex: "Segunda-feira", "Brunch domingo") com pratos e quantidades pré-definidas pra usar de novo.')
+    ),
+    el('a', { class: 'btn btn-primary', href: `#/c/${cid}/producao/templates/novo` }, '+ Novo template')
+  ));
+
+  if (templates.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', { class: 'muted' }, 'Nenhum template ainda. Crie um pra acelerar planejamentos recorrentes.')
+    ));
+    return;
+  }
+
+  const grid = el('div', { class: 'producao-templates-grid' });
+  templates.forEach(t => {
+    const itemsCount = (t.items || []).length;
+    const card = el('div', { class: 'producao-template-card-large' },
+      el('div', { class: 'producao-template-card-info' },
+        el('h4', {}, t.name),
+        t.description ? el('p', { class: 'muted' }, t.description) : null,
+        el('p', { class: 'producao-template-meta' }, `${itemsCount} prato(s)`)
+      ),
+      el('div', { class: 'producao-template-card-actions' },
+        el('button', { class: 'btn btn-small btn-primary', onclick: async () => {
+          try {
+            const items = (t.items || []).map(it => ({
+              dishId: it.dishId,
+              targetQty: Number(it.targetQty) || 0,
+              targetUnit: it.targetUnit || '',
+              excludedSfIds: new Set(it.excludedSfIds || [])
+            }));
+            const planId = await prodPlanCreateDraft(cid, {
+              name: t.name + ' — ' + new Date().toLocaleDateString('pt-BR'),
+              items
+            });
+            location.hash = `#/c/${cid}/producao/draft/${planId}`;
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '▶ Iniciar planejamento'),
+        el('a', { class: 'btn btn-small', href: `#/c/${cid}/producao/templates/edit/${t.id}` }, '✎ Editar'),
+        el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+          if (!confirm(`Excluir template "${t.name}"?`)) return;
+          try {
+            await deleteDoc(doc(db, 'clientes', cid, 'production_templates', t.id));
+            toast('Excluído');
+            renderTemplatesList(cid);
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '× Excluir')
+      )
+    );
+    grid.appendChild(card);
+  });
+  app.appendChild(grid);
+}
+
+// Editor de template (criar OU editar existente)
+async function renderTemplateEdit(cid, templateId) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  let template = { name: '', description: '', items: [] };
+  if (templateId) {
+    try {
+      const snap = await getDoc(doc(db, 'clientes', cid, 'production_templates', templateId));
+      if (snap.exists()) template = { id: templateId, ...snap.data() };
+    } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+  }
+
+  app.appendChild(el('a', { href: `#/c/${cid}/producao/templates`, class: 'back-link' }, '← Templates'));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('h1', {}, templateId ? 'Editar template' : 'Novo template')
+  ));
+
+  const nameInput = el('input', { type: 'text', value: template.name || '', placeholder: 'Ex: Segunda-feira, Brunch domingo' });
+  const descInput = el('input', { type: 'text', value: template.description || '', placeholder: 'Opcional — pra ajudar a lembrar o que é' });
+
+  const items = (template.items || []).map(it => ({
+    dishId: it.dishId,
+    targetQty: Number(it.targetQty) || 0,
+    targetUnit: it.targetUnit || '',
+    excludedSfIds: new Set(it.excludedSfIds || [])
+  }));
+
+  const itemsListEl = el('div', { class: 'template-items-list' });
+  function renderItems() {
+    itemsListEl.innerHTML = '';
+    if (items.length === 0) {
+      itemsListEl.appendChild(el('p', { class: 'muted', style: 'text-align:center;padding:1rem;' }, 'Nenhum prato adicionado.'));
+      return;
+    }
+    items.forEach((it, idx) => {
+      const dish = STATE.dishes.find(d => d.id === it.dishId);
+      if (!dish) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const finalUnit = it.targetUnit || (finalSf ? getSfRendimento(finalSf).unit : '');
+      const qtyInput = el('input', { type: 'number', min: '0', step: '1', value: it.targetQty || '', style: 'width:90px;' });
+      qtyInput.addEventListener('input', () => { it.targetQty = parseFloat(qtyInput.value) || 0; });
+      const row = el('div', { class: 'template-item-row' },
+        el('span', { class: 'template-item-name' }, dish.name),
+        qtyInput,
+        el('span', { class: 'muted' }, finalUnit),
+        el('button', { class: 'btn btn-small btn-danger', onclick: () => { items.splice(idx, 1); renderItems(); } }, '×')
+      );
+      itemsListEl.appendChild(row);
+    });
+  }
+  renderItems();
+
+  const addBtn = el('button', { class: 'btn', onclick: () => {
+    const modal = el('div', { class: 'modal' });
+    const overlay = el('div', { class: 'modal-overlay', onclick: () => modal.remove() });
+    const content = el('div', { class: 'modal-content modal-wide' },
+      el('h2', {}, 'Adicionar prato'),
+      el('div', { class: 'copy-sf-list' },
+        ...STATE.dishes.filter(d => !d.inactive && !items.find(it => it.dishId === d.id)).map(d => {
+          const finalSf = d.sub_fichas[d.sub_fichas.length - 1];
+          const rend = finalSf?.rendimento || '—';
+          return el('button', { class: 'copy-sf-item', onclick: () => {
+            items.push({
+              dishId: d.id,
+              targetQty: 0,
+              targetUnit: finalSf ? getSfRendimento(finalSf).unit || '' : '',
+              excludedSfIds: new Set()
+            });
+            modal.remove();
+            renderItems();
+          } },
+            el('div', { class: 'copy-sf-item-name' }, d.name),
+            el('div', { class: 'copy-sf-item-meta' }, `${(d.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
+          );
+        })
+      ),
+      el('div', { class: 'modal-actions' }, el('button', { class: 'btn', onclick: () => modal.remove() }, 'Fechar'))
+    );
+    modal.appendChild(overlay); modal.appendChild(content);
+    document.body.appendChild(modal);
+  } }, '+ Adicionar prato');
+
+  const saveBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
+    const name = nameInput.value.trim();
+    if (!name) { alert('Informe o nome do template'); return; }
+    const payload = {
+      name,
+      description: descInput.value.trim(),
+      items: items.map(it => ({
+        dishId: it.dishId,
+        dishName: STATE.dishes.find(d => d.id === it.dishId)?.name || it.dishId,
+        targetQty: Number(it.targetQty) || 0,
+        targetUnit: it.targetUnit || '',
+        excludedSfIds: Array.from(it.excludedSfIds || new Set())
+      })),
+      updatedAt: new Date().toISOString(),
+      updatedBy: STATE.user?.uid || null
+    };
+    try {
+      if (templateId) {
+        await setDoc(doc(db, 'clientes', cid, 'production_templates', templateId), payload, { merge: true });
+      } else {
+        payload.createdAt = new Date().toISOString();
+        payload.createdBy = STATE.user?.uid || null;
+        payload.createdByName = STATE.userDoc?.name || STATE.user?.email || '';
+        await addDoc(collection(db, 'clientes', cid, 'production_templates'), payload);
+      }
+      toast('Template salvo');
+      location.hash = `#/c/${cid}/producao/templates`;
+    } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+  } }, templateId ? 'Salvar alterações' : 'Criar template');
+
+  const panel = el('div', { class: 'admin-panel' },
+    el('div', { class: 'form-grid' },
+      el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+      el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Descrição (opcional)'), descInput)
+    ),
+    el('h3', { class: 'section-title' }, 'Pratos do template'),
+    itemsListEl,
+    el('div', { style: 'margin-top:0.6rem;' }, addBtn),
+    el('div', { class: 'panel-actions', style: 'margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1rem;' },
+      el('a', { class: 'btn', href: `#/c/${cid}/producao/templates` }, 'Cancelar'),
+      saveBtn
+    )
+  );
+  app.appendChild(panel);
+}
+
+// Modal: salvar planejamento atual como template
+function openSaveAsTemplateModal(cid) {
+  const nameInput = el('input', { type: 'text', placeholder: 'Ex: Segunda-feira, Brunch domingo', value: PROD_PLAN.name || '' });
+  const descInput = el('input', { type: 'text', placeholder: 'Opcional' });
+  const modal = el('div', { class: 'modal' });
+  modal.appendChild(el('div', { class: 'modal-overlay', onclick: () => modal.remove() }));
+  modal.appendChild(el('div', { class: 'modal-content' },
+    el('h2', {}, 'Salvar como template'),
+    el('p', { class: 'modal-subtitle' }, 'O template fica salvo pra você usar de novo. Os pratos e quantidades atuais viram a base.'),
+    el('div', { class: 'form-grid' },
+      el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
+      el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Descrição (opcional)'), descInput)
+    ),
+    el('div', { class: 'modal-actions' },
+      el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+      el('button', { class: 'btn btn-primary', onclick: async () => {
+        const name = nameInput.value.trim();
+        if (!name) { alert('Informe o nome'); return; }
+        try {
+          const payload = {
+            name,
+            description: descInput.value.trim(),
+            items: PROD_PLAN.items.map(it => {
+              const d = STATE.dishes.find(x => x.id === it.dishId);
+              return {
+                dishId: it.dishId,
+                dishName: d?.name || it.dishId,
+                targetQty: Number(it.targetQty) || 0,
+                targetUnit: it.targetUnit || '',
+                excludedSfIds: Array.from(it.excludedSfIds || new Set())
+              };
+            }),
+            createdAt: new Date().toISOString(),
+            createdBy: STATE.user?.uid || null,
+            createdByName: STATE.userDoc?.name || STATE.user?.email || '',
+            updatedAt: new Date().toISOString()
+          };
+          await addDoc(collection(db, 'clientes', cid, 'production_templates'), payload);
+          toast('Template salvo');
+          modal.remove();
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } }, 'Salvar template')
+    )
+  ));
+  document.body.appendChild(modal);
+}
+
+// Hub da aba Produção — lista drafts em aberto + templates + histórico
+async function renderProducaoHub(cid) {
+  const app = $('#app');
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  renderLoadingScreen();
+
+  // Carrega drafts (status != 'finalized') do restaurante
+  let drafts = [];
+  let templates = [];
+  try {
+    const [plansSnap, tplSnap] = await Promise.all([
+      getDocs(collection(db, 'clientes', cid, 'production_plans')),
+      getDocs(collection(db, 'clientes', cid, 'production_templates')).catch(() => ({ docs: [] }))
+    ]);
+    drafts = plansSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(p => p.status !== 'finalized')
+      .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+    templates = tplSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  } catch (err) {
+    console.error('[ProducaoHub] erro carregando:', err);
+  }
+
+  app.innerHTML = '';
+  app.appendChild(renderClienteContext(cid));
+  app.appendChild(el('div', { class: 'page-header' },
+    el('div', {},
+      el('h1', {}, 'Produção'),
+      el('p', {}, 'Planeje, marque como pronto e finalize. Reuse templates pros planejamentos recorrentes.')
+    ),
+    el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
+      el('a', { class: 'btn', href: `#/c/${cid}/producao/historico` }, '↺ Histórico'),
+      el('a', { class: 'btn', href: `#/c/${cid}/producao/templates` }, '☰ Templates'),
+      el('button', { class: 'btn btn-primary', onclick: async () => {
+        try {
+          const planId = await prodPlanCreateDraft(cid);
+          location.hash = `#/c/${cid}/producao/draft/${planId}`;
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } }, '+ Novo planejamento')
+    )
+  ));
+
+  // Seção: drafts em aberto
+  app.appendChild(el('h3', { class: 'section-title' }, `Em andamento (${drafts.length})`));
+  if (drafts.length === 0) {
+    app.appendChild(el('div', { class: 'empty-state' },
+      el('p', { class: 'muted' }, 'Nenhum planejamento em andamento. Clique em "+ Novo planejamento" ou use um template.')
+    ));
+  } else {
+    const draftsGrid = el('div', { class: 'producao-drafts-grid' });
+    drafts.forEach(p => {
+      const itemsCount = (p.items || []).length;
+      const isReady = p.status === 'ready';
+      const updatedAt = p.updatedAt || p.createdAt;
+      const dateStr = updatedAt ? new Date(updatedAt).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+      const card = el('div', { class: 'producao-draft-card' + (isReady ? ' is-ready' : '') });
+      const link = el('a', { class: 'producao-draft-link', href: `#/c/${cid}/producao/draft/${p.id}` },
+        el('div', { class: 'producao-draft-head' },
+          el('h4', { class: 'producao-draft-name' }, p.name || '(sem nome)'),
+          el('span', { class: 'producao-draft-badge ' + (isReady ? 'badge-ready' : 'badge-draft') },
+            isReady ? '✓ Pronto pra produzir' : '🕒 Em aberto'
+          )
+        ),
+        el('div', { class: 'producao-draft-meta' },
+          el('span', {}, `${itemsCount} prato(s)`),
+          el('span', {}, '· ' + dateStr),
+          p.createdByName ? el('span', {}, '· por ' + p.createdByName) : null
+        ),
+        el('div', { class: 'producao-draft-items' },
+          (p.items || []).slice(0, 4).map(it => it.dishName).join(' · ') +
+          (itemsCount > 4 ? ` +${itemsCount - 4}` : '')
+        )
+      );
+      card.appendChild(link);
+      const actions = el('div', { class: 'producao-draft-actions' },
+        el('button', { class: 'btn btn-small btn-danger', onclick: async (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (!confirm(`Excluir o planejamento "${p.name || '(sem nome)'}"?\n\nEle ainda não foi finalizado, então não está no histórico. Esta ação não pode ser desfeita.`)) return;
+          try { await prodPlanDeleteDraft(cid, p.id); toast('Excluído'); renderProducaoHub(cid); }
+          catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '× Excluir')
+      );
+      card.appendChild(actions);
+      draftsGrid.appendChild(card);
+    });
+    app.appendChild(draftsGrid);
+  }
+
+  // Seção: templates rápidos
+  if (templates.length > 0) {
+    app.appendChild(el('h3', { class: 'section-title', style: 'margin-top:2rem;' }, `Iniciar do template (${templates.length})`));
+    const tplGrid = el('div', { class: 'producao-templates-grid' });
+    templates.forEach(t => {
+      const itemsCount = (t.items || []).length;
+      const card = el('button', { class: 'producao-template-card', onclick: async () => {
+        try {
+          const items = (t.items || []).map(it => ({
+            dishId: it.dishId,
+            targetQty: Number(it.targetQty) || 0,
+            targetUnit: it.targetUnit || '',
+            excludedSfIds: new Set(it.excludedSfIds || [])
+          }));
+          const planId = await prodPlanCreateDraft(cid, {
+            name: t.name + ' — ' + new Date().toLocaleDateString('pt-BR'),
+            items
+          });
+          location.hash = `#/c/${cid}/producao/draft/${planId}`;
+        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+      } },
+        el('div', { class: 'producao-template-name' }, t.name),
+        el('div', { class: 'producao-template-meta' },
+          `${itemsCount} prato(s)`,
+          t.description ? el('span', { class: 'producao-template-desc' }, '· ' + t.description) : null
+        )
+      );
+      tplGrid.appendChild(card);
+    });
+    app.appendChild(tplGrid);
+  }
+}
+
+// Carrega um draft do Firestore e abre o editor
+async function renderProducaoDraftEdit(cid, planId) {
+  renderLoadingScreen();
+  try {
+    const ok = await prodPlanLoad(cid, planId);
+    if (!ok) { alert('Planejamento não encontrado'); location.hash = `#/c/${cid}/producao`; return; }
+    if (PROD_PLAN.status === 'finalized') {
+      location.hash = `#/c/${cid}/producao/plano/${planId}`;
+      return;
+    }
+    renderProducao(cid);
+  } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+}
+
 function renderProducao(cid) {
   const app = $('#app');
   app.innerHTML = '';
@@ -4549,45 +5022,47 @@ function renderProducao(cid) {
   if (!STATE.prodView) STATE.prodView = canSeeCost ? 'custo' : 'producao';
   if (!canSeeCost) STATE.prodView = 'producao';
 
+  const isReady = PROD_PLAN.status === 'ready';
+  const statusBadge = el('span', { class: 'planejamento-badge ' + (locked ? 'badge-finalized' : isReady ? 'badge-ready' : 'badge-draft') },
+    locked ? '✓ Finalizado' : isReady ? '✓ Pronto pra produzir' : '🕒 Em aberto'
+  );
+  // Input editável de nome do planejamento
+  const nameInput = el('input', {
+    type: 'text',
+    class: 'planejamento-name-input',
+    value: PROD_PLAN.name || '',
+    placeholder: 'Nome do planejamento (opcional)',
+    disabled: locked ? '' : null
+  });
+  nameInput.addEventListener('input', () => {
+    PROD_PLAN.name = nameInput.value;
+    prodPlanAutosave(cid);
+  });
+
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
-      el('h1', {}, locked ? 'Planejamento finalizado' : 'Plano de produção'),
-      el('p', {}, locked
-        ? `Finalizado em ${new Date(PROD_PLAN.finalizedAt).toLocaleString('pt-BR')}${PROD_PLAN.finalizedBy ? ' por ' + PROD_PLAN.finalizedBy : ''}. Você pode baixar os relatórios ou iniciar um novo planejamento.`
-        : `Selecione os pratos e quantidades para o dia. Ao finalizar, o plano é salvo no histórico e os relatórios são liberados pra download.`)
+      el('div', { style: 'display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.4rem;' },
+        el('a', { href: `#/c/${cid}/producao`, class: 'back-link', style: 'margin:0;' }, '← Produção'),
+        statusBadge
+      ),
+      nameInput,
+      el('p', { style: 'margin-top:0.5rem;' }, locked
+        ? `Finalizado em ${new Date(PROD_PLAN.finalizedAt).toLocaleString('pt-BR')}${PROD_PLAN.finalizedBy ? ' por ' + PROD_PLAN.finalizedBy : ''}.`
+        : isReady ? 'Planejamento marcado como pronto. Quando produzir, clique em "Finalizar produção".' : 'Defina os pratos e quantidades. As mudanças salvam automaticamente.')
     ),
     el('div', { style: 'display:flex;gap:0.5rem;flex-wrap:wrap;' },
-      el('a', { class: 'btn', href: `#/c/${cid}/producao/historico` }, '↺ Histórico'),
       locked && PROD_PLAN.planId
         ? el('button', { class: 'btn', onclick: async () => {
-            if (!confirm('Reabrir como rascunho?\n\nVocê poderá editar o planejamento e finalizar de novo. O mesmo registro no histórico será atualizado quando você finalizar.')) return;
+            if (!confirm('Reabrir como rascunho?\n\nO mesmo registro será atualizado quando você finalizar de novo.')) return;
             try {
               await prodPlanReopen(cid, PROD_PLAN.planId);
               toast('Reaberto como rascunho');
               renderProducao(cid);
             } catch (err) { alert('Erro: ' + (err.message || err.code)); }
           } }, '✎ Editar') : null,
-      locked && PROD_PLAN.items.length > 0
-        ? el('button', { class: 'btn', onclick: () => {
-            if (!confirm('Duplicar esse planejamento como um novo?\n\nOs pratos e quantidades atuais viram um novo rascunho. O plano original continua no histórico.')) return;
-            const snapshot = PROD_PLAN.items.map(it => ({
-              dishId: it.dishId,
-              targetQty: it.targetQty,
-              targetUnit: it.targetUnit,
-              excludedSfIds: new Set(Array.from(it.excludedSfIds || new Set()))
-            }));
-            prodPlanReset();
-            PROD_PLAN.items = snapshot;
-            renderProducao(cid);
-            toast('Planejamento duplicado');
-          } }, '⧉ Duplicar') : null,
       locked
-        ? el('button', { class: 'btn btn-primary', onclick: () => {
-            if (!confirm('Iniciar um novo planejamento? O plano atual já foi salvo no histórico.')) return;
-            prodPlanReset();
-            renderProducao(cid);
-          } }, '+ Novo planejamento')
-        : el('button', { class: 'btn btn-primary', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
+        ? el('a', { class: 'btn btn-primary', href: `#/c/${cid}/producao` }, '+ Novo planejamento')
+        : el('button', { class: 'btn', onclick: () => openAddDishToPlanModal(cid) }, '+ Adicionar prato')
     )
   ));
 
@@ -4692,8 +5167,9 @@ function renderProducao(cid) {
                 if (cleaned !== qtyInput.value) qtyInput.value = cleaned;
                 const v = parseFloat(cleaned);
                 item.targetQty = isNaN(v) ? 0 : v;
+                prodPlanAutosave(cid);
               });
-              qtyInput.addEventListener('change', () => recompute());
+              qtyInput.addEventListener('change', () => { recompute(); prodPlanAutosave(cid); });
               qtyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); qtyInput.blur(); } });
               // ±10 com "snap" pro próximo múltiplo de 10: 1→10, 23→30, 30→40
               // Shift+click: ±1 (granular)
@@ -4713,6 +5189,7 @@ function renderProducao(cid) {
                 item.targetQty = next;
                 qtyInput.value = next || '';
                 recompute();
+                prodPlanAutosave(cid);
               }
               minusBtn.addEventListener('click', (e) => bump(-10, e.shiftKey));
               plusBtn.addEventListener('click', (e) => bump(10, e.shiftKey));
@@ -4728,7 +5205,7 @@ function renderProducao(cid) {
           prodPlanIsLocked()
             ? null
             : el('button', { class: 'btn btn-small btn-danger', title: 'Remover do plano', onclick: () => {
-                PROD_PLAN.items.splice(itemIdx, 1); recompute();
+                PROD_PLAN.items.splice(itemIdx, 1); recompute(); prodPlanAutosave(cid);
               } }, '×')
         )
       );
@@ -4751,6 +5228,7 @@ function renderProducao(cid) {
           if (chk.checked) item.excludedSfIds.delete(sf.id);
           else item.excludedSfIds.add(sf.id);
           recompute();
+          prodPlanAutosave(cid);
         });
         sfBox.appendChild(el('label', { class: 'prod-sf-check' }, chk,
           el('span', { class: 'prod-sf-name' + (isFinal ? ' is-final' : '') }, sf.name),
@@ -4786,45 +5264,70 @@ function renderProducao(cid) {
       )
     );
     const actions = el('div', { class: 'prod-actions' });
+    const isReadyState = PROD_PLAN.status === 'ready';
     if (isLocked) {
       // Plano finalizado — relatórios liberados
       actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
       actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
       actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
     } else {
-      // Plano em rascunho — botão de finalizar (downloads ficam bloqueados)
-      const finalizeBtn = el('button', { class: 'btn btn-primary' }, '✓ Finalizar planejamento');
+      // 3 botões progressivos: salvar como template, marcar pronto, finalizar produção
+      // Salvar como template (sempre disponível se tem item)
+      if (PROD_PLAN.items.length > 0) {
+        actions.appendChild(el('button', { class: 'btn', onclick: () => openSaveAsTemplateModal(cid) }, '☰ Salvar como template'));
+      }
+      // Marcar como pronto / Voltar pra em aberto
+      if (isReadyState) {
+        actions.appendChild(el('button', { class: 'btn', onclick: async () => {
+          if (!confirm('Voltar este planejamento pra "em aberto"?')) return;
+          try { await prodPlanMarkDraftAgain(cid); renderProducao(cid); } catch (err) { alert(err.message); }
+        } }, '↶ Voltar pra em aberto'));
+        // Relatórios já liberados quando ready
+        actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoPDF(cid) }, '↓ PDF Produção'));
+        actions.appendChild(el('button', { class: 'btn', onclick: () => openRequisicaoOptionsModal(cid) }, '↓ PDF Requisição'));
+        actions.appendChild(el('button', { class: 'btn', onclick: () => exportProducaoXLSX(cid) }, '↓ Excel'));
+      } else {
+        // Status = draft
+        const readyBtn = el('button', { class: 'btn btn-accent' }, '✓ Marcar como pronto');
+        if (!canFinalize) {
+          readyBtn.disabled = true;
+          readyBtn.title = PROD_PLAN.items.length === 0
+            ? 'Adicione pelo menos um prato com quantidade > 0'
+            : 'Defina a quantidade de produção de todos os pratos';
+        } else {
+          readyBtn.addEventListener('click', async () => {
+            try { await prodPlanMarkReady(cid); toast('Marcado como pronto'); renderProducao(cid); }
+            catch (err) { alert('Erro: ' + (err.message || err.code)); }
+          });
+        }
+        actions.appendChild(readyBtn);
+      }
+      // Finalizar produção (irreversível — vai pro histórico)
+      const finalizeBtn = el('button', { class: 'btn btn-primary' }, '✓ Finalizar produção');
       if (!canFinalize) {
         finalizeBtn.disabled = true;
-        finalizeBtn.title = PROD_PLAN.items.length === 0
-          ? 'Adicione pelo menos um prato com quantidade > 0'
-          : 'Defina a quantidade de produção de todos os pratos';
+        finalizeBtn.title = 'Defina a quantidade de produção de todos os pratos';
       } else {
         finalizeBtn.addEventListener('click', async () => {
-          const msg = `Finalizar o plano com ${PROD_PLAN.items.length} prato(s)?\n\n` +
+          const msg = `Finalizar a PRODUÇÃO?\n\n` +
             `Após finalizar:\n` +
-            `• O plano é salvo no histórico do restaurante\n` +
-            `• Os relatórios (PDF Produção, PDF Requisição, Excel) ficam liberados\n` +
-            `• A edição fica bloqueada — você precisa iniciar um novo planejamento pra editar`;
+            `• O plano vai pro histórico do restaurante (não some)\n` +
+            `• A edição fica bloqueada (você pode reabrir como rascunho depois)`;
           if (!confirm(msg)) return;
           finalizeBtn.disabled = true;
           finalizeBtn.textContent = 'Salvando…';
           try {
             await prodPlanFinalize(cid, totalCost, totalPortions);
-            toast('Planejamento finalizado');
+            toast('Produção finalizada');
             renderProducao(cid);
           } catch (err) {
             finalizeBtn.disabled = false;
-            finalizeBtn.textContent = '✓ Finalizar planejamento';
+            finalizeBtn.textContent = '✓ Finalizar produção';
             alert('Erro ao finalizar: ' + (err.message || err.code));
           }
         });
       }
       actions.appendChild(finalizeBtn);
-      const lockedHint = el('span', { class: 'prod-finalize-hint' },
-        'Relatórios PDF e Excel serão liberados após finalizar.'
-      );
-      actions.appendChild(lockedHint);
     }
     // Lista compacta de preparações pra confirmação (antes ou depois de finalizar)
     if (PROD_PLAN.items.some(it => Number(it.targetQty) > 0)) {
@@ -5110,28 +5613,20 @@ function openAddDishToPlanModal(cid) {
       if (inPlan.has(dish.id)) return;
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const rend = finalSf?.rendimento || '—';
-      // Memória de produção: pré-preenche com a última config do prato (item 4)
-      const mem = dish.production_memory || null;
-      const hasMemory = mem && (mem.lastTargetQty > 0 || (Array.isArray(mem.lastExcludedSfIds) && mem.lastExcludedSfIds.length > 0));
-      const btn = el('button', { class: 'copy-sf-item' + (hasMemory ? ' has-memory' : ''), onclick: () => {
+      const btn = el('button', { class: 'copy-sf-item', onclick: () => {
         const finalR = getSfRendimento(finalSf);
         PROD_PLAN.items.push({
           dishId: dish.id,
-          targetQty: mem?.lastTargetQty || 0,
-          targetUnit: mem?.lastTargetUnit || finalR.unit || '',
-          excludedSfIds: new Set(mem?.lastExcludedSfIds || [])
+          targetQty: 0,
+          targetUnit: finalR.unit || '',
+          excludedSfIds: new Set()
         });
+        prodPlanAutosave(cid);
         modal.remove();
         renderProducao(cid);
       } },
-        el('div', { class: 'copy-sf-item-name' }, dish.name,
-          hasMemory ? el('span', { class: 'copy-sf-memory-tag', title: 'Usa a última configuração de produção' }, '★ pré-carregado') : null
-        ),
-        el('div', { class: 'copy-sf-item-meta' },
-          hasMemory && mem.lastTargetQty > 0
-            ? `${fmtNum(mem.lastTargetQty, 0)} ${mem.lastTargetUnit || ''} · ${(dish.sub_fichas || []).length - (mem.lastExcludedSfIds || []).length}/${(dish.sub_fichas || []).length} sub-fichas`
-            : `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`
-        )
+        el('div', { class: 'copy-sf-item-name' }, dish.name),
+        el('div', { class: 'copy-sf-item-meta' }, `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
       );
       list.appendChild(btn);
     });

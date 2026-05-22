@@ -197,7 +197,20 @@ service cloud.firestore {
       match /production_plans/{planId} {
         allow read: if hasClienteAccess(cid);
         allow create: if isMaster() || isStaffOf(cid) || isDonoOf(cid) || isAdminOf(cid);
-        allow update, delete: if isMaster() || isStaffOf(cid);
+        // Drafts/ready podem ser editados/deletados por quem cria (master/staff/dono/admin)
+        // Finalized: só master/staff podem mexer (histórico imutável pro lado do cliente)
+        allow update: if isMaster() || isStaffOf(cid)
+                      || ((isDonoOf(cid) || isAdminOf(cid))
+                          && resource.data.status != 'finalized');
+        allow delete: if isMaster() || isStaffOf(cid)
+                      || ((isDonoOf(cid) || isAdminOf(cid))
+                          && resource.data.status != 'finalized');
+      }
+
+      // ---------- production_templates ----------
+      match /production_templates/{templateId} {
+        allow read: if hasClienteAccess(cid);
+        allow create, update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid) || isAdminOf(cid);
       }
 
       // ---------- estoque (legado) ----------
