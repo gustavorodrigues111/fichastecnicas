@@ -164,6 +164,20 @@ service cloud.firestore {
       // O próprio user pode deletar seu pending (após migração pra users/{uid})
       allow delete: if isSignedIn()
                     && resource.data.email == request.auth.token.email;
+      // Cliente (dono) cria/atualiza/deleta pré-cadastros pros restaurantes dele
+      // (papel restrito a cliente_admin/cliente_op, clienteIds cruzando com o dono)
+      allow create, update: if isSignedIn() && hasUserDoc()
+                            && userDoc().role == 'cliente'
+                            && request.resource.data.role in ['cliente_admin', 'cliente_op']
+                            && request.resource.data.clienteIds is list
+                            && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
+      allow delete: if isSignedIn() && hasUserDoc()
+                    && userDoc().role == 'cliente'
+                    && resource.data.clienteIds is list
+                    && resource.data.clienteIds.hasAny(userDoc().clienteIds);
+      // LIST: cliente (dono) precisa listar pending_users pra UI de gerenciamento
+      allow list: if isSignedIn() && hasUserDoc()
+                  && (userDoc().role == 'master' || userDoc().role == 'cliente');
     }
 
     // ---------- clientes (top-level) ----------
