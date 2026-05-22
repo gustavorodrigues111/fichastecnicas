@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0422';
+const APP_BUILD = '20260522-V2-0430';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -7304,9 +7304,11 @@ async function renderClientTeamAdmin(cid) {
         } catch (err) { alert('Erro: ' + (err.message || err.code)); }
       } }, '↻ Reativar'));
     } else {
+      const isDonoRole = u.role === 'dono' || u.role === 'cliente';
+      const isAdminRole = u.role === 'admin' || u.role === 'cliente_admin';
+      const isOpRole = u.role === 'op' || u.role === 'cliente_op';
       // Toggle entre admin e op (não mexe em dono)
-      if (u.role === 'admin' || u.role === 'op' || u.role === 'cliente_admin' || u.role === 'cliente_op') {
-        const isAdminRole = u.role === 'admin' || u.role === 'cliente_admin';
+      if (isAdminRole || isOpRole) {
         const otherRole = isAdminRole ? 'op' : 'admin';
         const otherLabel = otherRole === 'admin' ? 'Promover a Admin' : 'Rebaixar para Operacional';
         actions.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
@@ -7317,6 +7319,28 @@ async function renderClientTeamAdmin(cid) {
             renderClientTeamAdmin(cid);
           } catch (err) { alert('Erro: ' + (err.message || err.code)); }
         } }, otherLabel));
+      }
+      // Promover a Dono — só master ou outro dono pode promover. Não promove quem já é dono.
+      if (!isDonoRole && (isMaster() || isDonoOf(cid))) {
+        actions.appendChild(el('button', { class: 'btn btn-small btn-accent', onclick: async () => {
+          if (!confirm(`Promover ${u.email} a DONO do restaurante?\n\nDonos têm acesso TOTAL: gerenciam equipe, fichas, preços, planejamento e podem promover/rebaixar outros membros. Pode haver mais de um dono no mesmo restaurante.\n\nConfirmar?`)) return;
+          try {
+            await setDoc(teamDocRef, { role: 'dono' }, { merge: true });
+            toast('Promovido a Dono');
+            renderClientTeamAdmin(cid);
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '↑ Promover a Dono'));
+      }
+      // Rebaixar Dono — só master rebaixa dono (evita lock-out se for o único dono)
+      if (isDonoRole && isMaster()) {
+        actions.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
+          if (!confirm(`Rebaixar ${u.email} de Dono para Admin?\n\nEle perde a permissão de gerenciar a equipe e promover outros. ATENÇÃO: se for o único dono do restaurante, ninguém mais poderá promover usuários — só você (master).`)) return;
+          try {
+            await setDoc(teamDocRef, { role: 'admin' }, { merge: true });
+            toast('Rebaixado para Admin');
+            renderClientTeamAdmin(cid);
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, '↓ Rebaixar p/ Admin'));
       }
       actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
         if (!confirm(`Desativar ${u.email}? Pode reativar depois.`)) return;
