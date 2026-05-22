@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0350';
+const APP_BUILD = '20260522-V2-0360';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2866,55 +2866,53 @@ function renderClienteHome(cid) {
     const cmvT = cmvTrend();
     const markupT = markupTrend();
 
-    // Preço/CMV/Markup editáveis pra master/staff/dono/admin (mesmo critério de canEditInsumoPrice)
-    const priceBadge = showCost ? el('span', { class: 'dish-price-badge' + (hasPriceOverride ? ' is-override' : '') + (canEditPrice ? ' is-editable' : ''),
+    // PREÇO DE VENDA — único badge que abre o editor (preço, CMV, markup)
+    const priceBadge = showCost ? el('span', {
+      class: 'dish-price-badge' + (hasPriceOverride ? ' is-override' : '') + (canEditPrice ? ' is-editable' : ''),
       title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
     },
       fmtBRL(salePrice),
       hasPriceOverride ? el('span', { class: 'dish-price-pin', title: 'Preço fixado pelo restaurante' }, '📌') : null
     ) : null;
-    const cmvTrendIcon = cmvT ? el('button', {
-      class: 'dish-metric-trend trend-' + cmvT.dir,
-      type: 'button',
-      title: 'Ver histórico de variações',
-      'aria-label': 'Ver histórico de variações'
-    }, cmvT.dir === 'up' ? '↑' : '↓') : null;
-    const markupTrendIcon = markupT ? el('button', {
-      class: 'dish-metric-trend trend-' + (markupT.dir === 'up' ? 'down' : 'up'),
-      type: 'button',
-      title: 'Ver histórico de variações',
-      'aria-label': 'Ver histórico de variações'
-    }, markupT.dir === 'up' ? '↑' : '↓') : null;
-    // Clique no ícone abre modal de histórico (funciona em mobile e desktop)
-    if (cmvTrendIcon) cmvTrendIcon.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      openPriceHistoryModal(dish);
-    });
-    if (markupTrendIcon) markupTrendIcon.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      openPriceHistoryModal(dish);
-    });
-    const cmvBadge = showCost ? el('span', { class: 'dish-metric dish-metric-cmv dish-metric-' + cmvStatus + (canEditPrice ? ' is-editable' : ''),
-      title: (canEditPrice ? 'Clique pra editar. ' : '') + (targetCmv ? `Alvo: ${fmtNum(targetCmv, 1)}%` : '')
+    if (priceBadge && canEditPrice) {
+      priceBadge.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        openDishPriceEditor(cid, dish);
+      });
+    }
+
+    // CMV — badge inteiro abre histórico. Seta inline mostra direção da última variação.
+    const cmvArrow = cmvT ? el('span', { class: 'dish-metric-arrow trend-' + cmvT.dir },
+      cmvT.dir === 'up' ? '↑' : '↓') : null;
+    const cmvBadge = showCost ? el('span', {
+      class: 'dish-metric dish-metric-cmv dish-metric-' + cmvStatus + ' is-history',
+      title: targetCmv ? `Alvo: ${fmtNum(targetCmv, 1)}% · clique pra ver histórico` : 'Clique pra ver histórico'
     },
       el('span', { class: 'dish-metric-label' }, 'CMV'),
       el('span', { class: 'dish-metric-value' }, fmtNum(cmv, 1) + '%'),
-      cmvTrendIcon
+      cmvArrow
     ) : null;
-    const markupBadge = showCost ? el('span', { class: 'dish-metric dish-metric-markup' + (canEditPrice ? ' is-editable' : '') },
+    if (cmvBadge) cmvBadge.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openPriceHistoryModal(dish);
+    });
+
+    // Markup — idem, inversão de cor da seta (subir markup = bom = verde)
+    const markupArrow = markupT ? el('span', {
+      class: 'dish-metric-arrow trend-' + (markupT.dir === 'up' ? 'down' : 'up')
+    }, markupT.dir === 'up' ? '↑' : '↓') : null;
+    const markupBadge = showCost ? el('span', {
+      class: 'dish-metric dish-metric-markup is-history',
+      title: 'Clique pra ver histórico'
+    },
       el('span', { class: 'dish-metric-label' }, 'Markup'),
       el('span', { class: 'dish-metric-value' }, fmtNum(markup, 0) + '%'),
-      markupTrendIcon
+      markupArrow
     ) : null;
-    if (canEditPrice) {
-      const openEditor = (e) => {
-        // Não abre editor se o click foi no ícone de trend (que é um button separado)
-        if (e.target.closest('.dish-metric-trend')) return;
-        e.preventDefault(); e.stopPropagation();
-        openDishPriceEditor(cid, dish);
-      };
-      [priceBadge, cmvBadge, markupBadge].forEach(b => b && b.addEventListener('click', openEditor));
-    }
+    if (markupBadge) markupBadge.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openPriceHistoryModal(dish);
+    });
     const summary = el('summary', { class: 'dish-head dish-summary v2' },
       el('div', { class: 'dish-summary-top' },
         el('span', { class: 'dish-chev' }, '▸'),
@@ -6514,8 +6512,18 @@ function renderInsumos(cid) {
           el('span', { class: 'usage-count' }, usedIn.length + ' receita' + (usedIn.length === 1 ? '' : 's')),
           usedIn.length > 0 ? usageTooltip : null
         );
+        // Nome clicável — abre modal com receitas + variações (útil principalmente no mobile)
+        const nameBtn = el('button', {
+          class: 'insumo-name-btn',
+          type: 'button',
+          title: 'Ver receitas que usam + variações'
+        }, insumo.name);
+        nameBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          openInsumoDetailsModal(cid, insumo, usedIn);
+        });
         const cells = [
-          el('td', { 'data-label': 'Insumo' }, insumo.name),
+          el('td', { 'data-label': 'Insumo' }, nameBtn),
           el('td', { 'data-label': 'Unidade' }, unitInput),
           el('td', { 'data-label': 'Preço (R$)' }, priceInput),
           el('td', { 'data-label': 'Variações' }, varBtn),
@@ -6660,6 +6668,76 @@ function openCopySubfichaModal(targetDish, onCopy) {
   modal.appendChild(content);
   document.body.appendChild(modal);
   searchInput.focus();
+}
+
+// Modal "Detalhes do insumo" — abre ao tocar no nome (lista receitas + variações)
+function openInsumoDetailsModal(cid, insumo, usedInArr) {
+  const existing = document.getElementById('insumo-details-modal');
+  if (existing) existing.remove();
+  const canEditPrice = canEditInsumoPrice(cid);
+
+  // Receitas que usam este insumo (passa via param ou calcula on-demand)
+  const usedIn = Array.isArray(usedInArr) ? usedInArr : (() => {
+    const set = new Set();
+    STATE.dishes.forEach(d => (d.sub_fichas || []).forEach(sf =>
+      (sf.ingredientes || []).forEach(i => {
+        if (i.insumo_id === insumo.id && !i.subref_id) set.add(d.name);
+      })
+    ));
+    return Array.from(set).sort();
+  })();
+
+  // Receitas
+  const usedSection = el('div', { class: 'insumo-detail-section' },
+    el('h3', { class: 'insumo-detail-title' }, `Usado em ${usedIn.length} receita${usedIn.length === 1 ? '' : 's'}`)
+  );
+  if (usedIn.length === 0) {
+    usedSection.appendChild(el('p', { class: 'muted', style: 'font-size:0.85rem;' }, 'Nenhuma ficha usa este insumo ainda.'));
+  } else {
+    const list = el('ul', { class: 'insumo-detail-recipes' });
+    usedIn.forEach(name => list.appendChild(el('li', {}, name)));
+    usedSection.appendChild(list);
+  }
+
+  // Variações
+  const variations = Array.isArray(insumo.variations) ? insumo.variations : [];
+  const varSection = el('div', { class: 'insumo-detail-section' },
+    el('div', { class: 'insumo-detail-title-row' },
+      el('h3', { class: 'insumo-detail-title' }, `Variações (${variations.length})`),
+      canEditPrice
+        ? el('button', { class: 'btn btn-small', onclick: () => { modal.remove(); openVariationsModal(cid, insumo); } },
+            variations.length > 0 ? 'Gerenciar' : '+ Cadastrar')
+        : null
+    )
+  );
+  if (variations.length === 0) {
+    varSection.appendChild(el('p', { class: 'muted', style: 'font-size:0.85rem;' },
+      'Sem variações cadastradas. ' + (canEditPrice ? 'Use "Cadastrar" pra adicionar cortes/preparos com fator de correção (ex: brunoise, julienne).' : 'Variações são cortes ou preparos do insumo com fator de correção próprio.')
+    ));
+  } else {
+    const list = el('ul', { class: 'insumo-detail-variations' });
+    variations.forEach(v => {
+      list.appendChild(el('li', {},
+        el('span', { class: 'variation-name' }, v.name),
+        el('span', { class: 'variation-fc' }, 'FC ' + fmtNum(v.fc || 1, 2))
+      ));
+    });
+    varSection.appendChild(list);
+  }
+
+  const modal = el('div', { class: 'modal', id: 'insumo-details-modal' },
+    el('div', { class: 'modal-overlay', onclick: () => modal.remove() }),
+    el('div', { class: 'modal-content', style: 'max-width:480px;' },
+      el('h2', {}, insumo.name),
+      el('p', { class: 'modal-subtitle' }, (insumo.unit || '') + ' · ' + fmtBRL(insumo.price || 0)),
+      usedSection,
+      varSection,
+      el('div', { class: 'modal-actions' },
+        el('button', { class: 'btn btn-primary', onclick: () => modal.remove() }, 'Fechar')
+      )
+    )
+  );
+  document.body.appendChild(modal);
 }
 
 // Modal de variações do insumo (ex: Cebola branca → brunoise FC 1,15, julienne FC 1,12)
