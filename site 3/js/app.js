@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2345';
+const APP_BUILD = '20260521-2355';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -5761,6 +5761,7 @@ async function renderClientTeamAdmin(cid) {
   // então a QUERY tem que usar array-contains-any com o MESMO array — caso contrário
   // a regra "as filter" não casa e o Firestore rejeita.
   let teamUsers = [];
+  let pendings = [];
   const myCids = (STATE.userDoc?.clienteIds || []).slice(0, 10);
   const myRole = STATE.userDoc?.role || '(sem role)';
   console.info('[Equipe] build', APP_BUILD, '· role:', myRole, '· clienteIds:', myCids, '· cid:', cid);
@@ -5786,6 +5787,19 @@ async function renderClientTeamAdmin(cid) {
       .filter(u => (u.clienteIds || []).includes(cid))
       .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
     console.info('[Equipe] ok ·', teamUsers.length, 'membros');
+    // Buscar pré-cadastros pendentes do mesmo restaurante (catch silencioso pra não quebrar a tela
+    // se a rule de list em pending_users der erro)
+    try {
+      const pendSnap = await getDocs(collection(db, 'pending_users'));
+      pendings = pendSnap.docs
+        .map(d => ({ slug: d.id, ...d.data() }))
+        .filter(p => Array.isArray(p.clienteIds) && p.clienteIds.includes(cid))
+        .filter(p => p.role === 'cliente_admin' || p.role === 'cliente_op');
+      console.info('[Equipe] pending_users ·', pendings.length);
+    } catch (e) {
+      console.warn('[Equipe] erro listando pending_users:', e?.code || e?.message);
+      pendings = [];
+    }
   } catch (err) {
     console.error('[Equipe] FALHOU:', err);
     app.innerHTML = '';
@@ -5853,9 +5867,12 @@ async function renderClientTeamAdmin(cid) {
 
   // Lista
   app.appendChild(el('h3', { class: 'section-title' }, `Equipe atual (${teamUsers.length})`));
-  if (teamUsers.length === 0) {
+  if (teamUsers.length === 0 && pendings.length === 0) {
     app.appendChild(el('div', { class: 'empty-state' }, el('p', { class: 'muted' }, 'Ainda não há ninguém na equipe.')));
     return;
+  }
+  if (teamUsers.length === 0 && pendings.length > 0) {
+    app.appendChild(el('div', { class: 'empty-state' }, el('p', { class: 'muted' }, 'Ninguém com acesso ativo ainda. Veja os pré-cadastros abaixo — eles aparecem aqui quando fizerem o primeiro login.')));
   }
   const grid = el('div', { class: 'user-admin-list' });
   teamUsers.forEach(u => {
@@ -5907,6 +5924,40 @@ async function renderClientTeamAdmin(cid) {
     grid.appendChild(card);
   });
   app.appendChild(grid);
+
+  // Pré-cadastros pendentes (pessoa convidada que ainda não fez login)
+  if (pendings.length > 0) {
+    app.appendChild(el('h3', { class: 'section-title', style: 'margin-top:2rem;' },
+      `Aguardando primeiro login (${pendings.length})`));
+    app.appendChild(el('p', { class: 'muted', style: 'margin:0 0 1rem;font-size:0.85rem;' },
+      'Essas pessoas foram pré-cadastradas e aparecem na equipe atual assim que fizerem o primeiro login. Você pode cancelar o convite a qualquer momento.'));
+    const pendGrid = el('div', { class: 'user-admin-list' });
+    pendings.forEach(p => {
+      const card = el('article', { class: 'user-card user-card-pending' });
+      card.appendChild(el('div', { class: 'user-card-head' },
+        el('div', { class: 'user-id' },
+          el('h4', { class: 'user-name' }, p.name || '—',
+            el('span', { class: 'pending-badge' }, '⏳ aguardando login')),
+          el('span', { class: 'user-email' }, p.email),
+          p.whatsapp ? el('span', { class: 'user-whatsapp' }, '📱 ' + p.whatsapp) : null
+        ),
+        el('span', { class: 'role-badge role-' + (p.role || 'none') }, roleLabel(p.role))
+      ));
+      const actions = el('div', { class: 'user-actions' },
+        el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
+          if (!confirm(`Cancelar o pré-cadastro de ${p.email}?\n\nA pessoa não vai mais conseguir entrar com esse acesso. Você pode pré-cadastrar de novo depois se quiser.`)) return;
+          try {
+            await deleteDoc(doc(db, 'pending_users', p.slug));
+            toast('Pré-cadastro cancelado');
+            renderClientTeamAdmin(cid);
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, 'Cancelar convite')
+      );
+      card.appendChild(actions);
+      pendGrid.appendChild(card);
+    });
+    app.appendChild(pendGrid);
+  }
 }
 
 function renderAdminEdit(cid, dishId) {

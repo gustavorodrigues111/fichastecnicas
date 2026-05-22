@@ -2673,6 +2673,11 @@ label.field textarea { min-height: 90px; resize: vertical; }
   letter-spacing: 0.02em;
   vertical-align: middle;
 }
+.user-card-pending {
+  background: #fefce8;
+  border-color: #fde68a;
+}
+.user-card-pending .user-name { color: #78350f; }
 .user-card-disabled {
   opacity: 0.6;
   background: #fafaf6 !important;
