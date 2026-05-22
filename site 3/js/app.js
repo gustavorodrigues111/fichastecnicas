@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0390';
+const APP_BUILD = '20260522-V2-0400';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2909,11 +2909,9 @@ function renderClienteHome(cid) {
     const cmvT = cmvTrend();
     const markupT = markupTrend();
 
-    // PREÇO DE VENDA + CUSTO — bloco compacto com labels
+    // PREÇO DE VENDA — bloco compacto com label em cima (na linha do nome do prato)
     let priceBlock = null;
     if (showCost) {
-      priceBlock = el('div', { class: 'dish-price-block' });
-      // Preço de venda (clicável pra editar)
       const priceBadgeInner = el('div', {
         class: 'dish-price-badge' + (canEditPrice ? ' is-editable' : ''),
         title: canEditPrice ? 'Clique pra editar preço, CMV e markup' : null
@@ -2924,15 +2922,10 @@ function renderClienteHome(cid) {
           openDishPriceEditor(cid, dish);
         });
       }
-      priceBlock.appendChild(el('div', { class: 'dish-price-row' },
+      priceBlock = el('div', { class: 'dish-price-row' },
         el('span', { class: 'dish-price-label' }, 'Preço de venda'),
         priceBadgeInner
-      ));
-      // Custo por porção — cor herdada do status do CMV
-      priceBlock.appendChild(el('div', { class: 'dish-price-row' },
-        el('span', { class: 'dish-price-label' }, 'Custo / porção'),
-        el('div', { class: 'dish-cost-badge dish-cost-' + cmvStatus }, fmtBRL(costInfo.costPerPortion))
-      ));
+      );
     }
 
     // CMV — badge inteiro abre histórico. Seta inline mostra direção da última variação.
@@ -2967,6 +2960,15 @@ function renderClienteHome(cid) {
       e.preventDefault(); e.stopPropagation();
       openPriceHistoryModal(dish);
     });
+
+    // CUSTO — badge na linha 2, mesma cor do CMV
+    const custoBadge = showCost ? el('span', {
+      class: 'dish-metric dish-metric-custo dish-metric-' + cmvStatus,
+      title: 'Custo por porção (derivado da ficha)'
+    },
+      el('span', { class: 'dish-metric-label' }, 'Custo'),
+      el('span', { class: 'dish-metric-value' }, fmtBRL(costInfo.costPerPortion))
+    ) : null;
     const summary = el('summary', { class: 'dish-head dish-summary v2' },
       el('div', { class: 'dish-summary-top' },
         el('span', { class: 'dish-chev' }, '▸'),
@@ -2976,7 +2978,7 @@ function renderClienteHome(cid) {
         ),
         priceBlock
       ),
-      showCost ? el('div', { class: 'dish-summary-bottom' }, cmvBadge, markupBadge) : null
+      showCost ? el('div', { class: 'dish-summary-bottom' }, custoBadge, cmvBadge, markupBadge) : null
     );
     dishGroup.appendChild(summary);
     const body = el('div', { class: 'dish-body' });
@@ -5835,16 +5837,23 @@ async function renderProducaoDetalhe(cid, planId) {
 }
 
 function openAddDishToPlanModal(cid) {
+  const selected = new Set(); // dishIds selecionados pra adicionar
   const modal = el('div', { class: 'modal' },
     el('div', { class: 'modal-overlay', onclick: () => modal.remove() })
   );
   const content = el('div', { class: 'modal-content modal-wide' },
-    el('h2', {}, 'Adicionar prato ao plano'),
-    el('p', { class: 'modal-subtitle' }, 'Selecione um prato. Você pode definir a quantidade depois.')
+    el('h2', {}, 'Adicionar pratos ao plano'),
+    el('p', { class: 'modal-subtitle' }, 'Selecione um ou mais pratos. As quantidades você define depois.')
   );
   const searchInput = el('input', { type: 'search', placeholder: 'Buscar prato...', class: 'copy-sf-search' });
   content.appendChild(searchInput);
   const list = el('div', { class: 'copy-sf-list' });
+  const confirmBtn = el('button', { class: 'btn btn-primary' }, 'Adicionar 0 pratos');
+  function updateConfirmBtn() {
+    const n = selected.size;
+    confirmBtn.textContent = n === 0 ? 'Selecione ao menos um prato' : `+ Adicionar ${n} prato${n === 1 ? '' : 's'}`;
+    confirmBtn.disabled = n === 0;
+  }
   function renderList() {
     list.innerHTML = '';
     const q = searchInput.value.toLowerCase().trim();
@@ -5856,24 +5865,23 @@ function openAddDishToPlanModal(cid) {
       const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
       const rend = finalSf?.rendimento || '—';
       const already = inPlan.has(dish.id);
+      const isSelected = selected.has(dish.id);
       const btn = el('button', {
-        class: 'copy-sf-item' + (already ? ' is-already-added' : ''),
+        class: 'copy-sf-item'
+          + (already ? ' is-already-added' : '')
+          + (isSelected ? ' is-selected' : ''),
         disabled: already ? '' : null,
+        type: 'button',
         onclick: already ? null : () => {
-          const finalR = getSfRendimento(finalSf);
-          PROD_PLAN.items.push({
-            dishId: dish.id,
-            targetQty: 0,
-            targetUnit: finalR.unit || '',
-            excludedSfIds: new Set()
-          });
-          prodPlanAutosave(cid);
-          modal.remove();
-          renderProducao(cid);
+          if (selected.has(dish.id)) selected.delete(dish.id);
+          else selected.add(dish.id);
+          renderList();
+          updateConfirmBtn();
         }
       },
         el('div', { class: 'copy-sf-item-name' }, dish.name,
-          already ? el('span', { class: 'copy-sf-added-badge' }, '✓ já no plano') : null
+          already ? el('span', { class: 'copy-sf-added-badge' }, '✓ já no plano') : null,
+          isSelected ? el('span', { class: 'copy-sf-selected-mark' }, '✓') : null
         ),
         el('div', { class: 'copy-sf-item-meta' }, `${(dish.sub_fichas || []).length} sub-fichas · rend. ${rend}`)
       );
@@ -5883,10 +5891,32 @@ function openAddDishToPlanModal(cid) {
     if (count === 0) list.appendChild(el('p', { class: 'muted' }, 'Nenhum prato encontrado.'));
   }
   renderList();
+  updateConfirmBtn();
   searchInput.addEventListener('input', renderList);
   content.appendChild(list);
+
+  confirmBtn.addEventListener('click', () => {
+    if (selected.size === 0) return;
+    selected.forEach(dishId => {
+      const dish = STATE.dishes.find(d => d.id === dishId);
+      if (!dish) return;
+      const finalSf = dish.sub_fichas[dish.sub_fichas.length - 1];
+      const finalR = getSfRendimento(finalSf);
+      PROD_PLAN.items.push({
+        dishId,
+        targetQty: 0,
+        targetUnit: finalR.unit || '',
+        excludedSfIds: new Set()
+      });
+    });
+    prodPlanAutosave(cid);
+    modal.remove();
+    renderProducao(cid);
+  });
+
   content.appendChild(el('div', { class: 'modal-actions' },
-    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar')
+    el('button', { class: 'btn', onclick: () => modal.remove() }, 'Cancelar'),
+    confirmBtn
   ));
   modal.appendChild(content);
   document.body.appendChild(modal);
@@ -6853,11 +6883,18 @@ function openVariationsModal(cid, insumo) {
   }
   renderVars();
   content.appendChild(varList);
-  content.appendChild(el('button', { class: 'btn btn-small', onclick: () => {
-    variations.push({ name: '', fc: 1 });
-    renderVars();
-    markDirty();
-  } }, '+ Adicionar variação'));
+  content.appendChild(el('button', {
+    class: 'btn btn-small',
+    type: 'button',
+    style: 'margin-top:0.5rem;',
+    onclick: (e) => {
+      e.preventDefault();
+      console.info('[variações] + Adicionar variação clicado. Total atual:', variations.length);
+      variations.push({ name: '', fc: 1 });
+      renderVars();
+      markDirty();
+    }
+  }, '+ Adicionar variação'));
   saveBtn = el('button', { class: 'btn btn-primary', onclick: async () => {
     // Valida: nomes únicos, FC válido
     const clean = variations
