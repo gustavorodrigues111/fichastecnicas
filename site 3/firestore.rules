@@ -85,11 +85,22 @@ service cloud.firestore {
     // ---------- users collection ----------
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isMaster());
-      // Bootstrap do master (auto-criação no primeiro login)
+      // Bootstrap do master (auto-criação no primeiro login do master email)
       allow create: if isSignedIn()
                     && request.auth.uid == uid
                     && request.resource.data.role == 'master'
                     && request.auth.token.email == 'gustavo@quibebe.com.br';
+      // Self-claim via pending_users: usuário pré-cadastrado pelo master cria seu
+      // próprio doc no primeiro login. Exige: email do token bate, role != master,
+      // marcado como claimedFromPending, e existe um pending_users com o slug
+      // referenciado (validação cruzada — não dá pra forjar sem pending real).
+      allow create: if isSignedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.role != 'master'
+                    && request.resource.data.claimedFromPending == true
+                    && request.resource.data.claimedFromPendingSlug is string
+                    && exists(/databases/$(database)/documents/pending_users/$(request.resource.data.claimedFromPendingSlug));
       // Self-update limitado: só o próprio user pode tirar mustChangePassword e setar passwordChangedAt
       allow update: if isSignedIn()
                     && request.auth.uid == uid

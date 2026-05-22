@@ -929,12 +929,19 @@ async function ensureUserDoc(user) {
         role: pData.role || 'cliente_op',
         clienteIds: pData.clienteIds || [],
         whatsapp: pData.whatsapp || '',
-        mustChangePassword: pData.mustChangePassword !== false, // default true
+        mustChangePassword: pData.mustChangePassword !== false,
         createdAt: serverTimestamp(),
-        claimedFromPending: true
+        claimedFromPending: true,
+        claimedFromPendingSlug: slug
       };
-      await setDoc(ref, newDoc);
-      // Apaga o pre-claim
+      try {
+        await setDoc(ref, newDoc);
+      } catch (err) {
+        console.error('Pending claim failed:', err);
+        STATE.userDoc = null;
+        STATE.userDocError = 'claim-failed: ' + (err.message || err.code);
+        return;
+      }
       try { await deleteDoc(pendingRef); } catch (e) { console.warn('delete pending:', e); }
       STATE.userDoc = { uid: user.uid, ...newDoc };
       return;
@@ -1270,11 +1277,22 @@ function renderLoginLanding() {
 function renderUnauthorized() {
   const app = $('#app');
   app.innerHTML = '';
-  app.appendChild(el('section', { class: 'login-landing' },
+  const email = STATE.user?.email || '';
+  const errorDetail = STATE.userDocError;
+  const box = el('section', { class: 'login-landing' },
     el('h1', {}, 'Sem acesso'),
     el('p', { class: 'subtitle' }, 'Sua conta existe mas ainda não foi autorizada por um administrador.'),
-    el('button', { class: 'btn', onclick: doLogout }, 'Sair')
-  ));
+    email ? el('p', { class: 'subtitle', style: 'font-family:DM Mono,monospace;font-size:0.85rem;color:var(--text3);' }, 'Logado como: ' + email) : null,
+    errorDetail
+      ? el('p', { class: 'subtitle', style: 'color:var(--danger);font-size:0.82rem;max-width:480px;margin:0 auto;' },
+          'Detalhe técnico: ' + errorDetail + '. Provavelmente as regras do Firestore precisam de redeploy. Avise o consultor.')
+      : null,
+    el('div', { style: 'display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap;' },
+      el('button', { class: 'btn', onclick: doLogout }, 'Sair'),
+      el('button', { class: 'btn btn-primary', onclick: () => location.reload() }, 'Tentar de novo')
+    )
+  );
+  app.appendChild(box);
 }
 
 function renderNoAccess() {
