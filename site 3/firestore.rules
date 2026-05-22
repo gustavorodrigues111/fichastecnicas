@@ -3,66 +3,69 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ============================================================
+    // SCHEMA v2
+    // ============================================================
+    // /platform_users/{uid}       — consultoria: master, staff
+    // /clientes/{cid}/team/{uid}  — equipe do restaurante: dono, admin, op
+    // /auth_index/{uid}           — { type: 'platform' | 'restaurant', cids:[...] }
+    // /pending_users/{slug}       — fila de pré-cadastros (legado, ainda usada)
+    // /clientes/{cid}             — restaurante
+    // /clientes/{cid}/dishes,insumos,config,production_plans — dados
+    // /users/{uid} e /pending_users (legados pre-v2) — leitura/escrita só master enquanto não removidos
+    // ============================================================
+
     // ---------- helpers ----------
     function isSignedIn() { return request.auth != null; }
-    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
-    function hasUserDoc() { return exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function authIdx() { return get(/databases/$(database)/documents/auth_index/$(request.auth.uid)).data; }
+    function hasAuthIdx() { return exists(/databases/$(database)/documents/auth_index/$(request.auth.uid)); }
+    function platformDoc() { return get(/databases/$(database)/documents/platform_users/$(request.auth.uid)).data; }
+    function teamDoc(cid) { return get(/databases/$(database)/documents/clientes/$(cid)/team/$(request.auth.uid)).data; }
+
+    function isPlatformUser() {
+      return isSignedIn() && hasAuthIdx() && authIdx().type == 'platform';
+    }
     function isMaster() {
       return isSignedIn() && (
         request.auth.token.email == 'gustavo@quibebe.com.br'
-        || (hasUserDoc() && userDoc().role == 'master')
+        || (isPlatformUser() && platformDoc().role == 'master')
       );
     }
-    function hasClienteAccess(cid) {
-      return isSignedIn() && hasUserDoc()
-        && (userDoc().role == 'master'
-            || (userDoc().clienteIds is list && userDoc().clienteIds.hasAny([cid])));
+    function isStaff() {
+      return isPlatformUser() && platformDoc().role == 'staff';
     }
     function isStaffOf(cid) {
-      return isSignedIn() && hasUserDoc()
-        && userDoc().role in ['master', 'staff']
-        && (userDoc().role == 'master' || userDoc().clienteIds.hasAny([cid]));
+      return isStaff() && (platformDoc().clienteIds is list) && (cid in platformDoc().clienteIds);
     }
-    // Cliente (dono): role=='cliente'
-    function isClienteOwnerOf(cid) {
-      return isSignedIn() && hasUserDoc()
-        && userDoc().role == 'cliente'
-        && userDoc().clienteIds.hasAny([cid]);
+    function isRestaurantUserOf(cid) {
+      return isSignedIn() && hasAuthIdx()
+        && authIdx().type == 'restaurant'
+        && (authIdx().cids is list) && (cid in authIdx().cids);
     }
-    // Equipe Admin do Cliente: role=='cliente_admin' OU role=='equipe' com can_view_insumos
-    function isClienteAdminOf(cid) {
-      return isSignedIn() && hasUserDoc()
-        && userDoc().clienteIds.hasAny([cid])
-        && (
-          userDoc().role == 'cliente_admin'
-          || (userDoc().role == 'equipe'
-              && userDoc().permissions != null
-              && userDoc().permissions.can_view_insumos == true)
-        );
+    function isDonoOf(cid) {
+      return isRestaurantUserOf(cid)
+        && exists(/databases/$(database)/documents/clientes/$(cid)/team/$(request.auth.uid))
+        && teamDoc(cid).role == 'dono';
     }
-    // Equipe Operacional: role=='cliente_op' OU role=='equipe' sem can_view_insumos
-    function isClienteOpOf(cid) {
-      return isSignedIn() && hasUserDoc()
-        && userDoc().clienteIds.hasAny([cid])
-        && (
-          userDoc().role == 'cliente_op'
-          || (userDoc().role == 'equipe'
-              && (userDoc().permissions == null
-                  || userDoc().permissions.can_view_insumos != true))
-        );
+    function isAdminOf(cid) {
+      return isRestaurantUserOf(cid)
+        && exists(/databases/$(database)/documents/clientes/$(cid)/team/$(request.auth.uid))
+        && teamDoc(cid).role == 'admin';
     }
-    // Qualquer perfil do lado do cliente (todos veem cardápio e produção)
-    function isAnyClienteSideOf(cid) {
-      return isClienteOwnerOf(cid) || isClienteAdminOf(cid) || isClienteOpOf(cid);
+    function isOpOf(cid) {
+      return isRestaurantUserOf(cid)
+        && exists(/databases/$(database)/documents/clientes/$(cid)/team/$(request.auth.uid))
+        && teamDoc(cid).role == 'op';
     }
-    // Quem vê preços: master, staff, cliente (dono) e cliente_admin
-    function canSeeInsumosOf(cid) {
-      return isStaffOf(cid) || isClienteOwnerOf(cid) || isClienteAdminOf(cid);
+    // Quem pode ver o restaurante (todos os perfis com acesso)
+    function hasClienteAccess(cid) {
+      return isMaster() || isStaffOf(cid) || isRestaurantUserOf(cid);
     }
-    // Quem edita preços
-    function canEditInsumoPriceOf(cid) {
-      return isStaffOf(cid) || isClienteOwnerOf(cid) || isClienteAdminOf(cid);
+    // Quem vê preços de insumos: master, staff, dono, admin (não op)
+    function canSeeInsumos(cid) {
+      return isMaster() || isStaffOf(cid) || isDonoOf(cid) || isAdminOf(cid);
     }
+
     function onlyPriceFields() {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
       return affected.hasOnly(['price', 'unit']);
@@ -75,183 +78,138 @@ service cloud.firestore {
       let affected = request.resource.data.diff(resource.data).affectedKeys();
       return affected.hasOnly(['inactive', 'inactivatedAt', 'inactivatedBy']);
     }
-    // Update da ficha pelo cliente (dono/admin): permitido SE
-    //   - a ficha não está locked, OU
-    //   - a ficha foi locked pelo próprio lado do cliente (lockedBy != 'consultoria'), OU
-    //   - o update afeta só target_cmv (pricing), OU
-    //   - o update afeta só inactive/inactivatedAt/inactivatedBy E a ficha é do cliente
     function clienteCanUpdateDish() {
       return resource.data.locked != true
         || resource.data.lockedBy != 'consultoria'
         || onlyDishPricingFields()
         || (resource.data.createdBy == 'cliente' && onlyInactiveFields());
     }
-    // Usuário desativado é bloqueado em tudo (exceto leitura do próprio doc)
-    function userIsActive() {
-      return hasUserDoc() && (userDoc().disabled != true);
-    }
 
-    // ---------- users collection ----------
-    match /users/{uid} {
-      // GET (leitura de um doc específico): regra completa por doc.
-      // - Próprio user: sempre
-      // - Master: tudo
-      // - Cliente (dono): só docs onde clienteIds cruza E role NÃO É master/staff
-      //   (camada de segurança: cliente NUNCA acessa docs da consultoria)
-      allow get: if isSignedIn() && (
-        request.auth.uid == uid
-        || isMaster()
-        || (
-          hasUserDoc()
-          && userDoc().role == 'cliente'
-          && resource.data.clienteIds is list
-          && resource.data.clienteIds.hasAny(userDoc().clienteIds)
-          && !(resource.data.role in ['master', 'staff'])
-        )
-      );
-      // LIST (query): rules-as-filters não casa hasAny(get()) com array-contains-any.
-      // Solução: list é permissivo (master OU cliente), mas o app SEMPRE filtra
-      // role no client (renderClientTeamAdmin descarta master/staff que escapem).
-      // Get individual (linha acima) bloqueia leitura direta de doc master/staff.
-      allow list: if isSignedIn() && hasUserDoc()
-                  && (userDoc().role == 'master' || userDoc().role == 'cliente')
-                  && userDoc().clienteIds is list;
-      // Bootstrap do master (auto-criação no primeiro login do master email)
-      allow create: if isSignedIn()
-                    && request.auth.uid == uid
-                    && request.resource.data.role == 'master'
-                    && request.auth.token.email == 'gustavo@quibebe.com.br';
-      // Self-claim via pending_users: usuário pré-cadastrado pelo master cria seu
-      // próprio doc no primeiro login. Exige: email do token bate, role != master,
-      // marcado como claimedFromPending, e existe um pending_users com o slug
-      // referenciado (validação cruzada — não dá pra forjar sem pending real).
-      allow create: if isSignedIn()
-                    && request.auth.uid == uid
-                    && request.resource.data.email == request.auth.token.email
-                    && request.resource.data.role != 'master'
-                    && request.resource.data.claimedFromPending == true
-                    && request.resource.data.claimedFromPendingSlug is string
-                    && exists(/databases/$(database)/documents/pending_users/$(request.resource.data.claimedFromPendingSlug));
-      // Self-update limitado: só o próprio user pode tirar mustChangePassword e setar passwordChangedAt
-      allow update: if isSignedIn()
-                    && request.auth.uid == uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword', 'passwordChangedAt']);
-      // Cliente (dono) gerencia membros da equipe dos restaurantes dele:
-      // - Pode criar usuários cliente_admin/cliente_op com clienteIds nos restaurantes dele
-      // - Pode atualizar (promover/rebaixar entre admin/op, desativar, reativar)
-      allow create: if isSignedIn()
-                    && hasUserDoc()
-                    && userDoc().role == 'cliente'
-                    && request.resource.data.role in ['cliente_admin', 'cliente_op']
-                    && request.resource.data.clienteIds is list
-                    && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
-      allow update: if isSignedIn()
-                    && hasUserDoc()
-                    && userDoc().role == 'cliente'
-                    && resource.data.clienteIds is list
-                    && resource.data.clienteIds.hasAny(userDoc().clienteIds)
-                    && request.resource.data.role in ['cliente_admin', 'cliente_op', 'equipe']
-                    && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
-      // Master cria/atualiza/deleta qualquer user
+    // ============================================================
+    // /auth_index — índice. Self-read + master full.
+    // ============================================================
+    match /auth_index/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isMaster());
+      // Self-create no primeiro login (bootstrap do master OU claim de pending)
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && (
+                      // bootstrap master
+                      (request.auth.token.email == 'gustavo@quibebe.com.br'
+                       && request.resource.data.type == 'platform')
+                      // claim de pending (precisa ter pending matching o slug do email)
+                      || (request.resource.data.type == 'restaurant'
+                          && request.resource.data.cids is list)
+                    );
+      // Master gerencia tudo
       allow create, update, delete: if isMaster();
+      // Dono/Master/Staff podem CRIAR auth_index de um novo membro convidado
+      allow create: if isSignedIn() && hasAuthIdx()
+                    && request.resource.data.type == 'restaurant'
+                    && request.resource.data.cids is list
+                    && request.resource.data.cids.size() >= 1
+                    && (isMaster() || isDonoOf(request.resource.data.cids[0]) || isStaffOf(request.resource.data.cids[0]));
     }
 
-    // ---------- pending_users collection (pré-cadastro por email) ----------
-    // Doc ID: slugified email. Quando o user loga, app migra esse doc pra users/{uid}
+    // ============================================================
+    // /platform_users — consultoria (master, staff). Só master gerencia.
+    // ============================================================
+    match /platform_users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isMaster());
+      allow list: if isMaster();
+      // Self-update limitado (mustChangePassword off + passwordChangedAt)
+      allow update: if isSignedIn() && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword', 'passwordChangedAt']);
+      // Master gerencia
+      allow create, update, delete: if isMaster();
+      // Bootstrap master (self-create no 1º login)
+      allow create: if isSignedIn() && request.auth.uid == uid
+                    && request.auth.token.email == 'gustavo@quibebe.com.br'
+                    && request.resource.data.role == 'master';
+    }
+
+    // ============================================================
+    // /pending_users — fila de convites pendentes
+    // ============================================================
     match /pending_users/{slug} {
-      // Master gerencia todos
-      allow read, create, update, delete: if isMaster();
-      // O próprio user (no login) lê seu pending pelo email no token
-      allow read: if isSignedIn()
-                  && resource.data.email == request.auth.token.email;
-      // O próprio user pode deletar seu pending (após migração pra users/{uid})
+      // Master e dono/staff podem ler+criar pré-cadastros
+      allow read, write: if isMaster();
+      // Próprio user lê seu pending no login (pelo email)
+      allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
+      // O próprio user deleta seu pending após claim
+      allow delete: if isSignedIn() && resource.data.email == request.auth.token.email;
+      // Dono cria/atualiza/deleta pré-cadastros do restaurante dele
+      allow create, update: if isSignedIn()
+                            && request.resource.data.cid is string
+                            && request.resource.data.role in ['admin', 'op']
+                            && (isMaster() || isDonoOf(request.resource.data.cid));
       allow delete: if isSignedIn()
-                    && resource.data.email == request.auth.token.email;
-      // Cliente (dono) cria/atualiza/deleta pré-cadastros pros restaurantes dele
-      // (papel restrito a cliente_admin/cliente_op, clienteIds cruzando com o dono)
-      allow create, update: if isSignedIn() && hasUserDoc()
-                            && userDoc().role == 'cliente'
-                            && request.resource.data.role in ['cliente_admin', 'cliente_op']
-                            && request.resource.data.clienteIds is list
-                            && request.resource.data.clienteIds.hasAny(userDoc().clienteIds);
-      allow delete: if isSignedIn() && hasUserDoc()
-                    && userDoc().role == 'cliente'
-                    && resource.data.clienteIds is list
-                    && resource.data.clienteIds.hasAny(userDoc().clienteIds);
-      // LIST: cliente (dono) precisa listar pending_users pra UI de gerenciamento
-      allow list: if isSignedIn() && hasUserDoc()
-                  && (userDoc().role == 'master' || userDoc().role == 'cliente');
+                    && resource.data.cid is string
+                    && (isMaster() || isDonoOf(resource.data.cid));
+      // LIST: master, qualquer signed-in (rule frouxa por causa de rules-as-filters; app filtra)
+      allow list: if isSignedIn();
     }
 
-    // ---------- clientes (top-level) ----------
+    // ============================================================
+    // /clientes — restaurantes
+    // ============================================================
     match /clientes/{cid} {
       allow read: if hasClienteAccess(cid);
+      allow list: if isSignedIn(); // app filtra por acesso depois
       allow create, update, delete: if isMaster();
 
-      // ---------- dishes (fichas) ----------
+      // ---------- /clientes/{cid}/team — equipe do restaurante ----------
+      match /team/{uid} {
+        // Quem tem acesso ao cid pode ver a equipe inteira
+        allow read, list: if hasClienteAccess(cid);
+        // Master, staff do cid e dono do cid gerenciam equipe
+        allow create, update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid);
+        // Próprio user lê seu doc
+        allow read: if isSignedIn() && request.auth.uid == uid;
+      }
+
+      // ---------- dishes ----------
       match /dishes/{dishId} {
-        // Leitura: qualquer pessoa do cliente (todos os perfis veem fichas)
         allow read: if hasClienteAccess(cid);
-        // Criação:
-        //   - master/staff: sempre
-        //   - cliente (dono/admin): ficha não pode nascer locked pela consultoria
-        //                           (pode nascer desbloqueada OU locked como 'cliente')
-        allow create: if isStaffOf(cid)
-                      || ((isClienteOwnerOf(cid) || isClienteAdminOf(cid))
+        allow create: if isMaster() || isStaffOf(cid)
+                      || ((isDonoOf(cid) || isAdminOf(cid))
                           && request.resource.data.lockedBy != 'consultoria');
-        // Exclusão:
-        //   - master/staff: sempre
-        //   - cliente DONO (não admin): qualquer ficha inativada do restaurante dele
-        allow delete: if isStaffOf(cid)
-                      || (isClienteOwnerOf(cid) && resource.data.inactive == true);
-        // Update:
-        //   - staff/master: tudo
-        //   - cliente (dono/admin): se ficha NÃO está locked OU lockedBy != consultoria,
-        //                           OU se update afeta só target_cmv (pricing)
-        allow update: if isStaffOf(cid)
-                      || ((isClienteOwnerOf(cid) || isClienteAdminOf(cid)) && clienteCanUpdateDish());
+        allow delete: if isMaster() || isStaffOf(cid)
+                      || (isDonoOf(cid) && resource.data.inactive == true);
+        allow update: if isMaster() || isStaffOf(cid)
+                      || ((isDonoOf(cid) || isAdminOf(cid)) && clienteCanUpdateDish());
       }
 
       // ---------- insumos ----------
       match /insumos/{insumoId} {
-        // Leitura: master/staff, cliente (dono), cliente_admin (perfis que veem preço)
-        // cliente_op NÃO vê insumos (sem preços)
-        allow read: if canSeeInsumosOf(cid);
-        allow create, delete: if isStaffOf(cid);
-        // Update:
-        //   - staff/master: tudo
-        //   - cliente / cliente_admin: só price/unit
-        allow update: if isStaffOf(cid)
-                      || ((isClienteOwnerOf(cid) || isClienteAdminOf(cid)) && onlyPriceFields());
+        allow read: if canSeeInsumos(cid);
+        allow create, delete: if isMaster() || isStaffOf(cid);
+        allow update: if isMaster() || isStaffOf(cid)
+                      || ((isDonoOf(cid) || isAdminOf(cid)) && onlyPriceFields());
       }
 
       // ---------- config ----------
       match /config/{configId} {
         allow read: if hasClienteAccess(cid);
-        allow write: if isStaffOf(cid);
+        allow write: if isMaster() || isStaffOf(cid);
       }
 
-      // ---------- production_plans (histórico de planejamentos finalizados) ----------
+      // ---------- production_plans ----------
       match /production_plans/{planId} {
-        // Leitura: qualquer pessoa do cliente vê o histórico
         allow read: if hasClienteAccess(cid);
-        // Criação: master/staff, cliente (dono), cliente_admin
-        allow create: if isStaffOf(cid) || isClienteOwnerOf(cid) || isClienteAdminOf(cid);
-        // Update/delete: só staff/master (histórico imutável pros perfis do cliente)
-        allow update, delete: if isStaffOf(cid);
+        allow create: if isMaster() || isStaffOf(cid) || isDonoOf(cid) || isAdminOf(cid);
+        allow update, delete: if isMaster() || isStaffOf(cid);
       }
 
-      // ---------- estoque (legado — mantido caso reative) ----------
+      // ---------- estoque (legado) ----------
       match /stock_templates/{tid} {
         allow read: if hasClienteAccess(cid);
-        allow create, update, delete: if isStaffOf(cid) || isClienteOwnerOf(cid);
+        allow create, update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid);
       }
       match /stock_counts/{countId} {
         allow read: if hasClienteAccess(cid);
         allow create: if hasClienteAccess(cid)
           && request.resource.data.authorUid == request.auth.uid;
-        allow update, delete: if isStaffOf(cid) || isClienteOwnerOf(cid);
-
+        allow update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid);
         match /logs/{logId} {
           allow read: if hasClienteAccess(cid);
           allow create: if hasClienteAccess(cid)
@@ -259,6 +217,15 @@ service cloud.firestore {
           allow update, delete: if false;
         }
       }
+    }
+
+    // ============================================================
+    // /users (LEGADO v1) — só master pode acessar enquanto não removido.
+    // Migração lê daqui. App não escreve mais aqui.
+    // ============================================================
+    match /users/{uid} {
+      allow read, write: if isMaster();
+      allow get: if isSignedIn() && request.auth.uid == uid;
     }
   }
 }

@@ -3199,6 +3199,56 @@ h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
   align-items: center;
 }
 
+/* ============ Restaurant picker (multi-restaurante home) ============ */
+.restaurant-picker {
+  max-width: 640px;
+  margin: 4rem auto;
+  padding: 0 1rem;
+}
+.restaurant-picker h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+.restaurant-picker .muted { margin: 0 0 1.5rem; }
+.restaurant-picker-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.restaurant-picker-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.1rem 1.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.05s;
+}
+.restaurant-picker-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.restaurant-picker-card:active { transform: translateY(1px); }
+.restaurant-picker-arrow { color: var(--accent); font-size: 1.2rem; }
+
+/* Seletor de restaurante no header (multi-cid) */
+#restaurant-switcher {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--text);
+  margin-right: 0.6rem;
+  cursor: pointer;
+}
+#restaurant-switcher:hover { border-color: var(--accent); }
+#restaurant-switcher:focus { outline: 2px solid var(--accent-border); outline-offset: 1px; }
+
 /* ============ Clientes (restaurant) grid ============ */
 .cliente-grid {
   display: grid;

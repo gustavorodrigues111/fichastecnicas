@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-0050';
+const APP_BUILD = '20260522-V2-0100';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -156,42 +156,53 @@ function scheduleSave(key, fn, delay = 700) {
   }, delay));
 }
 
-// ---------- Permission helpers ----------
-// Roles do sistema:
-//   master         — Gustavo. Cria/edita tudo. Único que cria clientes e Minha Equipe (staff).
-//   staff          — "Minha Equipe" (consultoria). Cria/edita fichas e preços nos restaurantes atribuídos.
-//   cliente        — Dono do restaurante. Vê tudo, edita preços, planeja produção, cria sua equipe.
-//                    Cria fichas próprias (desbloqueadas). Não edita fichas locked (criadas pela consultoria).
-//   cliente_admin  — Equipe administrativa do cliente. Vê preços, planeja produção. Não cria fichas.
-//   cliente_op     — Equipe operacional do cliente. Acessa fichas e planeja produção. Não vê preços.
-//   equipe (legado)— Mapeado dinamicamente pra cliente_admin (se via insumos) ou cliente_op.
-const isMaster = () => STATE.userDoc && (STATE.userDoc.role === 'master' || STATE.user?.email === MASTER_EMAIL);
-const isStaff = () => STATE.userDoc && STATE.userDoc.role === 'staff';
-const isClienteUser = () => STATE.userDoc && STATE.userDoc.role === 'cliente';
-const isClienteAdmin = () => STATE.userDoc && (STATE.userDoc.role === 'cliente_admin'
-  || (STATE.userDoc.role === 'equipe' && !!STATE.userDoc.permissions?.can_view_insumos));
-const isClienteOp = () => STATE.userDoc && (STATE.userDoc.role === 'cliente_op'
-  || (STATE.userDoc.role === 'equipe' && !STATE.userDoc.permissions?.can_view_insumos));
-// Compatibilidade: qualquer perfil de cliente (dono ou equipe)
-const isAnyClienteSide = () => isClienteUser() || isClienteAdmin() || isClienteOp();
+// ---------- Permission helpers (schema v2: platform_users + clientes/{cid}/team) ----------
+// STATE.userDoc carrega:
+//   - Platform: { uid, type:'platform', role:'master'|'staff', clienteIds:[cids que atende], name, email }
+//   - Restaurant: { uid, type:'restaurant', role:'dono'|'admin'|'op', cid:'<cid atual>',
+//                   cids:[todos cids que tem acesso], name, email, permissions, ... }
+const isPlatformUser = () => STATE.userDoc?.type === 'platform';
+const isRestaurantUser = () => STATE.userDoc?.type === 'restaurant';
+const isMaster = () => isPlatformUser() && STATE.userDoc.role === 'master';
+const isStaff = () => isPlatformUser() && STATE.userDoc.role === 'staff';
+const isDono = () => isRestaurantUser() && STATE.userDoc.role === 'dono';
+const isAdmin = () => isRestaurantUser() && STATE.userDoc.role === 'admin';
+const isOp = () => isRestaurantUser() && STATE.userDoc.role === 'op';
 
-const hasClientAccess = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
-const canViewCliente = (cid) => isMaster() || (STATE.userDoc?.clienteIds || []).includes(cid);
+// "Has access to this cid?"
+const hasClientAccess = (cid) => {
+  if (isMaster()) return true;
+  if (isStaff()) return (STATE.userDoc.clienteIds || []).includes(cid);
+  if (isRestaurantUser()) return (STATE.userDoc.cids || []).includes(cid);
+  return false;
+};
+const canViewCliente = (cid) => hasClientAccess(cid);
+
+// Versões com cid pra rules-like assertions
+const isDonoOf = (cid) => isDono() && (STATE.userDoc.cids || []).includes(cid);
+const isAdminOf = (cid) => isAdmin() && (STATE.userDoc.cids || []).includes(cid);
+const isOpOf = (cid) => isOp() && (STATE.userDoc.cids || []).includes(cid);
+
+// Aliases pra manter compatibilidade com código existente (não mexer no resto do app)
+const isClienteUser = isDono;
+const isClienteAdmin = isAdmin;
+const isClienteOp = isOp;
+const isAnyClienteSide = isRestaurantUser;
 
 // Edição de fichas (admin completo do restaurante): só master + staff
-const canEditCliente = (cid) => isMaster() || (isStaff() && (STATE.userDoc.clienteIds || []).includes(cid));
+const canEditCliente = (cid) => isMaster() || (isStaff() && hasClientAccess(cid));
 
-// Edição de preço de insumo: master, staff, cliente (dono), cliente_admin
+// Edição de preço de insumo: master, staff, dono, admin
 const canEditInsumoPrice = (cid) => canEditCliente(cid)
-  || ((isClienteUser() || isClienteAdmin()) && (STATE.userDoc.clienteIds || []).includes(cid));
+  || ((isDono() || isAdmin()) && hasClientAccess(cid));
 
 // Visualização das abas
 const canViewCardapio = (cid) => canViewCliente(cid); // todos veem o cardápio
-const canViewInsumosTab = (cid) => canViewCliente(cid) && (isMaster() || isStaff() || isClienteUser() || isClienteAdmin());
+const canViewInsumosTab = (cid) => canViewCliente(cid) && (isMaster() || isStaff() || isDono() || isAdmin());
 const canViewProducao = (cid) => canViewCliente(cid); // todos veem produção
 
 // Cliente (dono) gerencia equipe do próprio restaurante
-const canManageClientTeam = (cid) => isMaster() || (isClienteUser() && (STATE.userDoc.clienteIds || []).includes(cid));
+const canManageClientTeam = (cid) => isMaster() || isDonoOf(cid);
 
 // Edição de uma ficha específica (considera lock):
 //   - Ficha locked: só master, staff e — se locked pelo próprio lado do cliente — cliente (dono/admin)
@@ -200,9 +211,8 @@ const canManageClientTeam = (cid) => isMaster() || (isClienteUser() && (STATE.us
 function canEditDish(cid, dish) {
   if (!canViewCliente(cid)) return false;
   if (isMaster() || (isStaff() && hasClientAccess(cid))) return true;
-  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
+  if ((isDono() || isAdmin()) && hasClientAccess(cid)) {
     if (!dish || !dish.locked) return true;
-    // Ficha locked: só pode editar se o lock foi posto pelo lado do cliente (lockedBy !== 'consultoria')
     return dish.lockedBy && dish.lockedBy !== 'consultoria';
   }
   return false;
@@ -210,35 +220,31 @@ function canEditDish(cid, dish) {
 function canCreateDish(cid) {
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
-  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) return true;
+  if ((isDono() || isAdmin()) && hasClientAccess(cid)) return true;
   return false;
 }
 function canToggleDishLock(cid, dish) {
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
-  // Cliente (dono e admin) pode travar/destravar fichas que NÃO foram travadas pela consultoria
-  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
-    if (!dish) return true; // sem ficha (criação): ok
+  if ((isDono() || isAdmin()) && hasClientAccess(cid)) {
+    if (!dish) return true;
     return !dish.locked || (dish.lockedBy && dish.lockedBy !== 'consultoria');
   }
   return false;
 }
-// Inativação: admin/dono podem inativar fichas que o lado do cliente criou;
-// master/staff podem inativar qualquer ficha
 function canInactivateDish(cid, dish) {
   if (!dish) return false;
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
-  if ((isClienteUser() || isClienteAdmin()) && hasClientAccess(cid)) {
+  if ((isDono() || isAdmin()) && hasClientAccess(cid)) {
     return dish.createdBy === 'cliente';
   }
   return false;
 }
-// Exclusão definitiva: master/staff sempre; cliente DONO só ficha inativa (de qualquer origem)
 function canDeleteDish(cid, dish) {
   if (isMaster()) return true;
   if (isStaff() && hasClientAccess(cid)) return true;
-  if (isClienteUser() && hasClientAccess(cid)) {
+  if (isDono() && hasClientAccess(cid)) {
     return !!dish && dish.inactive === true;
   }
   return false;
@@ -248,11 +254,16 @@ const canManageUsers = () => isMaster();
 const canManageClientes = () => isMaster();
 
 const ROLE_LABELS = {
+  // Schema v2
   master: 'Master',
   staff: 'Minha Equipe',
-  cliente: 'Cliente (dono)',
-  cliente_admin: 'Equipe Admin do Cliente',
-  cliente_op: 'Equipe Operacional',
+  dono: 'Dono do restaurante',
+  admin: 'Admin (equipe do restaurante)',
+  op: 'Operacional (equipe do restaurante)',
+  // Aliases legados — mantidos pra docs antigos que ainda não migraram
+  cliente: 'Dono do restaurante',
+  cliente_admin: 'Admin (equipe do restaurante)',
+  cliente_op: 'Operacional (equipe do restaurante)',
   equipe: 'Equipe (legado)'
 };
 
@@ -489,13 +500,14 @@ function subscribeCliente(cid) {
 async function loadClientesList() {
   try {
     if (isMaster()) {
-      // Master: lista toda a coleção
       const snap = await getDocs(collection(db, 'clientes'));
       STATE.clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     } else {
-      // Staff/cliente: busca apenas os que estão em clienteIds (regras bloqueiam collection query)
-      const ids = STATE.userDoc?.clienteIds || [];
+      // Staff usa clienteIds (do platform_users). Restaurant user usa cids.
+      const ids = isStaff() ? (STATE.userDoc?.clienteIds || [])
+                : isRestaurantUser() ? (STATE.userDoc?.cids || [])
+                : [];
       if (ids.length === 0) { STATE.clientes = []; return; }
       const docs = await Promise.all(ids.map(id => getDoc(doc(db, 'clientes', id))));
       STATE.clientes = docs
@@ -509,6 +521,119 @@ async function loadClientesList() {
     toast('Erro ao listar restaurantes: ' + err.message);
   }
 }
+
+// =====================================================================
+// MIGRAÇÃO v1 → v2 (master-only, idempotente, NÃO destrutiva)
+// =====================================================================
+// - Move /users/{uid} pra /platform_users/{uid} OU /clientes/{cid}/team/{uid}
+// - Cria /auth_index/{uid} pra cada usuário migrado
+// - Atualiza /pending_users adicionando campo `cid` (string) baseado em clienteIds[0]
+// - NÃO deleta /users e /pending_users — backup. Limpeza manual depois.
+async function migrateUsersV2() {
+  if (!isMaster()) { alert('Só master pode rodar a migração'); return; }
+  if (!confirm('Iniciar migração v1 → v2?\n\nMove dados de /users pra /platform_users e /clientes/*/team. Cria /auth_index pra cada usuário. NÃO deleta nada — fica como backup.')) return;
+
+  const log = [];
+  const usersSnap = await getDocs(collection(db, 'users'));
+  const pendingsSnap = await getDocs(collection(db, 'pending_users')).catch(() => ({ docs: [] }));
+  log.push(`Lidos: ${usersSnap.docs.length} users, ${pendingsSnap.docs.length} pendings`);
+
+  let migrated = 0, skipped = 0, errors = 0;
+  for (const u of usersSnap.docs) {
+    const uid = u.id;
+    const data = u.data();
+    const role = data.role;
+    try {
+      if (role === 'master' || role === 'staff') {
+        await setDoc(doc(db, 'platform_users', uid), {
+          email: data.email,
+          name: data.name || data.email,
+          role,
+          clienteIds: data.clienteIds || [],
+          whatsapp: data.whatsapp || '',
+          mustChangePassword: !!data.mustChangePassword,
+          disabled: data.disabled === true ? true : false,
+          createdAt: data.createdAt || serverTimestamp(),
+          migratedFromV1: true
+        });
+        await setDoc(doc(db, 'auth_index', uid), { type: 'platform' });
+        log.push(`  ✓ ${data.email} → platform_users (${role})`);
+        migrated++;
+      } else {
+        // cliente / cliente_admin / cliente_op / equipe → team
+        const cids = Array.isArray(data.clienteIds) ? data.clienteIds : [];
+        if (cids.length === 0) {
+          log.push(`  ⚠ ${data.email} sem clienteIds — pulado`);
+          skipped++;
+          continue;
+        }
+        const newRole = role === 'cliente' ? 'dono'
+                      : role === 'cliente_admin' ? 'admin'
+                      : role === 'cliente_op' ? 'op'
+                      : role === 'equipe' ? (data.permissions?.can_view_insumos ? 'admin' : 'op')
+                      : 'op';
+        // Cria um doc em CADA cid que tiver no clienteIds
+        for (const cid of cids) {
+          await setDoc(doc(db, 'clientes', cid, 'team', uid), {
+            email: data.email,
+            name: data.name || data.email,
+            role: newRole,
+            whatsapp: data.whatsapp || '',
+            permissions: data.permissions || {},
+            mustChangePassword: !!data.mustChangePassword,
+            disabled: data.disabled === true ? true : false,
+            createdAt: data.createdAt || serverTimestamp(),
+            migratedFromV1: true
+          });
+        }
+        await setDoc(doc(db, 'auth_index', uid), {
+          type: 'restaurant',
+          cids
+        });
+        log.push(`  ✓ ${data.email} → team (${newRole}) em ${cids.join(', ')}`);
+        migrated++;
+      }
+    } catch (err) {
+      console.error('Migration error for', uid, err);
+      log.push(`  ✗ ${data.email}: ${err.message || err.code}`);
+      errors++;
+    }
+  }
+
+  // Migra pending_users adicionando campo `cid` (singular) e role v2
+  let pendMigrated = 0;
+  for (const p of pendingsSnap.docs) {
+    const slug = p.id;
+    const data = p.data();
+    try {
+      if (data.cid) continue; // já tem cid (já migrado)
+      const cids = Array.isArray(data.clienteIds) ? data.clienteIds : [];
+      const isPlat = data.role === 'master' || data.role === 'staff';
+      const newRole = data.role === 'cliente' ? 'dono'
+                    : data.role === 'cliente_admin' ? 'admin'
+                    : data.role === 'cliente_op' ? 'op'
+                    : data.role;
+      const patch = { role: newRole };
+      if (isPlat) {
+        patch.type = 'platform';
+      } else if (cids[0]) {
+        patch.cid = cids[0];
+        patch.type = 'restaurant';
+      }
+      await setDoc(doc(db, 'pending_users', slug), patch, { merge: true });
+      pendMigrated++;
+    } catch (err) {
+      log.push(`  ✗ pending ${slug}: ${err.message}`);
+    }
+  }
+  log.push(`Pendings atualizados: ${pendMigrated}`);
+  log.push(`\nResultado: ${migrated} migrados, ${skipped} pulados, ${errors} erros`);
+
+  console.log('[MIGRATE v2]\n' + log.join('\n'));
+  alert('Migração concluída!\n\n' + log.slice(-15).join('\n') + '\n\nVer console pra log completo.');
+}
+// Expor pro console
+if (typeof window !== 'undefined') window.migrateUsersV2 = migrateUsersV2;
 
 // ---------- Modal de editar cliente (nome, consultor, toggle) ----------
 function openEditClienteModal(cliente) {
@@ -933,55 +1058,178 @@ function openImportExcelModal(cid, clienteName) {
   document.body.appendChild(modal);
 }
 
-// ---------- Auth ----------
+// ---------- Auth (schema v2) ----------
+// Schema:
+//   /auth_index/{uid} → { type:'platform' } OR { type:'restaurant', cids:[cid1, cid2, ...] }
+//   /platform_users/{uid} → { role:'master'|'staff', clienteIds:[], ... }
+//   /clientes/{cid}/team/{uid} → { role:'dono'|'admin'|'op', ... }
 async function ensureUserDoc(user) {
-  const ref = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
-  if (snap.exists()) { STATE.userDoc = { uid: user.uid, ...snap.data() }; return; }
-  // Bootstrap: if matches master email, auto-create as master
-  if (user.email === MASTER_EMAIL) {
-    const d = { email: user.email, role: 'master', clienteIds: [], name: 'Master', createdAt: serverTimestamp() };
-    await setDoc(ref, d);
-    STATE.userDoc = { uid: user.uid, ...d };
-    return;
-  }
-  // Verifica se há pré-cadastro pendente com este email
-  try {
-    const slug = emailSlug(user.email);
-    const pendingRef = doc(db, 'pending_users', slug);
-    const pendingSnap = await getDoc(pendingRef);
-    if (pendingSnap.exists() && pendingSnap.data().email === user.email) {
-      const pData = pendingSnap.data();
-      const newDoc = {
-        email: user.email,
-        name: pData.name || user.email,
-        role: pData.role || 'cliente_op',
-        clienteIds: pData.clienteIds || [],
-        whatsapp: pData.whatsapp || '',
-        mustChangePassword: pData.mustChangePassword !== false,
-        createdAt: serverTimestamp(),
-        claimedFromPending: true,
-        claimedFromPendingSlug: slug
-      };
-      try {
-        await setDoc(ref, newDoc);
-      } catch (err) {
-        console.error('Pending claim failed:', err);
-        STATE.userDoc = null;
-        STATE.userDocError = 'claim-failed: ' + (err.message || err.code);
-        return;
-      }
-      try { await deleteDoc(pendingRef); } catch (e) { console.warn('delete pending:', e); }
-      STATE.userDoc = { uid: user.uid, ...newDoc };
+  STATE.userDocError = null;
+  // 1. Lê auth_index
+  const idxRef = doc(db, 'auth_index', user.uid);
+  let idxSnap;
+  try { idxSnap = await getDoc(idxRef); }
+  catch (err) { console.warn('[Auth v2] erro lendo auth_index:', err); STATE.userDoc = null; return; }
+
+  if (idxSnap.exists()) {
+    const idx = idxSnap.data();
+    if (idx.type === 'platform') {
+      const pSnap = await getDoc(doc(db, 'platform_users', user.uid));
+      if (!pSnap.exists()) { STATE.userDoc = null; STATE.userDocError = 'platform-user-missing'; return; }
+      STATE.userDoc = { uid: user.uid, type: 'platform', ...pSnap.data() };
       return;
     }
-  } catch (err) { console.warn('check pending_users:', err); }
+    if (idx.type === 'restaurant') {
+      // Pode ter múltiplos cids — carrega o primary (cids[0]) por padrão
+      const cids = Array.isArray(idx.cids) ? idx.cids : (idx.cid ? [idx.cid] : []);
+      if (cids.length === 0) { STATE.userDoc = null; STATE.userDocError = 'restaurant-no-cids'; return; }
+      // Lê o doc do primary restaurant
+      const primaryCid = cids[0];
+      const tSnap = await getDoc(doc(db, 'clientes', primaryCid, 'team', user.uid));
+      if (!tSnap.exists()) { STATE.userDoc = null; STATE.userDocError = 'team-doc-missing'; return; }
+      STATE.userDoc = {
+        uid: user.uid,
+        type: 'restaurant',
+        cid: primaryCid,
+        cids,
+        ...tSnap.data()
+      };
+      return;
+    }
+  }
+
+  // 2. Sem auth_index — primeiro login. 3 caminhos:
+  //   (a) bootstrap do master
+  //   (b) reivindicar pre-cadastro de equipe (team/{slug} com pending=true)
+  //   (c) fallback legacy: doc em /users/{uid} ou /pending_users/{slug} (compat com pré-v2)
+
+  // (a) Bootstrap master
+  if (user.email === MASTER_EMAIL) {
+    try {
+      await setDoc(doc(db, 'platform_users', user.uid), {
+        email: user.email, role: 'master', clienteIds: [], name: 'Master', createdAt: serverTimestamp()
+      });
+      await setDoc(idxRef, { type: 'platform' });
+      const pSnap = await getDoc(doc(db, 'platform_users', user.uid));
+      STATE.userDoc = { uid: user.uid, type: 'platform', ...pSnap.data() };
+      return;
+    } catch (err) {
+      console.error('[Auth v2] bootstrap master falhou:', err);
+      STATE.userDoc = null; STATE.userDocError = 'bootstrap-failed: ' + (err.message || err.code);
+      return;
+    }
+  }
+
+  // (b) Reivindicar pre-cadastro: procura em /clientes/*/team/{slug} com pending=true e email do token
+  const slug = emailSlug(user.email);
+  try {
+    const claimed = await claimPendingTeamMember(user, slug);
+    if (claimed) return;
+  } catch (err) { console.warn('[Auth v2] erro reivindicando team pending:', err); }
+
+  // (c) Fallback legacy — pré-migração, lê de /users e /pending_users
+  // (vai sumir depois da migração + cleanup)
+  try {
+    const legacyUserSnap = await getDoc(doc(db, 'users', user.uid));
+    if (legacyUserSnap.exists()) {
+      const data = legacyUserSnap.data();
+      console.warn('[Auth v2] LEGACY /users/{uid} ainda existe — rodar migração');
+      // Decifra role e mounta como se fosse v2 pra UI funcionar
+      const isPlat = data.role === 'master' || data.role === 'staff';
+      if (isPlat) {
+        STATE.userDoc = { uid: user.uid, type: 'platform', ...data };
+      } else {
+        const cids = Array.isArray(data.clienteIds) ? data.clienteIds : [];
+        const cidRole = data.role === 'cliente' ? 'dono'
+                      : data.role === 'cliente_admin' ? 'admin'
+                      : 'op';
+        STATE.userDoc = { uid: user.uid, type: 'restaurant', cid: cids[0] || null, cids, ...data, role: cidRole };
+      }
+      return;
+    }
+  } catch (err) { console.warn('[Auth v2] erro legacy users:', err); }
+
   STATE.userDoc = null;
+  STATE.userDocError = 'no-doc-found';
+}
+
+// Reivindica pré-cadastro: lê /pending_users/{slug}, se existe e email bate,
+// cria /clientes/{cid}/team/{uid} + /auth_index/{uid}, deleta o pending.
+async function claimPendingTeamMember(user, slug) {
+  const pendingRef = doc(db, 'pending_users', slug);
+  let pendingSnap;
+  try { pendingSnap = await getDoc(pendingRef); }
+  catch (err) { console.warn('[Auth v2] erro lendo pending:', err); return false; }
+  if (!pendingSnap.exists()) return false;
+  const pData = pendingSnap.data();
+  if (pData.email !== user.email) return false;
+
+  // O cid pode vir como string (v2) ou como clienteIds[0] (legado pré-v2)
+  const cid = pData.cid || (Array.isArray(pData.clienteIds) ? pData.clienteIds[0] : null);
+  if (!cid) { console.error('[Auth v2] pending sem cid:', pData); return false; }
+
+  // Mapeia role legada se necessário (cliente_admin/cliente_op → admin/op)
+  const role = pData.role === 'cliente_admin' ? 'admin'
+             : pData.role === 'cliente_op' ? 'op'
+             : pData.role || 'op';
+
+  const newTeamDoc = {
+    email: pData.email,
+    name: pData.name || user.email,
+    role,
+    whatsapp: pData.whatsapp || '',
+    permissions: pData.permissions || {},
+    mustChangePassword: pData.mustChangePassword !== false,
+    createdAt: serverTimestamp(),
+    claimedAt: new Date().toISOString(),
+    claimedFromPending: true
+  };
+  try {
+    await setDoc(doc(db, 'clientes', cid, 'team', user.uid), newTeamDoc);
+    await setDoc(doc(db, 'auth_index', user.uid), { type: 'restaurant', cids: [cid] });
+    try { await deleteDoc(pendingRef); } catch (e) { console.warn('delete pending:', e); }
+    STATE.userDoc = {
+      uid: user.uid,
+      type: 'restaurant',
+      cid,
+      cids: [cid],
+      ...newTeamDoc
+    };
+    console.info('[Auth v2] pending reivindicado em', cid, 'como', role);
+    return true;
+  } catch (err) {
+    console.error('[Auth v2] claim falhou:', err);
+    STATE.userDocError = 'claim-failed: ' + (err.message || err.code);
+    return false;
+  }
+}
+
+// Troca o restaurante ativo de um usuário com múltiplos cids
+async function switchActiveCid(targetCid) {
+  if (!isRestaurantUser()) return;
+  if (!(STATE.userDoc.cids || []).includes(targetCid)) {
+    console.error('[switch] usuário não tem acesso a', targetCid);
+    return;
+  }
+  if (STATE.userDoc.cid === targetCid) return;
+  // Recarrega o doc do team do novo cid
+  try {
+    const snap = await getDoc(doc(db, 'clientes', targetCid, 'team', STATE.user.uid));
+    if (!snap.exists()) { alert('Acesso ao restaurante perdido. Recarregue a página.'); return; }
+    STATE.userDoc = {
+      ...STATE.userDoc,
+      cid: targetCid,
+      ...snap.data()
+    };
+    location.hash = `#/c/${targetCid}`;
+  } catch (err) {
+    alert('Erro ao trocar restaurante: ' + (err.message || err.code));
+  }
 }
 
 // Modal: oferece pré-cadastro quando o email já existe no Firebase Auth mas não tem doc Firestore.
-// Quando a pessoa logar com a senha que ela já tem, o ensureUserDoc cria o doc automaticamente.
-async function offerPendingEnrollment({ email, name, role, clienteIds, whatsapp }) {
+// Schema v2: pending_users guarda { cid, role: 'admin'|'op' } (não mais clienteIds[]).
+async function offerPendingEnrollment({ email, name, role, cid, whatsapp }) {
   return new Promise((resolve) => {
     const existing = $('#pending-enroll-modal');
     if (existing) existing.remove();
@@ -990,9 +1238,9 @@ async function offerPendingEnrollment({ email, name, role, clienteIds, whatsapp 
       const slug = emailSlug(email);
       try {
         await setDoc(doc(db, 'pending_users', slug), {
-          email, name, role, clienteIds,
+          email, name, role, cid,
           whatsapp: whatsapp || '',
-          mustChangePassword: false, // já tem senha — não força troca
+          mustChangePassword: false,
           createdBy: STATE.user?.uid || 'master',
           createdAt: new Date().toISOString()
         });
@@ -1169,15 +1417,56 @@ function updateAuthUI() {
   updateBreadcrumb();
 }
 function updateBreadcrumb() {
-  const el = $('#brand-cliente');
-  if (!el) return;
+  const bcEl = $('#brand-cliente');
+  if (!bcEl) return;
   if (STATE.currentCliente && STATE.currentClienteId) {
-    el.textContent = ' · ' + STATE.currentCliente.name;
-    el.style.display = '';
+    bcEl.textContent = ' · ' + STATE.currentCliente.name;
+    bcEl.style.display = '';
+    // Adiciona seletor inline se usuário tem acesso a múltiplos restaurantes
+    refreshRestaurantSwitcher();
   } else {
-    el.textContent = '';
-    el.style.display = 'none';
+    bcEl.textContent = '';
+    bcEl.style.display = 'none';
+    const sw = $('#restaurant-switcher');
+    if (sw) sw.remove();
   }
+}
+
+// Seletor de restaurante no header — só aparece pra quem tem acesso a múltiplos cids
+function refreshRestaurantSwitcher() {
+  const existing = $('#restaurant-switcher');
+  if (existing) existing.remove();
+  const cids = isRestaurantUser() ? (STATE.userDoc.cids || [])
+             : isStaff() ? (STATE.userDoc.clienteIds || [])
+             : isMaster() ? STATE.clientes.map(c => c.id)
+             : [];
+  if (cids.length < 2) return;
+  const currentCid = STATE.currentClienteId;
+  const navEl = document.querySelector('.site-nav');
+  if (!navEl) return;
+  const select = document.createElement('select');
+  select.id = 'restaurant-switcher';
+  select.title = 'Trocar de restaurante';
+  cids.forEach(cid => {
+    const name = STATE.clientes.find(c => c.id === cid)?.name
+              || (cid === currentCid ? STATE.currentCliente?.name : null)
+              || cid;
+    const opt = document.createElement('option');
+    opt.value = cid;
+    opt.textContent = name;
+    if (cid === currentCid) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener('change', () => {
+    const next = select.value;
+    if (next === currentCid) return;
+    if (isRestaurantUser()) {
+      switchActiveCid(next);
+    } else {
+      location.hash = `#/c/${next}`;
+    }
+  });
+  navEl.insertBefore(select, navEl.firstChild);
 }
 
 // ---------- Router ----------
@@ -1225,11 +1514,12 @@ async function route() {
   // Bootstrap route '/'
   if (parts.length === 0) {
     if (isMaster() || isStaff()) { location.hash = '#/clientes'; return; }
-    // Qualquer perfil do lado do cliente (dono, admin, op) vai pro restaurante dele
-    if (isAnyClienteSide()) {
-      const cids = STATE.userDoc.clienteIds || [];
+    if (isRestaurantUser()) {
+      const cids = STATE.userDoc.cids || (STATE.userDoc.clienteIds || []);
       if (cids.length === 0) { renderNoAccess(); return; }
-      location.hash = `#/c/${cids[0]}`;
+      if (cids.length === 1) { location.hash = `#/c/${cids[0]}`; return; }
+      // Múltiplos restaurantes → mostra seletor
+      renderRestaurantPicker(cids);
       return;
     }
     console.error('[ROUTE] role desconhecida no boot:', STATE.userDoc?.role, 'uid:', STATE.user?.uid);
@@ -1341,6 +1631,35 @@ function renderUnauthorized() {
     )
   );
   app.appendChild(box);
+}
+
+// Seletor de restaurante (multi-cid): home picker quando pessoa tem acesso a vários
+async function renderRestaurantPicker(cids) {
+  const app = $('#app');
+  app.innerHTML = '';
+  renderLoadingScreen();
+  // Carrega nomes dos restaurantes
+  const items = [];
+  for (const cid of cids) {
+    try {
+      const snap = await getDoc(doc(db, 'clientes', cid));
+      items.push({ cid, name: snap.exists() ? (snap.data().name || cid) : cid });
+    } catch { items.push({ cid, name: cid }); }
+  }
+  app.innerHTML = '';
+  app.appendChild(el('section', { class: 'restaurant-picker' },
+    el('h1', {}, 'Em qual restaurante você quer entrar?'),
+    el('p', { class: 'muted' }, `Você tem acesso a ${items.length} restaurantes. Pode trocar a qualquer momento pelo seletor no topo da página.`),
+    el('div', { class: 'restaurant-picker-grid' },
+      ...items.map(it => {
+        const card = el('button', { class: 'restaurant-picker-card', onclick: () => switchActiveCid(it.cid) },
+          el('span', { class: 'restaurant-picker-name' }, it.name),
+          el('span', { class: 'restaurant-picker-arrow' }, '→')
+        );
+        return card;
+      })
+    )
+  ));
 }
 
 function renderNoAccess() {
@@ -1560,44 +1879,60 @@ async function renderUsuariosAdmin() {
   }
   const app = $('#app');
   renderLoadingScreen();
-  const [usersSnap, pendingSnap] = await Promise.all([
-    getDocs(collection(db, 'users')),
+  // Schema v2: tela "Usuários" mostra APENAS a consultoria (platform_users).
+  // Equipe dos restaurantes fica em /c/{cid}/equipe.
+  const [platformSnap, pendingSnap] = await Promise.all([
+    getDocs(collection(db, 'platform_users')).catch(() => ({ docs: [] })),
     getDocs(collection(db, 'pending_users')).catch(() => ({ docs: [] }))
   ]);
   await loadClientesList();
-  const users = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
-  const pendings = pendingSnap.docs.map(d => ({ slug: d.id, ...d.data() }));
+  const users = platformSnap.docs.map(d => ({ uid: d.id, ...d.data(), type: 'platform' }));
+  // Pendings da consultoria (type=platform). Pendings de restaurante aparecem na tela equipe.
+  const pendings = pendingSnap.docs
+    .map(d => ({ slug: d.id, ...d.data() }))
+    .filter(p => p.type === 'platform' || p.role === 'master' || p.role === 'staff');
   app.innerHTML = '';
 
   app.appendChild(el('a', { href: '#/clientes', class: 'back-link' }, '← Voltar'));
   app.appendChild(el('div', { class: 'page-header' },
     el('div', {},
-      el('h1', {}, 'Usuários'),
-      el('p', {}, 'Equipe e clientes. Papel define o que cada um pode fazer.')
+      el('h1', {}, 'Usuários da plataforma'),
+      el('p', {}, 'Consultoria — master e minha equipe. Equipe dos restaurantes está em cada restaurante (aba Equipe).')
     )
   ));
 
-  // Invite form — cleaner layout
+  // Link rápido pras equipes de cada restaurante
+  if (STATE.clientes.length > 0) {
+    const linksPanel = el('section', { class: 'admin-panel-card', style: 'margin-bottom:1.5rem;' },
+      el('h3', {}, 'Equipes dos restaurantes'),
+      el('p', { class: 'muted' }, 'A equipe interna de cada restaurante (dono, admin, op) é gerenciada dentro do próprio restaurante.')
+    );
+    const linkGrid = el('div', { class: 'cliente-chip-picker' });
+    STATE.clientes.forEach(c => {
+      const link = el('a', { class: 'cliente-chip-option', href: `#/c/${c.id}/equipe` },
+        document.createTextNode(c.name),
+        el('span', { class: 'muted', style: 'margin-left:0.4rem;font-size:0.75rem;' }, '→ Equipe')
+      );
+      linkGrid.appendChild(link);
+    });
+    linksPanel.appendChild(linkGrid);
+    app.appendChild(linksPanel);
+  }
+
+  // Invite form (só master/staff)
   const invitePanel = el('section', { class: 'admin-panel-card' },
-    el('h3', {}, 'Convidar novo usuário'),
-    el('p', { class: 'muted' }, 'Ao salvar, o sistema gera uma senha temporária. Você copia ou envia direto pelo WhatsApp. No primeiro login, a pessoa será obrigada a trocar a senha.')
+    el('h3', {}, 'Convidar membro da consultoria'),
+    el('p', { class: 'muted' }, 'Master tem acesso total. Equipe (staff) cria/edita fichas e preços nos restaurantes atribuídos.')
   );
 
   const nameInput = el('input', { type: 'text', placeholder: 'Nome completo', required: true });
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com', required: true });
   const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('optgroup', { label: 'Minha equipe (consultoria)' },
-      el('option', { value: 'master' }, 'Master — acesso total ao sistema'),
-      el('option', { value: 'staff' }, 'Equipe — cria/edita fichas e preços')
-    ),
-    el('optgroup', { label: 'Lado do cliente (restaurante)' },
-      el('option', { value: 'cliente' }, 'Cliente (dono) — edita preços e cria fichas próprias'),
-      el('option', { value: 'cliente_admin' }, 'Equipe Admin do Cliente — vê preços, planeja produção'),
-      el('option', { value: 'cliente_op' }, 'Equipe Operacional — só fichas e produção (sem preços)')
-    )
+    el('option', { value: 'staff' }, 'Equipe — cria/edita fichas e preços'),
+    el('option', { value: 'master' }, 'Master — acesso total ao sistema')
   );
-  roleSelect.value = 'cliente_op';
+  roleSelect.value = 'staff';
   const clienteChecks = el('div', { class: 'cliente-chip-picker' });
   STATE.clientes.forEach(c => {
     const input = el('input', { type: 'checkbox', value: c.id, id: 'inv-c-' + c.id });
@@ -1610,7 +1945,7 @@ async function renderUsuariosAdmin() {
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Papel'), roleSelect)
   ));
   invitePanel.appendChild(el('label', { class: 'field' },
-    el('span', { class: 'label-text' }, 'Restaurantes autorizados (obrigatório para Equipe e Cliente)'),
+    el('span', { class: 'label-text' }, 'Restaurantes que atende (Equipe = obrigatório selecionar pelo menos um. Master = acesso a todos.)'),
     clienteChecks
   ));
   const submitMasterBtn = el('button', { class: 'btn btn-primary' }, 'Criar usuário');
@@ -1623,12 +1958,12 @@ async function renderUsuariosAdmin() {
     const selected = $$('input[type=checkbox]:checked', clienteChecks).map(i => i.value);
     if (!name) { alert('Informe o nome'); return; }
     if (!email) { alert('Informe o email'); return; }
-    if (role !== 'master' && selected.length === 0) { alert('Selecione ao menos um restaurante'); return; }
+    if (role === 'staff' && selected.length === 0) { alert('Selecione ao menos um restaurante que o staff atende'); return; }
     submitMasterBtn.disabled = true;
     const orig = submitMasterBtn.textContent;
     submitMasterBtn.textContent = 'Criando...';
     try {
-      await inviteUser(email, name, role, selected, whatsapp);
+      await invitePlatformUser({ email, name, role, clienteIds: selected, whatsapp });
     } catch (err) {
       alert('Erro: ' + err.message);
     } finally {
@@ -1639,15 +1974,15 @@ async function renderUsuariosAdmin() {
   invitePanel.appendChild(el('div', { class: 'panel-actions' }, submitMasterBtn));
   app.appendChild(invitePanel);
 
-  // Pré-cadastros pendentes (esperando primeiro login)
+  // Pré-cadastros pendentes de consultoria
   if (pendings.length > 0) {
     app.appendChild(el('h3', { class: 'section-title' }, `Pré-cadastros pendentes (${pendings.length})`));
     app.appendChild(el('p', { class: 'muted', style: 'margin-bottom:1rem;font-size:0.88rem;' },
-      'Aguardando primeiro login da pessoa. Assim que ela entrar com o email + senha que já tem no Firebase, vira usuário ativo automaticamente.'
+      'Aguardando primeiro login. Quando a pessoa entrar com email + senha do Firebase, vira usuário ativo automaticamente.'
     ));
     const pendingGrid = el('div', { class: 'user-admin-list' });
     pendings.forEach(p => {
-      const card = el('article', { class: 'user-card' },
+      const card = el('article', { class: 'user-card user-card-pending' },
         el('div', { class: 'user-card-head' },
           el('div', { class: 'user-id' },
             el('h4', { class: 'user-name' }, p.name || '—',
@@ -1659,14 +1994,14 @@ async function renderUsuariosAdmin() {
         ),
         el('div', { class: 'user-actions' },
           el('button', { class: 'btn btn-small', onclick: async () => {
-            if (!confirm(`Enviar reset de senha para ${p.email}? A pessoa recebe um email pra criar nova senha.`)) return;
+            if (!confirm(`Enviar reset de senha para ${p.email}?`)) return;
             try {
               await sendPasswordResetEmail(auth, p.email);
               toast('Email de reset enviado');
             } catch (err) { alert('Erro: ' + (err.message || err.code)); }
           } }, '✉ Reset de senha'),
           el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
-            if (!confirm(`Cancelar o pré-cadastro de ${p.email}?\n\nIsso só apaga a "reserva" do nosso lado — não mexe na conta dela no Firebase.`)) return;
+            if (!confirm(`Cancelar o pré-cadastro de ${p.email}?`)) return;
             try {
               await deleteDoc(doc(db, 'pending_users', p.slug));
               toast('Pré-cadastro cancelado');
@@ -1680,24 +2015,19 @@ async function renderUsuariosAdmin() {
     app.appendChild(pendingGrid);
   }
 
-  // Existing users — agrupado por papel
-  app.appendChild(el('h3', { class: 'section-title' }, `Usuários cadastrados (${users.length})`));
+  // Lista de usuários da consultoria
+  app.appendChild(el('h3', { class: 'section-title' }, `Consultoria (${users.length})`));
   if (users.length === 0) {
     app.appendChild(el('div', { class: 'empty-state' },
-      el('p', { class: 'muted' }, 'Nenhum usuário ainda.')
+      el('p', { class: 'muted' }, 'Nenhum usuário da consultoria cadastrado.')
     ));
     return;
   }
 
-  // Resolve role efetivo (cliente_admin/op vs equipe legado)
-  function effectiveRole(u) {
-    if (u.role !== 'equipe') return u.role;
-    return u.permissions?.can_view_insumos ? 'cliente_admin' : 'cliente_op';
-  }
-  const roleOrder = ['master', 'staff', 'cliente', 'cliente_admin', 'cliente_op'];
+  const roleOrder = ['master', 'staff'];
   const groups = {};
   users.forEach(u => {
-    const r = effectiveRole(u) || 'outros';
+    const r = u.role || 'outros';
     if (!groups[r]) groups[r] = [];
     groups[r].push(u);
   });
@@ -1707,7 +2037,6 @@ async function renderUsuariosAdmin() {
 
   groupedIds.forEach(roleId => {
     const list = groups[roleId];
-    // ordena: ativos primeiro, depois desativados, ambos por nome
     list.sort((a, b) => {
       if (!!a.disabled !== !!b.disabled) return a.disabled ? 1 : -1;
       return (a.name || a.email || '').localeCompare(b.name || b.email || '', 'pt-BR');
@@ -1939,64 +2268,115 @@ function emailSlug(email) {
   return (email || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-async function inviteUser(email, name, role, clienteIds, whatsapp) {
-  // 1) Antes de criar no Auth, verifica se já existe doc Firestore com esse email (caso de soft-delete anterior)
-  try {
-    const existingSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-    if (!existingSnap.empty) {
-      const existingDoc = { uid: existingSnap.docs[0].id, ...existingSnap.docs[0].data() };
-      if (existingDoc.disabled) {
-        if (!confirm(`O email ${email} já tem conta no sistema (foi desativada antes).\n\nDeseja REATIVAR essa conta com os novos dados (nome, papel, restaurantes, WhatsApp)?\n\nA senha continuará a mesma que a pessoa já usava. Se ela esqueceu, use "Enviar reset de senha" depois.`)) return;
-        await setDoc(doc(db, 'users', existingDoc.uid), {
-          ...existingDoc,
-          name, role, clienteIds,
-          whatsapp: whatsapp || '',
-          disabled: deleteField(),
-          disabledAt: deleteField(),
-          reactivatedAt: new Date().toISOString()
-        }, { merge: true });
-        toast('Usuário reativado com novos dados');
-        refreshTeamView();
-        return;
-      } else {
-        alert(`Este email já tem conta ATIVA no sistema. Use o botão "Editar" no card do usuário para alterar dados, ou "Enviar reset de senha".`);
-        return;
-      }
-    }
-  } catch (err) { console.warn('check existing user:', err); }
+// =====================================================================
+// CONVITES — schema v2 (separados por destino)
+// =====================================================================
 
+// Cria conta no Firebase Auth (app secundário pra não trocar sessão do logado).
+// Retorna { uid, tempPw } se sucesso, { conflict: true } se email-already-in-use,
+// throw em outros erros.
+async function createAuthAccount(email) {
   const tempPw = generateTempPassword();
-  // Usa app secundário pra não afetar a sessão do master
   const secondaryApp = initializeApp(firebaseConfig, 'secondary-' + uid());
   const secondaryAuth = getAuth(secondaryApp);
-  let newUid = null;
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPw);
-    newUid = cred.user.uid;
+    const newUid = cred.user.uid;
     await signOut(secondaryAuth);
+    return { uid: newUid, tempPw };
   } catch (err) {
-    if (err.code === 'auth/email-already-in-use') {
-      // Email já existe no Auth (foi excluído definitivamente antes ou nunca teve doc).
-      // Em vez de bloquear, oferece pré-cadastrar via pending_users — quando a pessoa logar
-      // com a senha que já tem no Firebase, o sistema cria o doc users/{uid} automaticamente.
-      await offerPendingEnrollment({ email, name, role, clienteIds, whatsapp });
-      return;
-    }
-    if (err.code === 'auth/weak-password') {
-      alert('Senha muito fraca — tente de novo.');
-      return;
-    }
+    if (err.code === 'auth/email-already-in-use') return { conflict: true };
     throw err;
   }
-  await setDoc(doc(db, 'users', newUid), {
-    email, name, role, clienteIds,
-    whatsapp: whatsapp || '',
-    mustChangePassword: true,
-    createdAt: serverTimestamp()
-  });
+}
+
+// Convite de membro da CONSULTORIA (staff) — só master pode chamar.
+// Grava em /platform_users/{uid} + /auth_index/{uid}.
+async function invitePlatformUser({ email, name, role, clienteIds, whatsapp }) {
+  if (!isMaster()) { alert('Só master pode criar usuários da plataforma'); return; }
+  if (role !== 'staff' && role !== 'master') { alert('Role inválido pra plataforma'); return; }
+
+  const result = await createAuthAccount(email);
+  if (result.conflict) {
+    // Email já no Auth — pré-cadastra como platform (esquema: type=platform no pending)
+    return offerPlatformPendingEnrollment({ email, name, role, clienteIds, whatsapp });
+  }
+  await Promise.all([
+    setDoc(doc(db, 'platform_users', result.uid), {
+      email, name, role,
+      clienteIds: clienteIds || [],
+      whatsapp: whatsapp || '',
+      mustChangePassword: true,
+      createdAt: serverTimestamp()
+    }),
+    setDoc(doc(db, 'auth_index', result.uid), { type: 'platform' })
+  ]);
   toast('Usuário criado');
-  showInviteCredentialsModal({ name, email, password: tempPw, whatsapp });
+  showInviteCredentialsModal({ name, email, password: result.tempPw, whatsapp });
   refreshTeamView();
+}
+
+// Convite de membro da EQUIPE de UM restaurante específico — master ou dono daquele cid.
+// Grava em /clientes/{cid}/team/{uid} + /auth_index/{uid}.
+async function inviteTeamMember({ cid, email, name, role, whatsapp, permissions }) {
+  if (!isMaster() && !isDonoOf(cid)) { alert('Você não pode convidar pra esse restaurante'); return; }
+  if (role !== 'admin' && role !== 'op' && role !== 'dono') { alert('Role inválido pra equipe'); return; }
+
+  const result = await createAuthAccount(email);
+  if (result.conflict) {
+    return offerPendingEnrollment({ email, name, role, cid, whatsapp });
+  }
+  await Promise.all([
+    setDoc(doc(db, 'clientes', cid, 'team', result.uid), {
+      email, name, role,
+      whatsapp: whatsapp || '',
+      permissions: permissions || {},
+      mustChangePassword: true,
+      createdAt: serverTimestamp(),
+      invitedBy: STATE.user?.uid || null
+    }),
+    setDoc(doc(db, 'auth_index', result.uid), { type: 'restaurant', cids: [cid] })
+  ]);
+  toast('Membro adicionado à equipe');
+  showInviteCredentialsModal({ name, email, password: result.tempPw, whatsapp });
+  refreshTeamView();
+}
+
+// Pre-cadastro pra platform user (email já no Auth)
+async function offerPlatformPendingEnrollment({ email, name, role, clienteIds, whatsapp }) {
+  if (!confirm(`O email ${email} já existe no Firebase Auth. Deseja pré-cadastrar como ${role} (consultoria)?\n\nQuando a pessoa logar com a senha dela, o sistema vincula automaticamente.`)) return;
+  const slug = emailSlug(email);
+  try {
+    await setDoc(doc(db, 'pending_users', slug), {
+      email, name, role,
+      type: 'platform',
+      clienteIds: clienteIds || [],
+      whatsapp: whatsapp || '',
+      mustChangePassword: false,
+      createdBy: STATE.user?.uid || 'master',
+      createdAt: new Date().toISOString()
+    });
+    toast('Pré-cadastro de consultoria salvo');
+    showPreClaimSuccessModal(email, name);
+    refreshTeamView();
+  } catch (err) { alert('Erro ao pré-cadastrar: ' + (err.message || err.code)); }
+}
+
+// Shim de compatibilidade — código antigo ainda chama inviteUser(email, name, role, clienteIds, whatsapp)
+// Detecta o tipo pelo role e roteia.
+async function inviteUser(email, name, role, clienteIds, whatsapp) {
+  // Master/staff → platform; cliente/admin/op (e legados) → team de um restaurante
+  if (role === 'master' || role === 'staff') {
+    return invitePlatformUser({ email, name, role, clienteIds, whatsapp });
+  }
+  // Mapeia roles legados → v2
+  const v2role = role === 'cliente' ? 'dono'
+               : role === 'cliente_admin' ? 'admin'
+               : role === 'cliente_op' ? 'op'
+               : role;
+  const cid = (clienteIds && clienteIds[0]) || STATE.currentCliente?.id;
+  if (!cid) { alert('Selecione o restaurante antes de convidar'); return; }
+  return inviteTeamMember({ cid, email, name, role: v2role, whatsapp });
 }
 
 // Modal com credenciais geradas — admin copia ou envia pelo WhatsApp
@@ -5784,48 +6164,29 @@ async function renderClientTeamAdmin(cid) {
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   renderLoadingScreen();
-  // Cliente comum não pode listar TODA a collection users.
-  // A regra do Firestore exige resource.data.clienteIds.hasAny(userDoc().clienteIds),
-  // então a QUERY tem que usar array-contains-any com o MESMO array — caso contrário
-  // a regra "as filter" não casa e o Firestore rejeita.
+  // Schema v2: lê de /clientes/{cid}/team (escopo pelo PATH) — sem mais filtros frágeis
   let teamUsers = [];
   let pendings = [];
-  const myCids = (STATE.userDoc?.clienteIds || []).slice(0, 10);
   const myRole = STATE.userDoc?.role || '(sem role)';
-  console.info('[Equipe] build', APP_BUILD, '· role:', myRole, '· clienteIds:', myCids, '· cid:', cid);
+  console.info('[Equipe v2] build', APP_BUILD, '· role:', myRole, '· cid:', cid);
   try {
-    let q;
-    if (isMaster()) {
-      q = collection(db, 'users');
-    } else {
-      if (!myCids.length) throw new Error('Seu usuário não tem restaurantes vinculados (clienteIds vazio).');
-      q = query(collection(db, 'users'), where('clienteIds', 'array-contains-any', myCids));
-    }
-    const snap = await getDocs(q);
-    const rawUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-    // SEGURANÇA: filtragem em duas etapas. (1) Defensiva: descarta master/staff
-    // que possam escapar do filtro da query — cliente_dono NÃO deve ver consultoria
-    // em nenhuma hipótese. (2) Funcional: matchea cid + role da equipe.
-    const leakedConsultoria = rawUsers.filter(u => u.role === 'master' || u.role === 'staff');
-    if (leakedConsultoria.length > 0 && !isMaster()) {
-      console.error('[SECURITY] cliente_dono recebeu', leakedConsultoria.length, 'doc(s) de consultoria via list — descartados no client. Investigue a rule.');
-    }
-    teamUsers = rawUsers
-      .filter(u => u.role !== 'master' && u.role !== 'staff')
-      .filter(u => (u.clienteIds || []).includes(cid))
-      .filter(u => u.role === 'cliente_admin' || u.role === 'cliente_op' || u.role === 'equipe');
-    console.info('[Equipe] ok ·', teamUsers.length, 'membros');
-    // Buscar pré-cadastros pendentes do mesmo restaurante (catch silencioso pra não quebrar a tela
-    // se a rule de list em pending_users der erro)
+    const snap = await getDocs(collection(db, 'clientes', cid, 'team'));
+    teamUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    console.info('[Equipe v2] ok ·', teamUsers.length, 'membros');
+    // Pré-cadastros do restaurante (pending_users com cid==cid OU clienteIds.includes(cid) pra compat)
     try {
       const pendSnap = await getDocs(collection(db, 'pending_users'));
       pendings = pendSnap.docs
         .map(d => ({ slug: d.id, ...d.data() }))
-        .filter(p => Array.isArray(p.clienteIds) && p.clienteIds.includes(cid))
-        .filter(p => p.role === 'cliente_admin' || p.role === 'cliente_op');
-      console.info('[Equipe] pending_users ·', pendings.length);
+        .filter(p => {
+          if (p.cid === cid) return true; // v2
+          if (Array.isArray(p.clienteIds) && p.clienteIds.includes(cid)) return true; // legado
+          return false;
+        })
+        .filter(p => p.type !== 'platform'); // exclui pre-cadastros de consultoria
+      console.info('[Equipe v2] pending_users ·', pendings.length);
     } catch (e) {
-      console.warn('[Equipe] erro listando pending_users:', e?.code || e?.message);
+      console.warn('[Equipe v2] erro listando pending_users:', e?.code || e?.message);
       pendings = [];
     }
   } catch (err) {
@@ -5870,8 +6231,8 @@ async function renderClientTeamAdmin(cid) {
   const emailInput = el('input', { type: 'email', placeholder: 'email@exemplo.com' });
   const whatsInput = el('input', { type: 'tel', placeholder: '(11) 91234-5678' });
   const roleSelect = el('select', {},
-    el('option', { value: 'cliente_op' }, 'Equipe Operacional — acessa fichas e produção'),
-    el('option', { value: 'cliente_admin' }, 'Equipe Admin — vê preços, planeja produção')
+    el('option', { value: 'op' }, 'Operacional — acessa fichas e produção'),
+    el('option', { value: 'admin' }, 'Admin — vê preços, planeja produção')
   );
   invitePanel.appendChild(el('div', { class: 'form-grid' },
     el('label', { class: 'field' }, el('span', { class: 'label-text' }, 'Nome'), nameInput),
@@ -5929,31 +6290,35 @@ async function renderClientTeamAdmin(cid) {
       el('span', { class: 'role-badge role-' + (u.role || 'none') }, roleLabel(u.role))
     ));
     const actions = el('div', { class: 'user-actions' });
+    const teamDocRef = doc(db, 'clientes', cid, 'team', u.uid);
     if (isMe) actions.appendChild(el('span', { class: 'muted' }, '(você)'));
     else if (u.disabled) {
       actions.appendChild(el('button', { class: 'btn btn-small btn-primary', onclick: async () => {
         try {
-          await setDoc(doc(db, 'users', u.uid), { disabled: deleteField(), disabledAt: deleteField(), reactivatedAt: new Date().toISOString() }, { merge: true });
+          await setDoc(teamDocRef, { disabled: deleteField(), disabledAt: deleteField(), reactivatedAt: new Date().toISOString() }, { merge: true });
           toast('Reativado');
           renderClientTeamAdmin(cid);
         } catch (err) { alert('Erro: ' + (err.message || err.code)); }
       } }, '↻ Reativar'));
     } else {
-      // Toggle entre admin e op
-      const otherRole = u.role === 'cliente_admin' ? 'cliente_op' : 'cliente_admin';
-      const otherLabel = otherRole === 'cliente_admin' ? 'Promover a Admin' : 'Rebaixar para Operacional';
-      actions.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
-        if (!confirm(`Mudar ${u.email} para "${roleLabel(otherRole)}"?`)) return;
-        try {
-          await setDoc(doc(db, 'users', u.uid), { role: otherRole }, { merge: true });
-          toast('Papel alterado');
-          renderClientTeamAdmin(cid);
-        } catch (err) { alert('Erro: ' + (err.message || err.code)); }
-      } }, otherLabel));
+      // Toggle entre admin e op (não mexe em dono)
+      if (u.role === 'admin' || u.role === 'op' || u.role === 'cliente_admin' || u.role === 'cliente_op') {
+        const isAdminRole = u.role === 'admin' || u.role === 'cliente_admin';
+        const otherRole = isAdminRole ? 'op' : 'admin';
+        const otherLabel = otherRole === 'admin' ? 'Promover a Admin' : 'Rebaixar para Operacional';
+        actions.appendChild(el('button', { class: 'btn btn-small', onclick: async () => {
+          if (!confirm(`Mudar ${u.email} para "${roleLabel(otherRole)}"?`)) return;
+          try {
+            await setDoc(teamDocRef, { role: otherRole }, { merge: true });
+            toast('Papel alterado');
+            renderClientTeamAdmin(cid);
+          } catch (err) { alert('Erro: ' + (err.message || err.code)); }
+        } }, otherLabel));
+      }
       actions.appendChild(el('button', { class: 'btn btn-small btn-danger', onclick: async () => {
         if (!confirm(`Desativar ${u.email}? Pode reativar depois.`)) return;
         try {
-          await setDoc(doc(db, 'users', u.uid), { disabled: true, disabledAt: new Date().toISOString() }, { merge: true });
+          await setDoc(teamDocRef, { disabled: true, disabledAt: new Date().toISOString() }, { merge: true });
           toast('Desativado');
           renderClientTeamAdmin(cid);
         } catch (err) { alert('Erro: ' + (err.message || err.code)); }
