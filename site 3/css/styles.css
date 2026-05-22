@@ -2349,22 +2349,47 @@ table.insumos-table {
 .admin-panel h2 { margin-top: 0; }
 .dish-admin-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 1rem;
 }
 .dish-admin-item {
   background: var(--bg);
   border: 1px solid var(--border);
-  padding: 1rem 1.25rem;
+  border-radius: var(--r-md);
+  padding: 0.9rem 1rem;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.6rem;
 }
-.dish-admin-item .info { flex: 1; min-width: 0; }
-.dish-admin-item .info h4 { margin: 0 0 0.2rem 0; font-family: inherit; }
-.dish-admin-item .info p { margin: 0; font-size: 0.8rem; color: #888; }
-.dish-admin-actions { display: flex; gap: 0.4rem; }
+.dish-admin-item .info { min-width: 0; }
+.dish-admin-item .info h4 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.dish-admin-item .info p {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #888;
+}
+.dish-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+.dish-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border);
+}
+.dish-admin-actions .btn-small { font-size: 0.72rem; padding: 0.35rem 0.6rem; }
 
 /* Form */
 .form-grid {
@@ -2656,15 +2681,18 @@ label.field textarea { min-height: 90px; resize: vertical; }
 
 /* Lock de fichas */
 .lock-badge {
-  display: inline-block;
-  margin-left: 0.6rem;
+  display: inline-flex;
+  align-items: center;
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  vertical-align: middle;
+  line-height: 1.4;
+  white-space: nowrap;
 }
+/* Quando aparecer "solto" (fora de .dish-badges), ainda dá um respiro */
+h4 > .lock-badge, h3 > .lock-badge, h2 > .lock-badge { margin-left: 0.5rem; }
 .lock-by-master { background: #efece4; color: #8a6b40; }
 .lock-by-consultor { background: #fbd8d5; color: #a31e1e; }
 .lock-by-cliente { background: #dde9ff; color: #1d4ed8; }
@@ -4269,16 +4297,23 @@ label.field textarea { min-height: 90px; resize: vertical; }
 
   /* Admin page */
   .admin-panel { padding: 1.25rem; }
-  .dish-admin-list { grid-template-columns: 1fr; }
-  .dish-admin-item {
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    padding: 1rem;
-  }
+  .dish-admin-list { grid-template-columns: 1fr; gap: 0.75rem; }
+  .dish-admin-item { padding: 0.85rem 0.95rem; gap: 0.5rem; }
+  .dish-admin-item .info h4 { font-size: 0.92rem; }
+  .dish-admin-item .info p { font-size: 0.74rem; }
+  .dish-badges { gap: 0.3rem; }
+  .lock-badge { font-size: 0.62rem; padding: 2px 6px; }
   .dish-admin-actions {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .dish-admin-actions .btn-small {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.7rem;
+    padding: 0.35rem 0.55rem;
   }
 
   /* Admin edit: stack ingredient row */

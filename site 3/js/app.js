@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260521-2305';
+const APP_BUILD = '20260521-2310';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -5644,13 +5644,14 @@ function renderAdminList(cid) {
       }
     }
 
+    const badges = [];
+    if (isInactive) badges.push(el('span', { class: 'lock-badge lock-inactive', title: 'Ficha inativada — não aparece no cardápio nem no plano' }, '⊘ inativa'));
+    if (!isInactive && showLockedByConsultorBadge) badges.push(el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 consultor'));
+    if (!isInactive && lockedByCliente) badges.push(el('span', { class: 'lock-badge lock-by-cliente', title: 'Bloqueada pelo administrador do restaurante' }, '🔒 administrador'));
     const item = el('div', { class: 'dish-admin-item' + (dish.locked ? ' dish-locked' : '') + (isInactive ? ' dish-inactive' : '') },
       el('div', { class: 'info' },
-        el('h4', {}, dish.name,
-          isInactive ? el('span', { class: 'lock-badge lock-inactive', title: 'Ficha inativada — não aparece no cardápio nem no plano' }, '⊘ inativa') : null,
-          !isInactive && showLockedByConsultorBadge ? el('span', { class: 'lock-badge lock-by-consultor', title: 'Bloqueada para edição pela consultoria' }, '🔒 bloqueada pelo consultor') : null,
-          !isInactive && lockedByCliente ? el('span', { class: 'lock-badge lock-by-cliente', title: 'Bloqueada pelo administrador do restaurante' }, '🔒 bloqueada pelo administrador') : null
-        ),
+        el('h4', {}, dish.name),
+        badges.length ? el('div', { class: 'dish-badges' }, ...badges) : null,
         el('p', {}, `${(dish.sub_fichas || []).length} sub-fichas · ${dish.photos?.length || 0} fotos`)
       ),
       el('div', { class: 'dish-admin-actions' },
