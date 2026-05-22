@@ -2561,7 +2561,7 @@ function renderFicha(cid, dishId, initialSfId = null) {
 
   if (dish.photos && dish.photos.length) {
     const gallery = el('div', { class: 'gallery' });
-    dish.photos.forEach(p => gallery.appendChild(el('div', { class: 'photo' }, el('img', { src: p }))));
+    dish.photos.forEach(p => gallery.appendChild(el('div', { class: 'photo' }, el('img', { src: p, loading: 'lazy', decoding: 'async' }))));
     app.appendChild(gallery);
   }
 
@@ -5591,7 +5591,7 @@ function renderAdminEdit(cid, dishId) {
       const photo = dish.photos[i];
       const slot = el('label', { class: 'photo-slot' });
       if (photo) {
-        slot.appendChild(el('img', { src: photo }));
+        slot.appendChild(el('img', { src: photo, loading: 'lazy', decoding: 'async' }));
         slot.appendChild(el('button', { class: 'remove', onclick: e => { e.preventDefault(); dish.photos.splice(i, 1); renderPhotos(); } }, '×'));
       } else {
         slot.appendChild(document.createTextNode('+ foto'));

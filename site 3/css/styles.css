@@ -73,6 +73,22 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 p { margin: 0 0 1rem 0; }
 a { color: inherit; text-decoration: none; }
 
+/* ============ Performance: skip render de elementos fora da viewport ============ */
+/* content-visibility: auto faz o browser pular paint/layout de elementos não visíveis.
+   contain-intrinsic-size reserva o espaço pra evitar scroll jump. */
+.sf-card,
+.dish-admin-item,
+.copy-sf-item,
+.user-card,
+.prod-item,
+.historico-card,
+.cliente-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 200px;
+}
+/* Imagens decodificam assíncrono */
+img { content-visibility: auto; }
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
