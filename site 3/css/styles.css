@@ -3656,61 +3656,6 @@ label.field textarea { min-height: 90px; resize: vertical; }
 }
 
 /* ============ Update from file modal — opções ============ */
-.update-options-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  margin: 1rem 0 0;
-}
-.upd-opt {
-  display: flex;
-  gap: 0.85rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.upd-opt:hover { border-color: var(--accent); }
-.upd-opt input[type=radio] {
-  margin-top: 0.25rem;
-  cursor: pointer;
-}
-.upd-opt:has(input:checked) {
-  background: var(--bg);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.upd-opt-body { flex: 1; min-width: 0; }
-.upd-opt-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.3rem;
-  flex-wrap: wrap;
-}
-.upd-opt-icon { font-size: 1rem; }
-.upd-opt-label {
-  font-family: inherit;
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-.upd-opt-tag {
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 0.15rem 0.45rem;
-  background: var(--border);
-  color: #555;
-  font-weight: 600;
-}
-.upd-opt-tag.warn { background: #f4d4c4; color: #a63a2a; }
-.upd-opt-desc {
-  font-size: 0.85rem;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
-}
 
 /* ============ Edit user modal wide ============ */
 .modal-content-wide { max-width: 560px; }
@@ -4466,10 +4411,6 @@ label.field textarea { min-height: 90px; resize: vertical; }
 
   /* Breadcrumb no header — compacta em telas pequenas */
   .brand-cliente { font-size: 0.7rem; margin-left: 0.2rem; display: none; }
-
-  /* Update from file modal */
-  .upd-opt { padding: 0.75rem; flex-direction: column; gap: 0.4rem; }
-  .upd-opt-label { font-size: 1.05rem; }
 
   /* Admin panels mobile */
   .admin-panel-card { padding: 1.25rem 1.1rem; }
