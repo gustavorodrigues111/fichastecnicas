@@ -5681,13 +5681,20 @@ async function renderClientTeamAdmin(cid) {
   app.innerHTML = '';
   app.appendChild(renderClienteContext(cid));
   renderLoadingScreen();
-  // Cliente comum não pode listar TODA a collection users — usa query filtrada
-  // (a Firestore rule permite quando o doc retornado tem clienteIds em comum)
+  // Cliente comum não pode listar TODA a collection users.
+  // A regra do Firestore exige resource.data.clienteIds.hasAny(userDoc().clienteIds),
+  // então a QUERY tem que usar array-contains-any com o MESMO array — caso contrário
+  // a regra "as filter" não casa e o Firestore rejeita.
   let teamUsers = [];
   try {
-    const q = isMaster()
-      ? collection(db, 'users')
-      : query(collection(db, 'users'), where('clienteIds', 'array-contains', cid));
+    let q;
+    if (isMaster()) {
+      q = collection(db, 'users');
+    } else {
+      const myCids = (STATE.userDoc?.clienteIds || []).slice(0, 10); // array-contains-any limita a 10
+      if (!myCids.length) throw new Error('Seu usuário não tem restaurantes vinculados.');
+      q = query(collection(db, 'users'), where('clienteIds', 'array-contains-any', myCids));
+    }
     const snap = await getDocs(q);
     teamUsers = snap.docs
       .map(d => ({ uid: d.id, ...d.data() }))
