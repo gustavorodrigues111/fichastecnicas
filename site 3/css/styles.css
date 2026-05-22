@@ -3,10 +3,10 @@
 
 :root {
   /* Backgrounds */
-  --bg:        var(--bg)fff;
+  --bg:        #ffffff;
   --bg2:       #f9fafb;
   --bg3:       #f3f4f6;
-  --card-bg:   var(--bg)fff;
+  --card-bg:   #ffffff;
   --border:    #e5e7eb;
   --border2:   #d1d5db;
   /* Texto */
