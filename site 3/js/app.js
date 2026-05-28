@@ -1,7 +1,7 @@
 /* ================================================================
    Fichas Técnicas — multi-tenant SPA (Firebase + vanilla JS)
    ================================================================ */
-const APP_BUILD = '20260522-V2-0430';
+const APP_BUILD = '20260522-V2-0440';
 console.info('%cAppMise build ' + APP_BUILD, 'color:#6366f1;font-weight:600;');
 
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -252,6 +252,19 @@ function canDeleteDish(cid, dish) {
 
 const canManageUsers = () => isMaster();
 const canManageClientes = () => isMaster();
+
+// Doc ref do PRÓPRIO usuário logado (schema v2): platform_users OU clientes/{cid}/team
+function currentUserDocRef() {
+  const uid = STATE.user?.uid;
+  if (!uid || !STATE.userDoc) return null;
+  if (STATE.userDoc.type === 'platform') return doc(db, 'platform_users', uid);
+  if (STATE.userDoc.type === 'restaurant') {
+    const cid = STATE.userDoc.cid || (STATE.userDoc.cids || [])[0];
+    if (!cid) return null;
+    return doc(db, 'clientes', cid, 'team', uid);
+  }
+  return null;
+}
 
 const ROLE_LABELS = {
   // Schema v2
@@ -1428,7 +1441,11 @@ function renderForcePasswordChange() {
           submitBtn.textContent = 'Salvando...';
           try {
             await updatePassword(auth.currentUser, a);
-            await setDoc(doc(db, 'users', auth.currentUser.uid), { mustChangePassword: deleteField(), passwordChangedAt: new Date().toISOString() }, { merge: true });
+            // Schema v2: grava no doc correto (platform_users OU clientes/{cid}/team)
+            const ref = currentUserDocRef();
+            if (ref) {
+              await setDoc(ref, { mustChangePassword: deleteField(), passwordChangedAt: new Date().toISOString() }, { merge: true });
+            }
             if (STATE.userDoc) { delete STATE.userDoc.mustChangePassword; }
             toast('Senha atualizada');
             route();

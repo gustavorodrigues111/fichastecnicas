@@ -161,10 +161,13 @@ service cloud.firestore {
       match /team/{uid} {
         // Quem tem acesso ao cid pode ver a equipe inteira
         allow read, list: if hasClienteAccess(cid);
-        // Master, staff do cid e dono do cid gerenciam equipe
-        allow create, update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid);
         // Próprio user lê seu doc
         allow read: if isSignedIn() && request.auth.uid == uid;
+        // Self-update limitado: o próprio user tira mustChangePassword no 1º login
+        allow update: if isSignedIn() && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword', 'passwordChangedAt']);
+        // Master, staff do cid e dono do cid gerenciam equipe
+        allow create, update, delete: if isMaster() || isStaffOf(cid) || isDonoOf(cid);
       }
 
       // ---------- dishes ----------
